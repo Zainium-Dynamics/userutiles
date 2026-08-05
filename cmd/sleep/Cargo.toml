@@ -1,0 +1,25 @@
+[package]
+name = "user_sleep"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX sleep — delay for a specified time"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_sleep"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sleep"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true

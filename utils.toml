@@ -1,0 +1,50 @@
+# user_utils — build/install configuration (TOML only, no JSON)
+#
+# SPDX-License-Identifier: GPL-3.0
+# Copyright (c) Zainium Dynamics
+#
+# Zainium paths: NO /usr — only /overlayer/syshub/{bin,sbin,lib,share,drivers,engine}
+#
+# scripts/install.sh reads [paths].prefix as its default PREFIX. Env vars
+# PREFIX / ZEX_PREFIX still override this file when set, so packaging /
+# cross-root installs don't need to edit this file.
+
+[project]
+name = "user_utils"
+organization = "Zainium Dynamics"
+license = "GPL-3.0"
+
+[paths]
+prefix = "/overlayer/syshub"
+bindir = "/bin"
+sbindir = "/sbin"
+libdir = "/lib"
+sharedir = "/share"
+driversdir = "/drivers"
+enginedir = "/engine"
+
+[build]
+profile = "release"
+
+[toolchain]
+# Zainium OS's real native libc is relibc-zainium (env = "relibc"), not musl
+# or glibc — see relibc/targets/x86_64-zainium-relibc.json. But relibc is
+# currently no_std + alloc only (per its own README); there is no std-capable
+# Rust sysroot for x86_64-zainium-relibc yet, and user_utils is ordinary std
+# Rust (clap, rayon, indicatif, ...), so it cannot target relibc directly
+# today. relibc.toml itself marks x86_64-zainium-linux-musl as
+# `buildable = false` / "independently-built" — i.e. explicitly a compat/
+# bring-up target, not the final native one.
+#
+# Given that, this musl cross-toolchain (from zairoot, the built Zainium OS
+# root) is the practical build target for now: bin/x86_64-zainium-linux-musl-gcc
+# plus the matching sysroot at x86_64-zainium-linux-musl/{bin,include,lib} —
+# a self-contained GCC 15 cross-compiler, so no extra -L/-I/--sysroot flags
+# are needed, just point the linker at its gcc. Revisit once relibc gains std
+# support.
+# Override via the ZAIROOT env var (e.g. a different mount point / CI path).
+# When this path or the gcc inside it doesn't exist, scripts/build.sh falls
+# back to the plain "musl-gcc" already configured in .cargo/config.toml.
+zairoot = "/run/media/alizain/ZAINIUM_DRIVE/zairoot/overlayer/syshub"
+musl_target = "x86_64-unknown-linux-musl"
+musl_cc = "x86_64-zainium-linux-musl-gcc"

@@ -1,0 +1,8 @@
+[package]
+name = "blueprint"
+version = "5.0.1"
+description = "CLI tool to generate and archive project directory tree blueprints"
+license = "no"
+maintainer = "Zainium Core Team"
+build_type = "static"
+libc_target = "musl"

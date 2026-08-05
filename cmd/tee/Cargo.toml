@@ -1,0 +1,25 @@
+[package]
+name = "user_tee"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX tee — read from stdin and write to files and stdout"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_tee"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tee"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true

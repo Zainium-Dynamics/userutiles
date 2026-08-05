@@ -1,0 +1,25 @@
+[package]
+name = "user_false"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX false — always fail"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_false"
+path = "src/lib.rs"
+
+[[bin]]
+name = "false"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true

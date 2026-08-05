@@ -1,0 +1,25 @@
+[package]
+name = "user_hostid"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX hostid — print the numeric identifier for the current host"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_hostid"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hostid"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true

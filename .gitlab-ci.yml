@@ -1,0 +1,135 @@
+# =============================================================================
+# user_utils — GitLab CI/CD
+# =============================================================================
+# Fix for empty/instant-failed pipelines:
+#   Settings -> CI/CD -> Runners -> enable "Turn on instance runners for this project"
+#
+# The `build:zainium-musl` job cross-builds for Zainium OS's own musl target
+# (x86_64-zainium-linux-musl, see targets/README.md) using a toolchain that
+# lives on a physical drive, not on GitLab.com's shared runners. It's tagged
+# for a self-hosted runner and `allow_failure: true` until that runner is
+# registered — it does not block the rest of the pipeline going green.
+# =============================================================================
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+stages:
+  - check
+  - test
+  - build
+
+variables:
+  CARGO_HOME: "$CI_PROJECT_DIR/.cargo-ci"
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  RUST_BACKTRACE: "1"
+  FF_TIMESTAMPS: "true"
+
+default:
+  image: rust:latest
+  interruptible: true
+
+.cargo_job:
+  cache:
+    key:
+      files:
+        - Cargo.lock
+      prefix: user_utils-cargo
+    paths:
+      - .cargo-ci/registry/
+      - .cargo-ci/git/
+      - target/
+    policy: pull-push
+  before_script:
+    - rustc --version && cargo --version
+
+# =============================================================================
+# check
+# =============================================================================
+
+check:
+  extends: .cargo_job
+  stage: check
+  script:
+    - cargo check --workspace
+
+clippy:
+  extends: .cargo_job
+  stage: check
+  script:
+    - rustup component add clippy
+    - cargo clippy --workspace --all-targets -- -D warnings
+
+fmt:
+  extends: .cargo_job
+  stage: check
+  script:
+    - rustup component add rustfmt
+    - cargo fmt --all -- --check
+  allow_failure: true
+
+# =============================================================================
+# test
+# =============================================================================
+
+test:
+  extends: .cargo_job
+  stage: test
+  timeout: 45m
+  script:
+    - cargo test --workspace
+
+# =============================================================================
+# build
+# =============================================================================
+
+# Host glibc build -- every discrete cmd/* binary.
+build:host:
+  extends: .cargo_job
+  stage: build
+  script:
+    - ./scripts/build.sh
+    - test -x target/release/cat
+    - test -x target/release/ls
+  artifacts:
+    name: "user_utils-host-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - target/release/
+    expire_in: 1 week
+
+# Generic musl target (rustup's x86_64-unknown-linux-musl, stable toolchain).
+build:musl:
+  extends: .cargo_job
+  stage: build
+  before_script:
+    - rustc --version && cargo --version
+    - rustup target add x86_64-unknown-linux-musl
+    - apt-get update -qq && apt-get install -y -qq musl-tools
+  script:
+    - TARGET=x86_64-unknown-linux-musl ./scripts/build.sh
+    - test -x target/x86_64-unknown-linux-musl/release/cat
+  artifacts:
+    name: "user_utils-musl-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - target/x86_64-unknown-linux-musl/release/
+    expire_in: 1 week
+
+# Zainium's native musl target (see targets/README.md) — needs the
+# crosstool-NG toolchain + pinned nightly from zairoot, only present on a
+# self-hosted runner.
+build:zainium-musl:
+  stage: build
+  tags:
+    - zainium
+  script:
+    - ./scripts/build-zainium.sh
+  artifacts:
+    name: "user_utils-zainium-musl-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - dist/zainium/
+    expire_in: 1 week
+  allow_failure: true

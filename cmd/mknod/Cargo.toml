@@ -1,0 +1,25 @@
+[package]
+name = "user_mknod"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX mknod — make block or character special files"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_mknod"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mknod"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true

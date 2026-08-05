@@ -1,0 +1,26 @@
+[package]
+name = "user_grep"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX grep — print lines that match patterns"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_grep"
+path = "src/lib.rs"
+
+[[bin]]
+name = "grep"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+regex = "1"
+
+
+[lints]
+workspace = true

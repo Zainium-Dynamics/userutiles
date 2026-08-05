@@ -1,0 +1,4 @@
+fn main() -> std::process::ExitCode {
+    let args: Vec<String> = std::env::args().collect();
+    trigger::entry::run(args)
+}

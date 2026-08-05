@@ -1,0 +1,25 @@
+[package]
+name = "user_uniq"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX uniq — report or omit repeated lines"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_uniq"
+path = "src/lib.rs"
+
+[[bin]]
+name = "uniq"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true

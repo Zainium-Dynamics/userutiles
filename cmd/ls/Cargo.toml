@@ -1,0 +1,26 @@
+[package]
+name = "user_ls"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX ls — list directory contents"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_ls"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ls"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+colored = "2"
+
+
+[lints]
+workspace = true

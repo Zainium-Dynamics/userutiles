@@ -1,0 +1,24 @@
+[package]
+name = "user_dd"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX dd — convert and copy a file"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_dd"
+path = "src/lib.rs"
+
+[[bin]]
+name = "dd"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+[lints]
+workspace = true

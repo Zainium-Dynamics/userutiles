@@ -1,0 +1,26 @@
+[package]
+name = "user_pkill"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX pkill — signal processes by name"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_pkill"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pkill"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+user_pgrep = { path = "../pgrep" }
+
+
+[lints]
+workspace = true

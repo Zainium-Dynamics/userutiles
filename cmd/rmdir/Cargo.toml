@@ -1,0 +1,25 @@
+[package]
+name = "user_rmdir"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX rmdir — remove empty directories"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_rmdir"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rmdir"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true

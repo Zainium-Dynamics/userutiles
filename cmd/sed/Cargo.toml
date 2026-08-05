@@ -1,0 +1,25 @@
+[package]
+name = "user_sed"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX sed — stream editor for filtering and transforming text"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_sed"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sed"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true

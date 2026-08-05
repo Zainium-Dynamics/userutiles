@@ -1,0 +1,21 @@
+[package]
+name = "usercore"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "Shared core for user_utils — UI, errors, exit codes (no uucore)"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "usercore"
+path = "src/lib.rs"
+
+[dependencies]
+colored = "2"
+libc = "0.2"
+thiserror = "1"
+
+[lints]
+workspace = true

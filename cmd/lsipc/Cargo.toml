@@ -1,0 +1,24 @@
+[package]
+name = "user_lsipc"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX lsipc — show information on System V IPC facilities"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_lsipc"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lsipc"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+[lints]
+workspace = true

@@ -1,0 +1,23 @@
+[package]
+name = "user_diff"
+version = "0.5.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX diff — compare files line by line"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+name = "user_diff"
+path = "src/lib.rs"
+
+[[bin]]
+name = "diff"
+path = "src/main.rs"
+
+[dependencies]
+user_diffutils = { path = "../diffutils" }
+
+[lints]
+workspace = true

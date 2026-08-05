@@ -1,0 +1,24 @@
+[package]
+name = "user_od"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX od — dump files in octal and other formats"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_od"
+path = "src/lib.rs"
+
+[[bin]]
+name = "od"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+[lints]
+workspace = true

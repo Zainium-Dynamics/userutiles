@@ -1,0 +1,25 @@
+[package]
+name = "user_realpath"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX realpath — print resolved path"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_realpath"
+path = "src/lib.rs"
+
+[[bin]]
+name = "realpath"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true

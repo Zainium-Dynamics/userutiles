@@ -1,0 +1,25 @@
+[package]
+name = "user_base64"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX base64 — base64 encode/decode data"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_base64"
+path = "src/lib.rs"
+
+[[bin]]
+name = "base64"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true

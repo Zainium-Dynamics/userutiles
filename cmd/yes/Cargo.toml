@@ -1,0 +1,25 @@
+[package]
+name = "user_yes"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX yes — output a string repeatedly until killed"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_yes"
+path = "src/lib.rs"
+
+[[bin]]
+name = "yes"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true

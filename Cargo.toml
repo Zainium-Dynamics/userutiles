@@ -1,0 +1,221 @@
+[workspace]
+resolver = "2"
+members = [
+ "core",
+ "cmd/arch",
+ "cmd/b2sum",
+ "cmd/base32",
+ "cmd/base64",
+ "cmd/basename",
+ "cmd/basenc",
+ "cmd/blockdev",
+ "cmd/blueprint",
+ "cmd/cal",
+ "cmd/cat",
+ "cmd/chcpu",
+ "cmd/chgrp",
+ "cmd/chmod",
+ "cmd/chown",
+ "cmd/chroot",
+ "cmd/cksum",
+ "cmd/clear",
+ "cmd/cmp",
+ "cmd/comm",
+ "cmd/cp",
+ "cmd/csplit",
+ "cmd/ctrlaltdel",
+ "cmd/cut",
+ "cmd/date",
+ "cmd/dd",
+ "cmd/df",
+ "cmd/diff",
+ "cmd/diffutils",
+ "cmd/dir",
+ "cmd/dircolors",
+ "cmd/dirname",
+ "cmd/dmesg",
+ "cmd/drive",
+ "cmd/du",
+ "cmd/echo",
+ "cmd/env",
+ "cmd/expand",
+ "cmd/expr",
+ "cmd/factor",
+ "cmd/false",
+ "cmd/find",
+ "cmd/fmt",
+ "cmd/fold",
+ "cmd/free",
+ "cmd/fsfreeze",
+ "cmd/grep",
+ "cmd/groups",
+ "cmd/head",
+ "cmd/hexdump",
+ "cmd/hostid",
+ "cmd/hostname",
+ "cmd/id",
+ "cmd/install",
+ "cmd/join",
+ "cmd/kill",
+ "cmd/last",
+ "cmd/link",
+ "cmd/ln",
+ "cmd/locate",
+ "cmd/logname",
+ "cmd/ls",
+ "cmd/lscpu",
+ "cmd/lsipc",
+ "cmd/lslocks",
+ "cmd/lsmem",
+ "cmd/lsns",
+ "cmd/mcookie",
+ "cmd/md5sum",
+ "cmd/mesg",
+ "cmd/mkdir",
+ "cmd/mkfifo",
+ "cmd/mknod",
+ "cmd/mktemp",
+ "cmd/more",
+ "cmd/mountpoint",
+ "cmd/mv",
+ "cmd/nice",
+ "cmd/nl",
+ "cmd/nohup",
+ "cmd/nologin",
+ "cmd/nproc",
+ "cmd/numfmt",
+ "cmd/od",
+ "cmd/paste",
+ "cmd/pathchk",
+ "cmd/pgrep",
+ "cmd/pinky",
+ "cmd/pkill",
+ "cmd/pr",
+ "cmd/printenv",
+ "cmd/printf",
+ "cmd/prio",
+ "cmd/ps",
+ "cmd/ptx",
+ "cmd/pwd",
+ "cmd/readlink",
+ "cmd/realpath",
+ "cmd/renice",
+ "cmd/rev",
+ "cmd/rm",
+ "cmd/rmdir",
+ "cmd/sed",
+ "cmd/seq",
+ "cmd/setpgid",
+ "cmd/setsid",
+ "cmd/sha1sum",
+ "cmd/sha224sum",
+ "cmd/sha256sum",
+ "cmd/sha384sum",
+ "cmd/sha512sum",
+ "cmd/shred",
+ "cmd/shuf",
+ "cmd/sleep",
+ "cmd/sort",
+ "cmd/split",
+ "cmd/stat",
+ "cmd/stdbuf",
+ "cmd/struct",
+ "cmd/stty",
+ "cmd/sum",
+ "cmd/sync",
+ "cmd/sys",
+ "cmd/tac",
+ "cmd/tail",
+ "cmd/tar",
+ "cmd/tee",
+ "cmd/test",
+ "cmd/timeout",
+ "cmd/touch",
+ "cmd/tr",
+ "cmd/trace",
+ "cmd/tree",
+ "cmd/trigger",
+ "cmd/true",
+ "cmd/truncate",
+ "cmd/tsort",
+ "cmd/tty",
+ "cmd/uname",
+ "cmd/unexpand",
+ "cmd/uniq",
+ "cmd/unlink",
+ "cmd/updatedb",
+ "cmd/uptime",
+ "cmd/users",
+ "cmd/uuidgen",
+ "cmd/vdir",
+ "cmd/wc",
+ "cmd/which",
+ "cmd/who",
+ "cmd/whoami",
+ "cmd/xargs",
+ "cmd/yes",
+ "cmd/user-seccomp",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.70"
+license = "GPL-3.0"
+authors = ["Zainium Dynamics"]
+
+# Every `unsafe` block must carry a real `// SAFETY:` justification —
+# matches the discipline already enforced in zainix-kernel/relibc-zainium
+# and the near-zero-unsafe bar oxideutils already meets. Each member crate
+# opts in via `[lints]\nworkspace = true` in its own Cargo.toml.
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"
+not_unsafe_ptr_arg_deref = "deny"
+
+# Shared dependency versions, matching zex-native/elevate's convention —
+# crates opt in with `dep = { workspace = true }` instead of repinning a
+# version locally. Not every cmd/* crate has been migrated to reference
+# these yet (that's a larger, separate pass); this table exists so newly
+# touched crates converge on one version instead of drifting.
+[workspace.dependencies]
+usercore = { path = "core" }
+clap = { version = "4", features = ["derive"] }
+libc = "0.2"
+colored = "2"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+anyhow = "1"
+thiserror = "1"
+regex = "1"
+rayon = "1.8"
+walkdir = "2"
+indicatif = { version = "0.17", features = ["rayon"] }
+crossbeam-channel = "0.5"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+filetime = "0.2"
+xattr = "1"
+bytesize = "1"
+tempfile = "3"
+assert_cmd = "2"
+predicates = "3"
+
+# Optimized for a fleet of small discrete binaries: size and cold-start
+# latency matter as much as throughput here, matching the same tradeoff
+# zex-native/elevate makes. `panic = "abort"` only affects this profile —
+# `cargo test`/`cargo build` (dev/test profiles) are unaffected and keep
+# unwinding, so the test harness still isolates per-test panics normally.
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "s"
+strip = "symbols"
+panic = "abort"
+
+# Opt-in profile for throughput-sensitive builds (bulk copy/move/hash paths
+# in cp, mv, drive, the checksum utils) where raw speed matters more than
+# binary size: `cargo build --profile release-fast`.
+[profile.release-fast]
+inherits = "release"
+opt-level = 3

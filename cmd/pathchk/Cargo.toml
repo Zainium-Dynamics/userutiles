@@ -1,0 +1,25 @@
+[package]
+name = "user_pathchk"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX pathchk — check whether pathnames are valid or portable"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_pathchk"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pathchk"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true

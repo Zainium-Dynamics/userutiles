@@ -1,0 +1,25 @@
+[package]
+name = "user_sys"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZainiumOS System Inspector & Manager — zex sys"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_sys"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sys"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+sysinfo = { version = "0.29", default-features = false }
+chrono = "0.4"
+
+[lints]
+workspace = true

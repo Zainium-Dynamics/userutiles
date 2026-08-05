@@ -1,0 +1,25 @@
+[package]
+name = "user_unlink"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX unlink — call the unlink function to remove the specified file"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_unlink"
+path = "src/lib.rs"
+
+[[bin]]
+name = "unlink"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true

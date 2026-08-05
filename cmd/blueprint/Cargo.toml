@@ -1,0 +1,25 @@
+[package]
+name = "blueprint"
+version = "5.0.1"
+edition = "2021"
+description = "CLI tool to generate and archive project directory tree blueprints"
+license = "MIT"
+authors = ["Zainium Dynamics"]
+keywords = ["cli", "filesystem", "tree", "developer-tools"]
+categories = ["command-line-utilities", "development-tools"]
+
+[lib]
+name = "blueprint"
+path = "src/lib.rs"
+
+[[bin]]
+name = "blueprint"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+walkdir = "2.5"
+
+[lints]
+workspace = true

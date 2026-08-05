@@ -1,0 +1,23 @@
+[package]
+name = "user_nologin"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX nologin — politely refuse a login"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_nologin"
+path = "src/lib.rs"
+
+[[bin]]
+name = "nologin"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+
+[lints]
+workspace = true

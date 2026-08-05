@@ -1,0 +1,24 @@
+[package]
+name = "user_last"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX last — show a listing of last logged-in users"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_last"
+path = "src/lib.rs"
+
+[[bin]]
+name = "last"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+[lints]
+workspace = true

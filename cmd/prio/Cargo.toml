@@ -1,0 +1,37 @@
+[package]
+name = "prio"
+version = "1.0.0"
+edition = "2021"
+authors = ["Zainium Dynamics"]
+description = "ZainiumOS Process Priority & Resource Scheduler"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/zainiumos/prio"
+keywords = ["process", "priority", "scheduler", "zainium", "cgroup"]
+categories = ["command-line-utilities", "os"]
+rust-version = "1.75"
+
+[[bin]]
+name = "prio"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive", "color"] }
+colored = "2.1"
+thiserror = "1.0"
+libc = "0.2"
+sysinfo = "0.30"
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+ctrlc = { version = "3.4", features = ["termination"] }
+indexmap = "2.2"
+rayon = "1.9"
+rayon-core = "1.12"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.0"
+tempfile = "3.9"
+
+[lints]
+workspace = true

@@ -1,0 +1,24 @@
+[package]
+name = "user_touch"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX touch — change file timestamps / create empty files"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_touch"
+path = "src/lib.rs"
+
+[[bin]]
+name = "touch"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+[lints]
+workspace = true

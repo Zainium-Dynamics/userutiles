@@ -1,0 +1,25 @@
+[package]
+name = "user_hostname"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX hostname — show or set system host name"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_hostname"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hostname"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true

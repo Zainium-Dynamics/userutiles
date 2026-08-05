@@ -1,0 +1,23 @@
+[package]
+name = "user_cmp"
+version = "0.5.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX cmp — compare two files byte by byte"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+name = "user_cmp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cmp"
+path = "src/main.rs"
+
+[dependencies]
+user_diffutils = { path = "../diffutils" }
+
+[lints]
+workspace = true

@@ -1,0 +1,24 @@
+[package]
+name = "user_install"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX install — copy files and set attributes"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_install"
+path = "src/lib.rs"
+
+[[bin]]
+name = "install"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+[lints]
+workspace = true

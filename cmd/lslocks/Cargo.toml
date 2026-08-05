@@ -1,0 +1,23 @@
+[package]
+name = "user_lslocks"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX lslocks — list local system locks"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_lslocks"
+path = "src/lib.rs"
+
+[[bin]]
+name = "lslocks"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+
+[lints]
+workspace = true

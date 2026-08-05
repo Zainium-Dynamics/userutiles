@@ -1,0 +1,24 @@
+[package]
+name = "user_locate"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX locate — list files in databases that match a pattern"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_locate"
+path = "src/lib.rs"
+
+[[bin]]
+name = "locate"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+[lints]
+workspace = true

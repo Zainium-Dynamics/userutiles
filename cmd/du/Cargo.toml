@@ -1,0 +1,26 @@
+[package]
+name = "user_du"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX du — estimate file space usage"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_du"
+path = "src/lib.rs"
+
+[[bin]]
+name = "du"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+colored = "2"
+
+
+[lints]
+workspace = true

@@ -1,0 +1,25 @@
+[package]
+name = "user_chown"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX chown — change file owner and group"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_chown"
+path = "src/lib.rs"
+
+[[bin]]
+name = "chown"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true

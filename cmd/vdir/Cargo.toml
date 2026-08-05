@@ -1,0 +1,26 @@
+[package]
+name = "user_vdir"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX vdir — list directory contents in long format"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_vdir"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vdir"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+user_ls = { path = "../ls" }
+
+
+[lints]
+workspace = true

@@ -1,0 +1,23 @@
+[package]
+name = "user_ctrlaltdel"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX ctrlaltdel — set the function of the Ctrl-Alt-Del combination"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_ctrlaltdel"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ctrlaltdel"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+
+[lints]
+workspace = true

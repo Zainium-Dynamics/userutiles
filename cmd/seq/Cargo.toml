@@ -1,0 +1,25 @@
+[package]
+name = "user_seq"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX seq — print a sequence of numbers"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_seq"
+path = "src/lib.rs"
+
+[[bin]]
+name = "seq"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+
+[lints]
+workspace = true
