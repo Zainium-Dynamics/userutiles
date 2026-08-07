@@ -507,7 +507,7 @@ fn is_ascii_printable(byte: u8) -> bool {
 
 #[inline]
 fn format_octal(byte: u8, buf: &mut [u8; 3]) -> &str {
-    *buf = [b' ', b' ', b'0'];
+    *buf = *b"  0";
 
     let mut num = byte;
     let mut idx = 2; // Start at the last position in the buffer
@@ -695,8 +695,8 @@ fn report_difference(from_byte: u8, to_byte: u8, at_byte: usize, at_line: usize,
     };
     print!(
         "{} {} differ: {term} {}, line {}",
-        &params.from.to_string_lossy(),
-        &params.to.to_string_lossy(),
+        params.from.to_string_lossy(),
+        params.to.to_string_lossy(),
         at_byte,
         at_line
     );

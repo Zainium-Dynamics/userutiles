@@ -16,6 +16,7 @@ name = "mv"
 path = "src/main.rs"
 
 [dependencies]
+usercore = { path = "../../core" }
 clap = { version = "4", features = ["derive", "cargo"] }
 rayon = "1.8"
 walkdir = "2"

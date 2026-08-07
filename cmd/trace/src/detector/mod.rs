@@ -1,5 +1,5 @@
-pub mod os;
 pub mod kernel;
+pub mod os;
 
-pub use os::OsInfo;
 pub use kernel::KernelInfo;
+pub use os::OsInfo;

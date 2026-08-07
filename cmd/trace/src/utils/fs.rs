@@ -1,6 +1,6 @@
+use crate::utils::TraceResult;
 use std::fs;
 use std::path::Path;
-use crate::utils::TraceResult;
 
 pub fn ensure_output_dir(path: &str) -> TraceResult<()> {
     if !Path::new(path).exists() {

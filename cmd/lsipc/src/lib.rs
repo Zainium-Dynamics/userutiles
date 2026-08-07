@@ -5,8 +5,10 @@ mod columns;
 mod model;
 mod render;
 
-use columns::{ColumnFlags, resolve_columns};
-use render::{Entry, NameCache, OutputMode, Row, TimeFormat, cell_value, now_unix, render_pretty, render_rows};
+use columns::{resolve_columns, ColumnFlags};
+use render::{
+    cell_value, now_unix, render_pretty, render_rows, Entry, NameCache, OutputMode, Row, TimeFormat,
+};
 use usercore::Ui;
 
 const HELP: &str = "Usage: lsipc [options]\n\
@@ -260,7 +262,14 @@ pub fn run() -> i32 {
                 return 1;
             }
         };
-        render_output(output_mode, "ipclimits", &columns, opts.noheadings, &rows, opts.shell);
+        render_output(
+            output_mode,
+            "ipclimits",
+            &columns,
+            opts.noheadings,
+            &rows,
+            opts.shell,
+        );
         return 0;
     }
 
@@ -280,7 +289,14 @@ pub fn run() -> i32 {
             return 1;
         }
     };
-    render_output(output_mode, table_name, &columns, opts.noheadings, &rows, opts.shell);
+    render_output(
+        output_mode,
+        table_name,
+        &columns,
+        opts.noheadings,
+        &rows,
+        opts.shell,
+    );
     0
 }
 
@@ -331,11 +347,25 @@ fn describe_rows(
     Ok(rows)
 }
 
-fn build_row(entry: &Entry, columns: &[&'static str], opts: &Options, clock: &Clock, names: &mut NameCache) -> Row {
+fn build_row(
+    entry: &Entry,
+    columns: &[&'static str],
+    opts: &Options,
+    clock: &Clock,
+    names: &mut NameCache,
+) -> Row {
     columns
         .iter()
         .map(|&col| {
-            let val = cell_value(entry, col, opts.bytes, opts.numeric_perms, clock.format, clock.now, names);
+            let val = cell_value(
+                entry,
+                col,
+                opts.bytes,
+                opts.numeric_perms,
+                clock.format,
+                clock.now,
+                names,
+            );
             (col, val)
         })
         .collect()
@@ -401,40 +431,135 @@ fn finish_single(
     if mode == OutputMode::Pretty {
         render_pretty(row, elements.as_deref());
     } else {
-        render_output(mode, table_name, columns, false, std::slice::from_ref(row), false);
+        render_output(
+            mode,
+            table_name,
+            columns,
+            false,
+            std::slice::from_ref(row),
+            false,
+        );
     }
 }
 
-fn global_rows(opts: &Options, no_kind_given: bool, columns: &[&'static str]) -> Result<Vec<Row>, String> {
+fn global_rows(
+    opts: &Options,
+    no_kind_given: bool,
+    columns: &[&'static str],
+) -> Result<Vec<Row>, String> {
     let mut rows = Vec::new();
     let in_bytes = opts.bytes;
 
     if opts.queues || no_kind_given {
         let limits = model::read_msg_limits()?;
         let count = model::read_msg_table(None)?.len() as u64;
-        rows.push(global_row(columns, "MSGMNI", "Number of System V message queues", Some(count), limits.mni, true));
-        rows.push(global_row(columns, "MSGMAX", "Max size of System V message (bytes)", None, limits.max, in_bytes));
-        rows.push(global_row(columns, "MSGMNB", "Default max size of System V queue (bytes)", None, limits.mnb, in_bytes));
+        rows.push(global_row(
+            columns,
+            "MSGMNI",
+            "Number of System V message queues",
+            Some(count),
+            limits.mni,
+            true,
+        ));
+        rows.push(global_row(
+            columns,
+            "MSGMAX",
+            "Max size of System V message (bytes)",
+            None,
+            limits.max,
+            in_bytes,
+        ));
+        rows.push(global_row(
+            columns,
+            "MSGMNB",
+            "Default max size of System V queue (bytes)",
+            None,
+            limits.mnb,
+            in_bytes,
+        ));
     }
     if opts.shmems || no_kind_given {
         let limits = model::read_shm_limits()?;
         let entries = model::read_shm_table(None)?;
         let page_size = page_size()?;
         let pages = entries.iter().map(|e| e.size).sum::<u64>() / page_size;
-        rows.push(global_row(columns, "SHMMNI", "Shared memory segments", Some(entries.len() as u64), limits.mni, true));
-        rows.push(global_row(columns, "SHMALL", "Shared memory pages", Some(pages), limits.all, true));
-        rows.push(global_row(columns, "SHMMAX", "Max size of shared memory segment (bytes)", None, limits.max, in_bytes));
-        rows.push(global_row(columns, "SHMMIN", "Min size of shared memory segment (bytes)", None, limits.min, in_bytes));
+        rows.push(global_row(
+            columns,
+            "SHMMNI",
+            "Shared memory segments",
+            Some(entries.len() as u64),
+            limits.mni,
+            true,
+        ));
+        rows.push(global_row(
+            columns,
+            "SHMALL",
+            "Shared memory pages",
+            Some(pages),
+            limits.all,
+            true,
+        ));
+        rows.push(global_row(
+            columns,
+            "SHMMAX",
+            "Max size of shared memory segment (bytes)",
+            None,
+            limits.max,
+            in_bytes,
+        ));
+        rows.push(global_row(
+            columns,
+            "SHMMIN",
+            "Min size of shared memory segment (bytes)",
+            None,
+            limits.min,
+            in_bytes,
+        ));
     }
     if opts.semaphores || no_kind_given {
         let limits = model::read_sem_limits()?;
         let entries = model::read_sem_table(None)?;
         let total_nsems: u64 = entries.iter().map(|e| e.nsems).sum();
-        rows.push(global_row(columns, "SEMMNI", "Number of semaphore identifiers", Some(entries.len() as u64), limits.mni, true));
-        rows.push(global_row(columns, "SEMMNS", "Total number of semaphores", Some(total_nsems), limits.mns, true));
-        rows.push(global_row(columns, "SEMMSL", "Max semaphores per semaphore set", None, limits.msl, true));
-        rows.push(global_row(columns, "SEMOPM", "Max number of operations per semop(2)", None, limits.opm, true));
-        rows.push(global_row(columns, "SEMVMX", "Semaphore max value", None, limits.vmx, true));
+        rows.push(global_row(
+            columns,
+            "SEMMNI",
+            "Number of semaphore identifiers",
+            Some(entries.len() as u64),
+            limits.mni,
+            true,
+        ));
+        rows.push(global_row(
+            columns,
+            "SEMMNS",
+            "Total number of semaphores",
+            Some(total_nsems),
+            limits.mns,
+            true,
+        ));
+        rows.push(global_row(
+            columns,
+            "SEMMSL",
+            "Max semaphores per semaphore set",
+            None,
+            limits.msl,
+            true,
+        ));
+        rows.push(global_row(
+            columns,
+            "SEMOPM",
+            "Max number of operations per semop(2)",
+            None,
+            limits.opm,
+            true,
+        ));
+        rows.push(global_row(
+            columns,
+            "SEMVMX",
+            "Semaphore max value",
+            None,
+            limits.vmx,
+            true,
+        ));
     }
 
     Ok(rows)
@@ -455,7 +580,10 @@ fn global_row(
                 "RESOURCE" => Some(resource.to_string()),
                 "DESCRIPTION" => Some(description.to_string()),
                 "LIMIT" => Some(size_desc(limit, in_bytes)),
-                "USED" => Some(used.map(|u| size_desc(u, in_bytes)).unwrap_or_else(|| "-".to_string())),
+                "USED" => Some(
+                    used.map(|u| size_desc(u, in_bytes))
+                        .unwrap_or_else(|| "-".to_string()),
+                ),
                 "USE%" => Some(
                     used.map(|u| format!("{:.2}%", (u as f64) / (limit as f64) * 100.0))
                         .unwrap_or_else(|| "-".to_string()),

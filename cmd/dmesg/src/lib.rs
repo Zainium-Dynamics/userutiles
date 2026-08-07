@@ -175,11 +175,17 @@ fn parse_relative_datetime(s: &str) -> Option<DateTime<FixedOffset>> {
         "now" => return Some(now),
         "today" => {
             let midnight = now.date_naive().and_hms_opt(0, 0, 0)?;
-            return Local.from_local_datetime(&midnight).single().map(|d| d.fixed_offset());
+            return Local
+                .from_local_datetime(&midnight)
+                .single()
+                .map(|d| d.fixed_offset());
         }
         "yesterday" => {
             let midnight = (now.date_naive() - chrono::Duration::days(1)).and_hms_opt(0, 0, 0)?;
-            return Local.from_local_datetime(&midnight).single().map(|d| d.fixed_offset());
+            return Local
+                .from_local_datetime(&midnight)
+                .single()
+                .map(|d| d.fixed_offset());
         }
         _ => {}
     }
@@ -519,8 +525,8 @@ fn parse_args(args: &[String]) -> Result<Options, String> {
         let mut set = HashSet::new();
         for list in &facility_raw {
             for item in list.split(',') {
-                let f = Facility::parse(item)
-                    .ok_or_else(|| format!("unknown facility '{item}'"))?;
+                let f =
+                    Facility::parse(item).ok_or_else(|| format!("unknown facility '{item}'"))?;
                 set.insert(f);
             }
         }
@@ -861,7 +867,10 @@ mod tests {
 
         let two_days_ago = parse_datetime("2 days ago").unwrap();
         let diff_secs = (now - two_days_ago).num_seconds();
-        assert!((172_795..=172_805).contains(&diff_secs), "diff_secs={diff_secs}");
+        assert!(
+            (172_795..=172_805).contains(&diff_secs),
+            "diff_secs={diff_secs}"
+        );
 
         assert!(parse_datetime("30 minutes ago").is_ok());
         assert!(parse_datetime("3 weeks ago").is_ok());

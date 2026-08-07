@@ -132,10 +132,7 @@ fn binary(a: &str, op: &str, b: &str, bracket: bool) -> i32 {
                 // (exit 1) — the two are observably different to callers
                 // (e.g. `if`/`&&` chains, scripts checking `$?`).
                 let bad = if a.parse::<i64>().is_err() { a } else { b };
-                eprintln!(
-                    "{}: {bad}: integer expression expected",
-                    prog(bracket)
-                );
+                eprintln!("{}: {bad}: integer expression expected", prog(bracket));
                 2
             }
         },
@@ -271,8 +268,20 @@ mod tests {
         let b = dir.join("b");
         std::fs::write(&a, b"a").unwrap();
         std::fs::write(&b, b"b").unwrap();
-        assert_eq!(eval(&args(&[a.to_str().unwrap(), "-ef", a.to_str().unwrap()]), false), 0);
-        assert_eq!(eval(&args(&[a.to_str().unwrap(), "-ef", b.to_str().unwrap()]), false), 1);
+        assert_eq!(
+            eval(
+                &args(&[a.to_str().unwrap(), "-ef", a.to_str().unwrap()]),
+                false
+            ),
+            0
+        );
+        assert_eq!(
+            eval(
+                &args(&[a.to_str().unwrap(), "-ef", b.to_str().unwrap()]),
+                false
+            ),
+            1
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

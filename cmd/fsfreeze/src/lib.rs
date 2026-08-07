@@ -110,7 +110,10 @@ fn freeze_or_thaw(mountpoint: &str, freeze: bool) -> io::Result<()> {
     let file = File::open(mountpoint)?;
     let metadata = file.metadata()?;
     if !metadata.is_dir() {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "not a directory"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "not a directory",
+        ));
     }
 
     let code = if freeze { FIFREEZE } else { FITHAW };
@@ -179,10 +182,8 @@ mod tests {
 
     #[test]
     fn freeze_on_regular_file_is_rejected_as_not_a_directory() {
-        let path = std::env::temp_dir().join(format!(
-            "user-fsfreeze-test-file-{}",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("user-fsfreeze-test-file-{}", std::process::id()));
         std::fs::write(&path, b"not a directory").unwrap();
         let err = freeze_or_thaw(path.to_str().unwrap(), true).unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::InvalidInput);

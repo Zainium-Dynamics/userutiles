@@ -13,10 +13,40 @@ pub(crate) const SEM_ALL: [&str; 2] = ["NSEMS", "OTIME"];
 pub(crate) const SUMMARY_ALL: [&str; 5] = ["RESOURCE", "DESCRIPTION", "USED", "USE%", "LIMIT"];
 
 const ALL_COLUMN_NAMES: [&str; 34] = [
-    "KEY", "ID", "OWNER", "PERMS", "CUID", "CUSER", "CGID", "CGROUP", "UID", "USER", "GID",
-    "GROUP", "CTIME", "USEDBYTES", "MSGS", "SEND", "RECV", "LSPID", "LRPID", "SIZE", "NATTCH",
-    "STATUS", "ATTACH", "DETACH", "COMMAND", "CPID", "LPID", "NSEMS", "OTIME", "RESOURCE",
-    "DESCRIPTION", "USED", "USE%", "LIMIT",
+    "KEY",
+    "ID",
+    "OWNER",
+    "PERMS",
+    "CUID",
+    "CUSER",
+    "CGID",
+    "CGROUP",
+    "UID",
+    "USER",
+    "GID",
+    "GROUP",
+    "CTIME",
+    "USEDBYTES",
+    "MSGS",
+    "SEND",
+    "RECV",
+    "LSPID",
+    "LRPID",
+    "SIZE",
+    "NATTCH",
+    "STATUS",
+    "ATTACH",
+    "DETACH",
+    "COMMAND",
+    "CPID",
+    "LPID",
+    "NSEMS",
+    "OTIME",
+    "RESOURCE",
+    "DESCRIPTION",
+    "USED",
+    "USE%",
+    "LIMIT",
 ];
 
 /// `(name, title)` pairs, for `-H`-equivalent help text and the `-i` pretty
@@ -211,7 +241,15 @@ pub(crate) fn resolve_columns(
     let not_applicable: Vec<&str> = list
         .iter()
         .copied()
-        .filter(|&name| !column_applies_to(name, flags.queues, flags.shmems, flags.semaphores, flags.global))
+        .filter(|&name| {
+            !column_applies_to(
+                name,
+                flags.queues,
+                flags.shmems,
+                flags.semaphores,
+                flags.global,
+            )
+        })
         .collect();
     let warning = (!not_applicable.is_empty()).then(|| {
         format!(
@@ -241,7 +279,14 @@ pub(crate) fn column_title(name: &'static str) -> &'static str {
 mod tests {
     use super::*;
 
-    fn flags(queues: bool, shmems: bool, semaphores: bool, global: bool, creator: bool, time: bool) -> ColumnFlags {
+    fn flags(
+        queues: bool,
+        shmems: bool,
+        semaphores: bool,
+        global: bool,
+        creator: bool,
+        time: bool,
+    ) -> ColumnFlags {
         ColumnFlags {
             queues,
             shmems,

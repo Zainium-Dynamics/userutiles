@@ -27,7 +27,10 @@ pub(crate) fn read_all(path: &str) -> Result<Vec<Record>, String> {
     // `setutxent`/`getutxent`/`endutxent` calls to use instead of the
     // default `/var/run/utmp`; `path_c` stays alive for the whole call.
     if unsafe { libc::utmpxname(path_c.as_ptr()) } != 0 {
-        return Err(format!("cannot open {path}: {}", std::io::Error::last_os_error()));
+        return Err(format!(
+            "cannot open {path}: {}",
+            std::io::Error::last_os_error()
+        ));
     }
 
     let mut out = Vec::new();

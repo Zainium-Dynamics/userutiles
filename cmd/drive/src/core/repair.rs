@@ -24,7 +24,8 @@ pub fn run_repair(device: &str, dry_run: bool) -> Result<()> {
 
     if is_mounted(&dev_path) {
         print_error(&format!("{dev_path} is currently mounted — unmount first"));
-        println!("  {} Run: {}",
+        println!(
+            "  {} Run: {}",
             "→".bright_cyan(),
             format!("drive umount {dev_path}").bright_blue()
         );
@@ -83,7 +84,8 @@ pub fn run_repair(device: &str, dry_run: bool) -> Result<()> {
         }
         RepairResult::Failed(reason) => {
             print_error(&format!("Repair failed: {reason}"));
-            println!("  {} Consider cloning the device before further attempts: {}",
+            println!(
+                "  {} Consider cloning the device before further attempts: {}",
                 "→".bright_cyan(),
                 format!("drive clone {dev_path} /dev/TARGET").bright_blue()
             );
@@ -92,7 +94,8 @@ pub fn run_repair(device: &str, dry_run: bool) -> Result<()> {
             print_warning(&format!(
                 "Automatic repair not supported for filesystem: {fs_type}"
             ));
-            println!("  {} Check the manual for: {}",
+            println!(
+                "  {} Check the manual for: {}",
                 "→".bright_cyan(),
                 format!("man fsck.{fs_type}").bright_blue()
             );

@@ -2,7 +2,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use usercore::Ui;
+use usercore::{protect, Ui};
 
 /// Entry point for the `rmdir` utility. Parses `std::env::args()` and
 /// removes each `DIRECTORY`, which must be empty, optionally walking up and
@@ -76,6 +76,11 @@ pub fn run() -> i32 {
 /// `ui` on failure — unless the only reason it failed was non-emptiness and
 /// `ignore_fail` is set, in which case it's silently skipped.
 fn remove_one(d: &std::path::Path, ignore_fail: bool, verbose: bool, ui: &Ui, status: &mut i32) {
+    if let Some(reason) = protect::removal_denied(d) {
+        ui.err(&format!("failed to remove '{}': {}", d.display(), reason.message()));
+        *status = 1;
+        return;
+    }
     match fs::remove_dir(d) {
         Ok(()) => {
             if verbose {
@@ -103,6 +108,11 @@ fn remove_with_ancestors(
 ) {
     let mut cur = d.to_path_buf();
     loop {
+        if let Some(reason) = protect::removal_denied(&cur) {
+            ui.err(&format!("failed to remove '{}': {}", cur.display(), reason.message()));
+            *status = 1;
+            break;
+        }
         match fs::remove_dir(&cur) {
             Ok(()) => {
                 if verbose {
@@ -219,7 +229,8 @@ mod tests {
 
     #[test]
     fn remove_missing_directory_errors() {
-        let missing = std::env::temp_dir().join(format!("user_rmdir_missing_{}", std::process::id()));
+        let missing =
+            std::env::temp_dir().join(format!("user_rmdir_missing_{}", std::process::id()));
         let ui = Ui::with_color("rmdir", false);
         let mut status = 0;
         remove_one(&missing, false, false, &ui, &mut status);

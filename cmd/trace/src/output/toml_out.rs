@@ -76,7 +76,6 @@ pub fn format_toml(data: &TraceData) -> crate::utils::TraceResult<String> {
         timestamp: chrono::Local::now().to_rfc3339(),
     };
 
-    toml::to_string_pretty(&out).map_err(|e| {
-        crate::utils::TraceError::SerializationError(format!("TOML: {e}"))
-    })
+    toml::to_string_pretty(&out)
+        .map_err(|e| crate::utils::TraceError::SerializationError(format!("TOML: {e}")))
 }

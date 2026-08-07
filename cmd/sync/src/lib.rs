@@ -67,9 +67,8 @@ Synchronize cached writes to persistent storage.\n\n\
 /// Open `path` and sync it (or the filesystem containing it, or just its
 /// data) according to the `-f`/`-d` flags, then close it.
 fn sync_path(path: &std::path::Path, data_only: bool, file_sys: bool) -> std::io::Result<()> {
-    let c = CString::new(path.as_os_str().as_bytes()).map_err(|_| {
-        std::io::Error::new(std::io::ErrorKind::InvalidInput, "path contains NUL")
-    })?;
+    let c = CString::new(path.as_os_str().as_bytes())
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "path contains NUL"))?;
     // SAFETY: `c` is a valid, NUL-terminated `CString` built from
     // `path`'s bytes and kept alive across this call, so `c.as_ptr()` is
     // a valid C string pointer; `open(2)` cannot invoke UB regardless

@@ -1,5 +1,5 @@
 //! user yes
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{self, Write};
 pub fn run() -> i32 {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--help" || a == "-h") {

@@ -21,7 +21,15 @@ List the ranges of available memory with their online status.\n\n\
   -h, --help            display this help and exit\n\
       --version         output version information and exit\n";
 
-const ALL_COLUMNS: [&str; 7] = ["RANGE", "SIZE", "STATE", "REMOVABLE", "BLOCK", "NODE", "ZONES"];
+const ALL_COLUMNS: [&str; 7] = [
+    "RANGE",
+    "SIZE",
+    "STATE",
+    "REMOVABLE",
+    "BLOCK",
+    "NODE",
+    "ZONES",
+];
 const DEFAULT_COLUMNS: [&str; 5] = ["RANGE", "SIZE", "STATE", "REMOVABLE", "BLOCK"];
 /// Columns whose differing values across otherwise-adjacent blocks force
 /// them apart even without `-a`/`-S` — a coalesced row can't show two
@@ -157,7 +165,11 @@ pub fn run() -> i32 {
     };
     blocks.sort_by_key(|b| b.index);
 
-    let rows = if opts.all { blocks.clone() } else { coalesce(&blocks, &split_keys) };
+    let rows = if opts.all {
+        blocks.clone()
+    } else {
+        coalesce(&blocks, &split_keys)
+    };
 
     // The summary lines are a plain-table-only convention: real lsmem
     // doesn't append them to `-J`/`-P` output unless `--summary` is given
@@ -184,7 +196,11 @@ pub fn run() -> i32 {
 
 fn resolve_columns(output: Option<&str>, output_all: bool) -> Result<Vec<&'static str>, String> {
     let base = || -> Vec<&'static str> {
-        if output_all { ALL_COLUMNS.to_vec() } else { DEFAULT_COLUMNS.to_vec() }
+        if output_all {
+            ALL_COLUMNS.to_vec()
+        } else {
+            DEFAULT_COLUMNS.to_vec()
+        }
     };
     let Some(spec) = output else {
         return Ok(base());
@@ -218,7 +234,10 @@ fn resolve_columns(output: Option<&str>, output_all: bool) -> Result<Vec<&'stati
 /// selected output columns (matches real `lsmem` — including `NODE`/`ZONES`
 /// via `-o`/`--output-all` splits ranges even without an explicit `-S`).
 /// `-S/--split` adds any further named columns explicitly.
-fn resolve_split_keys(columns: &[&'static str], split: Option<&str>) -> Result<Vec<&'static str>, String> {
+fn resolve_split_keys(
+    columns: &[&'static str],
+    split: Option<&str>,
+) -> Result<Vec<&'static str>, String> {
     let mut keys: Vec<&'static str> = vec!["STATE", "REMOVABLE"];
     for &optional in &["NODE", "ZONES"] {
         if columns.contains(&optional) && !keys.contains(&optional) {
@@ -436,8 +455,10 @@ fn print_table(columns: &[&'static str], rows: &[Block], opts: &Options) {
     }
     if opts.pairs {
         for row in rows {
-            let cells: Vec<String> =
-                columns.iter().map(|&c| format!("{c}=\"{}\"", cell(c, row, opts.bytes))).collect();
+            let cells: Vec<String> = columns
+                .iter()
+                .map(|&c| format!("{c}=\"{}\"", cell(c, row, opts.bytes)))
+                .collect();
             println!("{}", cells.join(" "));
         }
         return;
@@ -462,7 +483,13 @@ fn print_table(columns: &[&'static str], rows: &[Block], opts: &Options) {
         } else {
             let cells: Vec<String> = columns
                 .iter()
-                .map(|&c| pad(&cell(c, row, opts.bytes), column_width(c), column_right_aligned(c)))
+                .map(|&c| {
+                    pad(
+                        &cell(c, row, opts.bytes),
+                        column_width(c),
+                        column_right_aligned(c),
+                    )
+                })
                 .collect();
             println!("{}", cells.join(" ").trim_end());
         }
@@ -503,7 +530,10 @@ fn json_value(col: &str, row: &Block, bytes: bool) -> String {
     match col {
         "SIZE" if bytes => row.len.to_string(),
         "REMOVABLE" => row.removable.to_string(),
-        "NODE" => row.node.map(|n| n.to_string()).unwrap_or_else(|| "null".to_string()),
+        "NODE" => row
+            .node
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| "null".to_string()),
         _ => json_string(&cell(col, row, bytes)),
     }
 }
@@ -525,8 +555,16 @@ fn json_string(s: &str) -> String {
 }
 
 fn print_summary(blocks: &[Block], block_size: u64, bytes: bool) {
-    let total_online: u64 = blocks.iter().filter(|b| b.state == "online").map(|b| b.len).sum();
-    let total_offline: u64 = blocks.iter().filter(|b| b.state != "online").map(|b| b.len).sum();
+    let total_online: u64 = blocks
+        .iter()
+        .filter(|b| b.state == "online")
+        .map(|b| b.len)
+        .sum();
+    let total_offline: u64 = blocks
+        .iter()
+        .filter(|b| b.state != "online")
+        .map(|b| b.len)
+        .sum();
 
     let fmt = |n: u64| if bytes { n.to_string() } else { human_size(n) };
     summary_line("Memory block size:", &fmt(block_size));
@@ -619,13 +657,19 @@ mod tests {
 
     #[test]
     fn coalesce_does_not_merge_differing_state() {
-        let blocks = vec![block(0, 0, 100, "online", false), block(1, 100, 100, "offline", false)];
+        let blocks = vec![
+            block(0, 0, 100, "online", false),
+            block(1, 100, 100, "offline", false),
+        ];
         assert_eq!(coalesce(&blocks, &["STATE", "REMOVABLE"]).len(), 2);
     }
 
     #[test]
     fn coalesce_splits_on_zones_when_requested() {
-        let mut blocks = vec![block(0, 0, 100, "online", false), block(1, 100, 100, "online", false)];
+        let mut blocks = vec![
+            block(0, 0, 100, "online", false),
+            block(1, 100, 100, "online", false),
+        ];
         blocks[1].zones = "DMA32".into();
         // Without ZONES as a split key, these merge (same state/removable).
         assert_eq!(coalesce(&blocks, &["STATE", "REMOVABLE"]).len(), 1);
@@ -645,9 +689,15 @@ mod tests {
 
     #[test]
     fn resolve_columns_defaults_and_output_all() {
-        assert_eq!(resolve_columns(None, false).unwrap(), DEFAULT_COLUMNS.to_vec());
+        assert_eq!(
+            resolve_columns(None, false).unwrap(),
+            DEFAULT_COLUMNS.to_vec()
+        );
         assert_eq!(resolve_columns(None, true).unwrap(), ALL_COLUMNS.to_vec());
-        assert_eq!(resolve_columns(Some("RANGE,NODE"), false).unwrap(), vec!["RANGE", "NODE"]);
+        assert_eq!(
+            resolve_columns(Some("RANGE,NODE"), false).unwrap(),
+            vec!["RANGE", "NODE"]
+        );
     }
 
     #[test]

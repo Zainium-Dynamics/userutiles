@@ -100,8 +100,7 @@ impl ChainedFileReader {
         let mut offset = 0;
         while self.ensure_current_file() {
             let remaining_in_buffer = (buf.len() - offset) as u64;
-            let nbytes =
-                remaining_in_buffer.min(self.remaining_bytes.unwrap_or(u64::MAX)) as usize;
+            let nbytes = remaining_in_buffer.min(self.remaining_bytes.unwrap_or(u64::MAX)) as usize;
             if nbytes == 0 {
                 break;
             }
@@ -430,12 +429,12 @@ fn print_hexdump_line(format: DisplayFormat, offset: u64, line_data: &[u8], out:
     print_offset(offset, format, out);
     match format {
         DisplayFormat::Canonical => print_canonical(line_data, out),
-        DisplayFormat::OneByteOctal => print_bytes(line_data, out, |b, o| {
-            o.push_str(&format!(" {b:03o}"))
-        }),
-        DisplayFormat::OneByteHex => print_bytes(line_data, out, |b, o| {
-            o.push_str(&format!("  {b:02x}"))
-        }),
+        DisplayFormat::OneByteOctal => {
+            print_bytes(line_data, out, |b, o| o.push_str(&format!(" {b:03o}")))
+        }
+        DisplayFormat::OneByteHex => {
+            print_bytes(line_data, out, |b, o| o.push_str(&format!("  {b:02x}")))
+        }
         DisplayFormat::OneByteChar => print_bytes(line_data, out, print_char_byte),
         DisplayFormat::TwoBytesDecimal => {
             print_words(line_data, 8, out, |w, o| o.push_str(&format!("   {w:05}")))
@@ -443,9 +442,9 @@ fn print_hexdump_line(format: DisplayFormat, offset: u64, line_data: &[u8], out:
         DisplayFormat::TwoBytesOctal => {
             print_words(line_data, 8, out, |w, o| o.push_str(&format!("  {w:06o}")))
         }
-        DisplayFormat::TwoBytesHex => {
-            print_words(line_data, 8, out, |w, o| o.push_str(&format!("    {w:04x}")))
-        }
+        DisplayFormat::TwoBytesHex => print_words(line_data, 8, out, |w, o| {
+            o.push_str(&format!("    {w:04x}"))
+        }),
         DisplayFormat::TwoBytesHexDefault => {
             print_words(line_data, 5, out, |w, o| o.push_str(&format!(" {w:04x}")))
         }
@@ -493,7 +492,11 @@ where
         byte_printer(byte, out);
     }
     // Pad every line to the same length, matching the original hexdump.
-    out.push_str(&format!("{:width$}\n", "", width = (16 - line_data.len()) * 4));
+    out.push_str(&format!(
+        "{:width$}\n",
+        "",
+        width = (16 - line_data.len()) * 4
+    ));
 }
 
 fn print_char_byte(byte: u8, out: &mut String) {
@@ -611,7 +614,10 @@ mod tests {
         let mut options = default_options();
         options.formats = vec![DisplayFormat::OneByteHex];
         let out = dump(&bytes, &options);
-        assert_eq!(out, "0000000  00  ff  41                                                    \n0000003\n");
+        assert_eq!(
+            out,
+            "0000000  00  ff  41                                                    \n0000003\n"
+        );
     }
 
     #[test]
@@ -620,7 +626,10 @@ mod tests {
         let mut options = default_options();
         options.formats = vec![DisplayFormat::OneByteChar];
         let out = dump(&bytes, &options);
-        assert_eq!(out, "0000000   A  \\n  \\0                                                    \n0000003\n");
+        assert_eq!(
+            out,
+            "0000000   A  \\n  \\0                                                    \n0000003\n"
+        );
     }
 
     #[test]
@@ -779,7 +788,10 @@ mod tests {
         std::fs::write(&f2, [4u8, 5, 6]).unwrap();
 
         let mut reader = ChainedFileReader::new(
-            vec![f1.to_string_lossy().into_owned(), f2.to_string_lossy().into_owned()],
+            vec![
+                f1.to_string_lossy().into_owned(),
+                f2.to_string_lossy().into_owned(),
+            ],
             None,
         );
         let mut buf = [0u8; 16];
@@ -792,7 +804,8 @@ mod tests {
 
     #[test]
     fn chained_file_reader_reports_open_errors() {
-        let mut reader = ChainedFileReader::new(vec!["/no/such/file-user-hexdump".to_string()], None);
+        let mut reader =
+            ChainedFileReader::new(vec!["/no/such/file-user-hexdump".to_string()], None);
         let mut buf = [0u8; 16];
         let n = reader.read(&mut buf);
         assert_eq!(n, 0);

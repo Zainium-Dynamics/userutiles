@@ -1,10 +1,9 @@
-//! Zainium protected paths — never removable via user_utils tools (even as root).
+//! Zainium protected paths — never removable or modifiable via user_utils tools (even as root).
 //!
 //! Rules:
-//! - `/overlayer/syshub` and everything under it: **cannot be deleted**
-//! - any `zaisys` directory and everything under it: **cannot be deleted**
-//! - any `zexlib` directory itself: **cannot be deleted**
-//! - contents *inside* `zexlib`: **may be deleted** (including under syshub)
+//! - `/overlayer/syshub` and everything under it: **cannot be modified or deleted**
+//! - any `zaisys` directory and everything under it: **cannot be modified or deleted**
+//! - `zexlib` (both root and contents): **fully modifiable and deletable**
 
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -12,6 +11,9 @@ use std::path::{Component, Path, PathBuf};
 /// Absolute tree that may never be removed (root or any descendant),
 /// except paths that fall under a `zexlib` content-allow exception.
 pub const PROTECTED_TREE_PREFIXES: &[&str] = &["/overlayer/syshub"];
+
+/// Absolute trees that may never be modified (no exceptions).
+pub const MODIFICATION_PREFIXES: &[&str] = &["/overlayer/syshub", "/overlayer/zaisys"];
 
 /// Directory basenames that are fully protected (self + descendants).
 pub const PROTECTED_TREE_NAMES: &[&str] = &["zaisys"];
@@ -26,8 +28,8 @@ pub enum ProtectReason {
     SyshubTree,
     /// `zaisys` directory or anything under it.
     ZaisysTree,
-    /// The `zexlib` directory itself (not its children).
-    ZexlibRoot,
+    /// `/overlayer/syshub` or `/overlayer/zaisys` tree (for modification block).
+    OverlayerTree,
 }
 
 impl ProtectReason {
@@ -37,8 +39,8 @@ impl ProtectReason {
                 "protected path: /overlayer/syshub cannot be removed (even as root)"
             }
             Self::ZaisysTree => "protected path: zaisys cannot be removed (even as root)",
-            Self::ZexlibRoot => {
-                "protected path: zexlib cannot be removed (contents inside may be deleted)"
+            Self::OverlayerTree => {
+                "protected path: core OS layers cannot be modified (even as root)"
             }
         }
     }
@@ -89,17 +91,12 @@ pub fn removal_denied(path: &Path) -> Option<ProtectReason> {
 
 /// Same as [`removal_denied`] but for an already-resolved absolute path.
 pub fn removal_denied_resolved(resolved: &Path) -> Option<ProtectReason> {
-    // 1) Inside zexlib (not the zexlib root) → always allow, even under syshub.
-    if is_inside_named_root(resolved, "zexlib") {
+    // 1) Inside zexlib or the zexlib root itself → always allow, even under syshub.
+    if is_named_root(resolved, "zexlib") || is_inside_named_root(resolved, "zexlib") {
         return None;
     }
 
-    // 2) The zexlib directory itself → deny.
-    if is_named_root(resolved, "zexlib") {
-        return Some(ProtectReason::ZexlibRoot);
-    }
-
-    // 3) zaisys root or anything under it → deny.
+    // 2) zaisys root or anything under it → deny.
     if is_named_root(resolved, "zaisys") || is_inside_named_root(resolved, "zaisys") {
         return Some(ProtectReason::ZaisysTree);
     }
@@ -113,6 +110,34 @@ pub fn removal_denied_resolved(resolved: &Path) -> Option<ProtectReason> {
     }
 
     let _ = (PROTECTED_TREE_NAMES, PROTECTED_ROOT_NAMES); // documented constants
+    None
+}
+
+/// Return `Some(reason)` if `path` must not be modified or overwritten.
+/// Stricter than `removal_denied`: no exception for `zexlib` contents,
+/// and guards both `/overlayer/syshub` and `/overlayer/zaisys` trees against any mutation.
+pub fn modification_denied(path: &Path) -> Option<ProtectReason> {
+    let resolved = resolve_path(path);
+    modification_denied_resolved(&resolved)
+}
+
+/// Same as [`modification_denied`] but for an already-resolved absolute path.
+pub fn modification_denied_resolved(resolved: &Path) -> Option<ProtectReason> {
+    for prefix in MODIFICATION_PREFIXES {
+        let p = Path::new(prefix);
+        if resolved == p || resolved.starts_with(p) {
+            return Some(ProtectReason::OverlayerTree);
+        }
+    }
+
+    if is_named_root(resolved, "zexlib") || is_inside_named_root(resolved, "zexlib") {
+        return None;
+    }
+
+    if is_named_root(resolved, "zaisys") || is_inside_named_root(resolved, "zaisys") {
+        return Some(ProtectReason::ZaisysTree);
+    }
+
     None
 }
 
@@ -151,25 +176,9 @@ mod tests {
     }
 
     #[test]
-    fn zexlib_root_blocked_contents_allowed() {
-        assert_eq!(
-            removal_denied_resolved(Path::new("/zexlib")),
-            Some(ProtectReason::ZexlibRoot)
-        );
-        assert_eq!(
-            removal_denied_resolved(Path::new("/overlayer/zexlib")),
-            Some(ProtectReason::ZexlibRoot)
-        );
-        assert_eq!(removal_denied_resolved(Path::new("/zexlib/pkg/foo")), None);
-        // Even under syshub, zexlib contents are removable.
-        assert_eq!(
-            removal_denied_resolved(Path::new("/overlayer/syshub/zexlib/cache/x")),
-            None
-        );
-        assert_eq!(
-            removal_denied_resolved(Path::new("/overlayer/syshub/zexlib")),
-            Some(ProtectReason::ZexlibRoot)
-        );
+    fn zexlib_allowed() {
+        assert_eq!(removal_denied_resolved(Path::new("/zexlib")), None);
+        assert_eq!(removal_denied_resolved(Path::new("/overlayer/zexlib")), None);
     }
 
     #[test]
@@ -189,5 +198,33 @@ mod tests {
         assert_eq!(removal_denied_resolved(Path::new("/tmp/foo")), None);
         assert_eq!(removal_denied_resolved(Path::new("/home/user/a")), None);
         assert_eq!(removal_denied_resolved(Path::new("/overlayer/other")), None);
+    }
+
+    #[test]
+    fn modification_denied_blocks_everything_in_syshub_and_zaisys() {
+        assert_eq!(
+            modification_denied_resolved(Path::new("/overlayer/syshub")),
+            Some(ProtectReason::OverlayerTree)
+        );
+        assert_eq!(
+            modification_denied_resolved(Path::new("/overlayer/syshub/bin/ls")),
+            Some(ProtectReason::OverlayerTree)
+        );
+        assert_eq!(
+            modification_denied_resolved(Path::new("/overlayer/zaisys")),
+            Some(ProtectReason::OverlayerTree)
+        );
+
+    }
+
+    #[test]
+    fn modification_denied_zexlib_exception() {
+        assert_eq!(modification_denied_resolved(Path::new("/overlayer/zexlib")), None);
+    }
+
+    #[test]
+    fn modification_denied_allows_unrelated() {
+        assert_eq!(modification_denied_resolved(Path::new("/tmp/foo")), None);
+        assert_eq!(modification_denied_resolved(Path::new("/overlayer-backup")), None);
     }
 }

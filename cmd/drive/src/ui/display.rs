@@ -23,11 +23,7 @@ pub fn print_success(msg: &str) {
 
 /// ⚠ warning message
 pub fn print_warning(msg: &str) {
-    println!(
-        "  {} {}",
-        "⚠".bright_yellow().bold(),
-        msg.bright_yellow()
-    );
+    println!("  {} {}", "⚠".bright_yellow().bold(), msg.bright_yellow());
 }
 
 /// ✖ error message

@@ -362,10 +362,18 @@ mod tests {
         };
 
         let human = calculate_cache_totals(&topo, false).unwrap();
-        assert!(!human.children[0].data.starts_with("32768"), "{:?}", human.children[0].data);
+        assert!(
+            !human.children[0].data.starts_with("32768"),
+            "{:?}",
+            human.children[0].data
+        );
 
         let bytes = calculate_cache_totals(&topo, true).unwrap();
-        assert!(bytes.children[0].data.starts_with("32768"), "{:?}", bytes.children[0].data);
+        assert!(
+            bytes.children[0].data.starts_with("32768"),
+            "{:?}",
+            bytes.children[0].data
+        );
     }
 
     #[test]
@@ -435,7 +443,12 @@ mod tests {
         if !cpu_base.exists() {
             return;
         }
-        let infos = collect(cpu_base, Path::new(PATH_SYS_KERNEL), PATH_PROC_CPUINFO, false);
+        let infos = collect(
+            cpu_base,
+            Path::new(PATH_SYS_KERNEL),
+            PATH_PROC_CPUINFO,
+            false,
+        );
         assert!(!infos.is_empty());
     }
 }

@@ -1,14 +1,14 @@
-pub mod syscalls;
-pub mod process;
-pub mod memory;
 pub mod cpu;
+pub mod memory;
 pub mod network;
+pub mod process;
+pub mod syscalls;
 
-pub use syscalls::{SyscallTracer, SyscallStats, SyscallInfo};
-pub use process::ProcessInfo;
-pub use memory::MemoryStats;
 pub use cpu::CpuStats;
+pub use memory::MemoryStats;
 pub use network::NetworkStats;
+pub use process::ProcessInfo;
+pub use syscalls::{SyscallInfo, SyscallStats, SyscallTracer};
 
 use crate::utils::TraceResult;
 

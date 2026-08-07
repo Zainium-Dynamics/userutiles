@@ -34,7 +34,8 @@ pub fn run_format(
     let fs = filesystem.to_lowercase();
     if !is_supported_fs(&fs) {
         print_error(&format!("Unsupported filesystem: {fs}"));
-        println!("  {} Supported: {}",
+        println!(
+            "  {} Supported: {}",
             "→".bright_cyan(),
             SUPPORTED_FS.join(", ").bright_magenta()
         );
@@ -45,7 +46,8 @@ pub fn run_format(
     let size = device_size_bytes(&dev_path);
 
     // --- Danger warning ---------------------------------------------------
-    println!("  {} {} All data on {} will be {} erased!",
+    println!(
+        "  {} {} All data on {} will be {} erased!",
         "⚠".bright_yellow(),
         "DANGER:".bright_yellow().bold(),
         dev_path.bright_blue(),
@@ -96,14 +98,16 @@ pub fn run_format(
         // btrfs gets compression hint
         if fs == "btrfs" {
             print_success("Filesystem created with compression support enabled");
-            println!("  {} Mount with {} for transparent compression",
+            println!(
+                "  {} Mount with {} for transparent compression",
                 "→".bright_cyan(),
                 "-o compress=zstd".bright_blue()
             );
         }
     } else {
         print_error("Formatting failed — check device and permissions");
-        println!("  {} Try running with {}",
+        println!(
+            "  {} Try running with {}",
             "→".bright_cyan(),
             "sudo".bright_blue()
         );

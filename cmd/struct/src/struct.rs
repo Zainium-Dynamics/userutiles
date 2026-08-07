@@ -569,7 +569,8 @@ mod tests {
     }
 
     fn tmp_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("user_struct_test_{}_{name}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("user_struct_test_{}_{name}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         dir
     }
@@ -578,10 +579,7 @@ mod tests {
     fn end_to_end_creates_nested_file_and_parents() {
         let root = tmp_dir("nested_file");
         let target = root.join("a/b/c/file.txt");
-        let code = run([
-            arg("struct"),
-            OsString::from(target.as_os_str()),
-        ]);
+        let code = run([arg("struct"), OsString::from(target.as_os_str())]);
         assert_eq!(code, EXIT_OK);
         assert!(target.is_file());
         assert!(root.join("a/b/c").is_dir());
@@ -613,11 +611,7 @@ mod tests {
     fn end_to_end_force_file_creates_extensionless_file() {
         let root = tmp_dir("force_file");
         let target = root.join("trigger");
-        let code = run([
-            arg("struct"),
-            arg("-t"),
-            OsString::from(target.as_os_str()),
-        ]);
+        let code = run([arg("struct"), arg("-t"), OsString::from(target.as_os_str())]);
         assert_eq!(code, EXIT_OK);
         assert!(target.is_file());
         let _ = fs::remove_dir_all(&root);
@@ -631,6 +625,9 @@ mod tests {
     #[test]
     fn meaningful_parent_skips_empty_relative_parent() {
         assert_eq!(meaningful_parent(Path::new("file.txt")), None);
-        assert_eq!(meaningful_parent(Path::new("dir/file.txt")), Some(Path::new("dir")));
+        assert_eq!(
+            meaningful_parent(Path::new("dir/file.txt")),
+            Some(Path::new("dir"))
+        );
     }
 }

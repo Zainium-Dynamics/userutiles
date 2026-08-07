@@ -40,7 +40,10 @@ fn golden_path_resolves_symlink() {
     let (stdout, stderr, code) = run(&[link.to_str().unwrap()]);
     assert_eq!(code, 0);
     assert!(stderr.is_empty());
-    assert_eq!(stdout.trim_end(), target.canonicalize().unwrap().to_str().unwrap());
+    assert_eq!(
+        stdout.trim_end(),
+        target.canonicalize().unwrap().to_str().unwrap()
+    );
 }
 
 #[test]

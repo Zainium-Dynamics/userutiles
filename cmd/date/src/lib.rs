@@ -1,6 +1,6 @@
 //! user date — print or set the system date and time.
 use std::ffi::CString;
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{self, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use usercore::Ui;
@@ -84,7 +84,7 @@ pub fn run() -> i32 {
         match std::fs::metadata(f) {
             Ok(m) => {
                 use std::os::unix::fs::MetadataExt;
-                m.mtime() as i64
+                m.mtime()
             }
             Err(e) => {
                 ui.err(&format!("{f}: {e}"));

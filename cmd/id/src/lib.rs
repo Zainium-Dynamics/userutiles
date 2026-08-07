@@ -187,7 +187,7 @@ fn get_groups() -> Vec<u32> {
             return vec![libc::getegid()];
         }
         buf.truncate(n as usize);
-        buf.into_iter().map(|g| g as u32).collect()
+        buf.into_iter().collect()
     }
 }
 

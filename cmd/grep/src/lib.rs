@@ -169,12 +169,21 @@ pub fn run() -> i32 {
 /// treated unsupported metacharacters (notably `[...]` character classes) as
 /// literal text and produced wrong — not just unsupported — results.
 enum Matcher {
-    Fixed { needle: String, icase: bool, word: bool },
+    Fixed {
+        needle: String,
+        icase: bool,
+        word: bool,
+    },
     Regex(regex::Regex),
 }
 
 impl Matcher {
-    fn new(pattern: &str, ignore_case: bool, fixed: bool, word: bool) -> Result<Self, regex::Error> {
+    fn new(
+        pattern: &str,
+        ignore_case: bool,
+        fixed: bool,
+        word: bool,
+    ) -> Result<Self, regex::Error> {
         if fixed || !has_meta(pattern) {
             let needle = if ignore_case {
                 pattern.to_ascii_lowercase()
@@ -200,7 +209,11 @@ impl Matcher {
 
     fn is_match(&self, line: &str) -> bool {
         match self {
-            Matcher::Fixed { needle, icase, word } => {
+            Matcher::Fixed {
+                needle,
+                icase,
+                word,
+            } => {
                 let owned;
                 let l: &str = if *icase {
                     owned = line.to_ascii_lowercase();

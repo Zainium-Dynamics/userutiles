@@ -62,7 +62,10 @@ pub fn run() -> i32 {
         let c = match CString::new(p.as_os_str().as_bytes()) {
             Ok(c) => c,
             Err(_) => {
-                ui.err(&format!("cannot create fifo '{}': path contains NUL", p.display()));
+                ui.err(&format!(
+                    "cannot create fifo '{}': path contains NUL",
+                    p.display()
+                ));
                 status = 1;
                 continue;
             }

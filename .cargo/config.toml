@@ -11,3 +11,10 @@ linker = "musl-gcc"
 # `cargo build` (no --target), so this doesn't affect the default path.
 [target.x86_64-zainium-linux-musl]
 linker = "x86_64-zainium-linux-musl-gcc"
+
+[unstable]
+json-target-spec = true
+build-std = ["core", "alloc", "std"]
+
+[build]
+target = "targets/x86_64-zainium-linux-musl.json"

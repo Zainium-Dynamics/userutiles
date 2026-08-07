@@ -241,7 +241,7 @@ fn list_dir(path: &Path, o: &Opts, show_header: bool, blank_before: bool) -> io:
 
     if o.long {
         // total blocks
-        let blocks: u64 = entries.iter().map(|(_, _, m)| m.blocks() as u64).sum();
+        let blocks: u64 = entries.iter().map(|(_, _, m)| m.blocks()).sum();
         println!("total {}", blocks / 2); // 512-byte to 1K blocks like GNU
         for (p, name, meta) in &entries {
             print_long(p, name, meta, o)?;
@@ -687,8 +687,7 @@ mod tests {
 
     #[test]
     fn list_path_missing_path_errors() {
-        let missing =
-            PathBuf::from(format!("/nonexistent_user_ls_test_{}", std::process::id()));
+        let missing = PathBuf::from(format!("/nonexistent_user_ls_test_{}", std::process::id()));
         let o = base_opts();
         assert!(list_path(&missing, &o, false, false).is_err());
     }

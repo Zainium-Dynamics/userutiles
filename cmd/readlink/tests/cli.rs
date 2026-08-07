@@ -53,7 +53,10 @@ fn canonicalize_flag_resolves_to_absolute_real_path() {
 
     let (stdout, _, code) = run(&["-f", link.to_str().unwrap()]);
     assert_eq!(code, 0);
-    assert_eq!(stdout.trim_end(), target.canonicalize().unwrap().to_str().unwrap());
+    assert_eq!(
+        stdout.trim_end(),
+        target.canonicalize().unwrap().to_str().unwrap()
+    );
 }
 
 #[test]

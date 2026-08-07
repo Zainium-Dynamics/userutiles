@@ -111,7 +111,10 @@ fn no_dereference_recreates_the_symlink_itself() {
         .success();
 
     let meta = fs::symlink_metadata(&dst).unwrap();
-    assert!(meta.file_type().is_symlink(), "-P must copy the link itself");
+    assert!(
+        meta.file_type().is_symlink(),
+        "-P must copy the link itself"
+    );
 }
 
 #[test]
@@ -128,7 +131,10 @@ fn dereference_copies_symlink_target_content() {
         .success();
 
     let meta = fs::symlink_metadata(&dst).unwrap();
-    assert!(!meta.file_type().is_symlink(), "-L must copy real content, not a link");
+    assert!(
+        !meta.file_type().is_symlink(),
+        "-L must copy real content, not a link"
+    );
     assert_eq!(fs::read(&dst).unwrap(), b"real content");
 }
 
@@ -211,9 +217,13 @@ fn reflink_auto_falls_back_silently_when_unsupported() {
     let dst = dir.path().join("b.txt");
     fs::write(&src, b"reflink me").unwrap();
 
-    cp().args(["--reflink=auto", src.to_str().unwrap(), dst.to_str().unwrap()])
-        .assert()
-        .success();
+    cp().args([
+        "--reflink=auto",
+        src.to_str().unwrap(),
+        dst.to_str().unwrap(),
+    ])
+    .assert()
+    .success();
 
     assert_eq!(fs::read(&dst).unwrap(), b"reflink me");
 }

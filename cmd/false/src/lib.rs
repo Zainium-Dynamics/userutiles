@@ -6,7 +6,9 @@
 ///
 /// Always returns 1, except for `--help`/`--version` which return 0.
 pub fn run() -> i32 {
-    let first = std::env::args_os().nth(1).map(|a| a.to_string_lossy().into_owned());
+    let first = std::env::args_os()
+        .nth(1)
+        .map(|a| a.to_string_lossy().into_owned());
     dispatch(first.as_deref())
 }
 

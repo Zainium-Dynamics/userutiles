@@ -101,7 +101,11 @@ pub fn run() -> i32 {
         i += 1;
     }
 
-    let base = if ignore_env { Vec::new() } else { env::vars().collect() };
+    let base = if ignore_env {
+        Vec::new()
+    } else {
+        env::vars().collect()
+    };
     let env_map = build_env(base, &unsets, &sets);
 
     if cmd.is_empty() {

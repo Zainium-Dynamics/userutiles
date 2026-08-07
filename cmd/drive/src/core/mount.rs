@@ -22,7 +22,8 @@ pub fn run_mount(device: &str, custom_mp: Option<&str>, verbose: bool) -> Result
     // Check device exists
     if !Path::new(&dev_path).exists() {
         print_error(&format!("Device not found: {dev_path}"));
-        println!("  {} Suggestion: run {} to see available devices",
+        println!(
+            "  {} Suggestion: run {} to see available devices",
             "→".bright_cyan(),
             "drive list".bright_blue()
         );
@@ -68,7 +69,8 @@ pub fn run_mount(device: &str, custom_mp: Option<&str>, verbose: bool) -> Result
         fs::create_dir_all(&mountpoint)
             .with_context(|| format!("Cannot create mountpoint {}", mountpoint.display()))?;
         if verbose {
-            println!("  {} Created mountpoint {}",
+            println!(
+                "  {} Created mountpoint {}",
                 "→".bright_cyan(),
                 mountpoint.display()
             );
@@ -106,7 +108,8 @@ pub fn run_mount(device: &str, custom_mp: Option<&str>, verbose: bool) -> Result
         }
         Err(e) => {
             print_error(&format!("Failed to execute mount: {e}"));
-            println!("  {} Suggestion: Try 'drive repair {device}' first",
+            println!(
+                "  {} Suggestion: Try 'drive repair {device}' first",
                 "→".bright_cyan()
             );
         }
@@ -184,7 +187,8 @@ pub fn run_umount(device: &str, verbose: bool) -> Result<()> {
                 print_error(&format!(
                     "Failed to unmount {dev_path} — device may be busy"
                 ));
-                println!("  {} Tip: check open files with {} or {}",
+                println!(
+                    "  {} Tip: check open files with {} or {}",
                     "→".bright_cyan(),
                     "lsof +f -- /mountpoint".bright_blue(),
                     "fuser -m /mountpoint".bright_blue()
@@ -266,7 +270,8 @@ fn current_mountpoint(dev: &str) -> Option<String> {
 }
 
 fn maybe_suggest_repair(device: &str) {
-    println!("  {} Suggestion: Try {}",
+    println!(
+        "  {} Suggestion: Try {}",
         "→".bright_cyan(),
         format!("drive repair {device}").bright_blue()
     );

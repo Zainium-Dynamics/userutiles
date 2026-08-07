@@ -181,20 +181,12 @@ impl Parser {
                 Some("+") => {
                     self.bump();
                     let r = self.parse_mul()?.as_int()?;
-                    left = Val::Int(
-                        left.as_int()?
-                            .checked_add(r)
-                            .ok_or("integer overflow")?,
-                    );
+                    left = Val::Int(left.as_int()?.checked_add(r).ok_or("integer overflow")?);
                 }
                 Some("-") => {
                     self.bump();
                     let r = self.parse_mul()?.as_int()?;
-                    left = Val::Int(
-                        left.as_int()?
-                            .checked_sub(r)
-                            .ok_or("integer overflow")?,
-                    );
+                    left = Val::Int(left.as_int()?.checked_sub(r).ok_or("integer overflow")?);
                 }
                 _ => break,
             }
@@ -209,11 +201,7 @@ impl Parser {
                 Some("*") | Some("\\*") => {
                     self.bump();
                     let r = self.parse_primary()?.as_int()?;
-                    left = Val::Int(
-                        left.as_int()?
-                            .checked_mul(r)
-                            .ok_or("integer overflow")?,
-                    );
+                    left = Val::Int(left.as_int()?.checked_mul(r).ok_or("integer overflow")?);
                 }
                 Some("/") => {
                     self.bump();
@@ -221,11 +209,7 @@ impl Parser {
                     if r == 0 {
                         return Err("division by zero".into());
                     }
-                    left = Val::Int(
-                        left.as_int()?
-                            .checked_div(r)
-                            .ok_or("integer overflow")?,
-                    );
+                    left = Val::Int(left.as_int()?.checked_div(r).ok_or("integer overflow")?);
                 }
                 Some("%") => {
                     self.bump();
@@ -233,11 +217,7 @@ impl Parser {
                     if r == 0 {
                         return Err("division by zero".into());
                     }
-                    left = Val::Int(
-                        left.as_int()?
-                            .checked_rem(r)
-                            .ok_or("integer overflow")?,
-                    );
+                    left = Val::Int(left.as_int()?.checked_rem(r).ok_or("integer overflow")?);
                 }
                 _ => break,
             }

@@ -151,7 +151,8 @@ fn run() -> Result<()> {
     if is_full_power {
         display::print_full_power_success(pid, dur.unwrap());
     } else if !cli.auto {
-        println!("  {:<14} {}",
+        println!(
+            "  {:<14} {}",
             colored::Colorize::bright_green("PID :"),
             colored::Colorize::bright_magenta(&*pid.to_string())
         );

@@ -13,7 +13,8 @@ pub fn run(_ctx: &Ctx) {
     // process starts — sorts deterministically instead of panicking.
     processes.sort_by(|a, b| b.cpu_usage().total_cmp(&a.cpu_usage()));
 
-    println!("  {} {} {} {} {}",
+    println!(
+        "  {} {} {} {} {}",
         theme::paint_pad(Tone::Green, "PID", 8),
         theme::paint_pad(Tone::Green, "Name", 28),
         theme::paint_pad(Tone::Green, "CPU%", 10),
@@ -33,9 +34,10 @@ pub fn run(_ctx: &Ctx) {
             Tone::Green
         };
         let status = format!("{:?}", proc.status());
-        println!("  {} {} {} {} {}",
+        println!(
+            "  {} {} {} {} {}",
             format!("{:<8}", proc.pid()),
-            theme::paint_pad(Tone::Purple, &proc.name().to_string(), 28),
+            theme::paint_pad(Tone::Purple, proc.name(), 28),
             theme::paint_pad(cpu_tone, &format!("{:.1}%", cpu), 10),
             theme::paint_pad(Tone::Blue, &format!("{} MB", mem_mb), 12),
             status

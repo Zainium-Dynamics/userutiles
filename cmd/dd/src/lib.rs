@@ -2,7 +2,8 @@
 use std::fs::OpenOptions;
 use std::io::{self, Read, Seek, SeekFrom, Write};
 
-use usercore::Ui;
+use std::path::Path;
+use usercore::{protect, Ui};
 
 /// Entry point for the `dd` utility. Parses `key=value` operands from
 /// `std::env::args()` (`if=`, `of=`, `bs=`, `ibs=`, `obs=`, `count=`,
@@ -127,6 +128,10 @@ pub fn run() -> i32 {
     let mut writer: Box<dyn Write> = if ofile == "-" {
         Box::new(io::stdout())
     } else {
+        if let Some(reason) = protect::modification_denied(Path::new(&ofile)) {
+            ui.err(&format!("{ofile}: {}", reason.message()));
+            return 1;
+        }
         let mut opts = OpenOptions::new();
         opts.write(true).create(true);
         if !conv_notrunc {

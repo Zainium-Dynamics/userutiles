@@ -1,4 +1,3 @@
-
 use log::LevelFilter;
 use std::io::Write;
 
@@ -11,13 +10,6 @@ pub fn init_logger(verbose: bool) {
 
     env_logger::Builder::new()
         .filter_level(level)
-        .format(|buf, record| {
-            writeln!(
-                buf,
-                "[{}] {}",
-                record.level(),
-                record.args()
-            )
-        })
+        .format(|buf, record| writeln!(buf, "[{}] {}", record.level(), record.args()))
         .init();
 }

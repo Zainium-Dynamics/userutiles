@@ -1,6 +1,6 @@
 //! user uname
 use std::ffi::CStr;
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{self, Write};
 use std::mem::MaybeUninit;
 
 #[derive(Default)]

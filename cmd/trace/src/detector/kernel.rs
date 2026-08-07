@@ -34,11 +34,7 @@ impl KernelInfo {
         #[cfg(target_arch = "arm")]
         return Ok("arm".to_string());
 
-        #[cfg(not(any(
-            target_arch = "x86_64",
-            target_arch = "aarch64",
-            target_arch = "arm"
-        )))]
+        #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "arm")))]
         return Ok("unknown".to_string());
     }
 }

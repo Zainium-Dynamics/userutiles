@@ -153,7 +153,11 @@ pub(crate) fn cell_value(
         "CGID" => Some(common.cgid.to_string()),
         "UID" => Some(common.uid.to_string()),
         "GID" => Some(common.gid.to_string()),
-        "OWNER" => Some(names.user(common.uid).unwrap_or_else(|| common.uid.to_string())),
+        "OWNER" => Some(
+            names
+                .user(common.uid)
+                .unwrap_or_else(|| common.uid.to_string()),
+        ),
         "CUSER" => names.user(common.cuid),
         "USER" => names.user(common.uid),
         "CGROUP" => names.group(common.cgid),
@@ -168,7 +172,13 @@ pub(crate) fn cell_value(
     }
 }
 
-fn shm_field(e: &ShmEntry, col: &str, bytes: bool, time_format: TimeFormat, now: i64) -> Option<String> {
+fn shm_field(
+    e: &ShmEntry,
+    col: &str,
+    bytes: bool,
+    time_format: TimeFormat,
+    now: i64,
+) -> Option<String> {
     match col {
         "SIZE" => Some(size_desc(e.size, bytes)),
         "NATTCH" => Some(e.nattch.to_string()),
@@ -195,7 +205,13 @@ fn sem_field(e: &SemEntry, col: &str, time_format: TimeFormat, now: i64) -> Opti
     }
 }
 
-fn msg_field(e: &MsgEntry, col: &str, bytes: bool, time_format: TimeFormat, now: i64) -> Option<String> {
+fn msg_field(
+    e: &MsgEntry,
+    col: &str,
+    bytes: bool,
+    time_format: TimeFormat,
+    now: i64,
+) -> Option<String> {
     match col {
         "USEDBYTES" => Some(size_desc(e.cbytes, bytes)),
         "MSGS" => Some(e.qnum.to_string()),
@@ -238,7 +254,10 @@ fn pid_command_line(pid: i32) -> Option<String> {
     if trimmed.is_empty() {
         return None;
     }
-    let joined: Vec<u8> = trimmed.iter().map(|&b| if b == 0 { b' ' } else { b }).collect();
+    let joined: Vec<u8> = trimmed
+        .iter()
+        .map(|&b| if b == 0 { b' ' } else { b })
+        .collect();
     Some(String::from_utf8_lossy(&joined).into_owned())
 }
 
@@ -350,7 +369,11 @@ fn format_time(format: TimeFormat, now: i64, time: i64) -> Option<String> {
             tm.tm_year + 1900
         ),
         TimeFormat::Iso => {
-            let tz_minutes = if tm.tm_isdst < 0 { 0 } else { tm.tm_gmtoff / 60 };
+            let tz_minutes = if tm.tm_isdst < 0 {
+                0
+            } else {
+                tm.tm_gmtoff / 60
+            };
             let tz_hours = tz_minutes / 60;
             let tz_minutes = (tz_minutes % 60).abs();
             format!(
@@ -396,7 +419,13 @@ pub(crate) fn now_unix() -> i64 {
 /// One row of already-resolved `(column, value)` cells, in column order.
 pub(crate) type Row = Vec<(&'static str, Option<String>)>;
 
-pub(crate) fn render_rows(mode: OutputMode, columns: &[&'static str], noheadings: bool, rows: &[Row], shell: bool) {
+pub(crate) fn render_rows(
+    mode: OutputMode,
+    columns: &[&'static str],
+    noheadings: bool,
+    rows: &[Row],
+    shell: bool,
+) {
     match mode {
         OutputMode::Table => render_table(columns, noheadings, rows, shell),
         OutputMode::Export => render_export(rows, ' ', shell),
@@ -480,14 +509,26 @@ fn render_table(columns: &[&'static str], noheadings: bool, rows: &[Row], shell:
     if !noheadings {
         let header: Vec<String> = columns
             .iter()
-            .map(|c| pad(&column_header(c, shell), column_width(c), column_right_aligned(c)))
+            .map(|c| {
+                pad(
+                    &column_header(c, shell),
+                    column_width(c),
+                    column_right_aligned(c),
+                )
+            })
             .collect();
         println!("{}", header.join(" ").trim_end());
     }
     for row in rows {
         let cells: Vec<String> = row
             .iter()
-            .map(|(col, val)| pad(val.as_deref().unwrap_or(""), column_width(col), column_right_aligned(col)))
+            .map(|(col, val)| {
+                pad(
+                    val.as_deref().unwrap_or(""),
+                    column_width(col),
+                    column_right_aligned(col),
+                )
+            })
             .collect();
         println!("{}", cells.join(" ").trim_end());
     }
@@ -497,7 +538,13 @@ fn render_export(rows: &[Row], separator: char, shell: bool) {
     for row in rows {
         let cells: Vec<String> = row
             .iter()
-            .map(|(col, val)| format!("{}=\"{}\"", column_header(col, shell), val.as_deref().unwrap_or("")))
+            .map(|(col, val)| {
+                format!(
+                    "{}=\"{}\"",
+                    column_header(col, shell),
+                    val.as_deref().unwrap_or("")
+                )
+            })
             .collect();
         let joiner = separator.to_string();
         println!("{}", cells.join(&joiner));
@@ -509,7 +556,10 @@ fn render_raw(columns: &[&'static str], noheadings: bool, rows: &[Row]) {
         println!("{}", columns.join(" "));
     }
     for row in rows {
-        let cells: Vec<String> = row.iter().map(|(_, val)| val.clone().unwrap_or_default()).collect();
+        let cells: Vec<String> = row
+            .iter()
+            .map(|(_, val)| val.clone().unwrap_or_default())
+            .collect();
         println!("{}", cells.join(" "));
     }
 }
@@ -545,7 +595,11 @@ pub(crate) fn render_json_named(table_name: &str, columns: &[&'static str], rows
             out.push_str("         ");
             out.push_str(&json_string(&col.to_lowercase()));
             out.push_str(": ");
-            out.push_str(&val.as_deref().map(json_string).unwrap_or_else(|| "null".to_string()));
+            out.push_str(
+                &val.as_deref()
+                    .map(json_string)
+                    .unwrap_or_else(|| "null".to_string()),
+            );
             if j + 1 < row.len() {
                 out.push(',');
             }

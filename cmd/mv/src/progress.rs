@@ -9,7 +9,7 @@
 // Bright Green — success tick (✓)
 // Bright Red — error indicator (only in ui.rs)
 
-use std::{collections::HashMap, path::PathBuf, time::Duration};
+use std::{collections::HashMap, path::{Path, PathBuf}, time::Duration};
 
 use bytesize::ByteSize;
 use crossbeam_channel::Receiver;
@@ -99,7 +99,7 @@ fn per_file_style() -> ProgressStyle {
         .progress_chars("━╸─")
 }
 
-fn display_name(path: &PathBuf) -> String {
+fn display_name(path: &Path) -> String {
     path.file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| path.display().to_string())

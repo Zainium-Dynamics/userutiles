@@ -214,7 +214,10 @@ mod tests {
 
     #[test]
     fn pretty_duration_singular_units() {
-        assert_eq!(pretty_duration(86400 + 3600 + 60), "1 day, 1 hour, 1 minute");
+        assert_eq!(
+            pretty_duration(86400 + 3600 + 60),
+            "1 day, 1 hour, 1 minute"
+        );
     }
 
     #[test]

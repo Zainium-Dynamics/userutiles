@@ -192,7 +192,8 @@ fn main() -> std::io::Result<()> {
     fs::write(&out_path, buf)?;
     println!("Man page written to: {}", out_path.display());
     println!("Install with:");
-    println!("  sudo cp {} /usr/local/share/man/man1/drive.1",
+    println!(
+        "  sudo cp {} /usr/local/share/man/man1/drive.1",
         out_path.display()
     );
     println!("  sudo mandb");

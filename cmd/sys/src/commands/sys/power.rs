@@ -17,7 +17,8 @@ pub fn run(_ctx: &Ctx) {
     if info.battery_present {
         if let Some(pct) = info.battery_percent {
             let bat_bar = theme::bar(pct as f64, 18);
-            println!("  {} {}% {}",
+            println!(
+                "  {} {}% {}",
                 theme::paint_pad(Tone::Green, "Battery", 18),
                 pct,
                 bat_bar
@@ -27,7 +28,8 @@ pub fn run(_ctx: &Ctx) {
             theme::kv_row("Battery Status", status);
         }
     } else {
-        println!("  {} Not present",
+        println!(
+            "  {} Not present",
             theme::paint_pad(Tone::Green, "Battery", 18)
         );
     }

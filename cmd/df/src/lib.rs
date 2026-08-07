@@ -181,12 +181,12 @@ fn statvfs(path: &str) -> io::Result<StatVfs> {
     // populated every field of `st`, so `assume_init` is sound.
     let st = unsafe { st.assume_init() };
     Ok(StatVfs {
-        blocks: st.f_blocks as u64,
-        bfree: st.f_bfree as u64,
-        bavail: st.f_bavail as u64,
-        bsize: st.f_frsize as u64,
-        files: st.f_files as u64,
-        ffree: st.f_ffree as u64,
+        blocks: st.f_blocks,
+        bfree: st.f_bfree,
+        bavail: st.f_bavail,
+        bsize: st.f_frsize,
+        files: st.f_files,
+        ffree: st.f_ffree,
     })
 }
 

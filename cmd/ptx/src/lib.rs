@@ -93,7 +93,10 @@ mod tests {
     #[test]
     fn permute_line_single_word_has_no_context() {
         let r = permute_line("hello");
-        assert_eq!(r, vec![("".to_string(), "hello".to_string(), "".to_string())]);
+        assert_eq!(
+            r,
+            vec![("".to_string(), "hello".to_string(), "".to_string())]
+        );
     }
 
     #[test]

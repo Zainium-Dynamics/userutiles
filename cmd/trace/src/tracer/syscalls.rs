@@ -23,11 +23,11 @@ pub struct SyscallTracer {
 
 impl SyscallTracer {
     pub fn new() -> Self {
-        let tracer = SyscallTracer {
+        
+        SyscallTracer {
             stats: HashMap::new(),
             syscall_names: Self::init_syscall_names(),
-        };
-        tracer
+        }
     }
 
     fn init_syscall_names() -> HashMap<u64, String> {

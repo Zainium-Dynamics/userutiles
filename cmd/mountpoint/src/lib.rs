@@ -152,7 +152,6 @@ fn device_number(path: &str) -> io::Result<(u32, u32)> {
 /// Splits a Linux `dev_t` into (major, minor), matching glibc's
 /// `gnu_dev_major`/`gnu_dev_minor` bit layout.
 fn split_devno(dev: libc::dev_t) -> (u32, u32) {
-    let dev = dev as u64;
     let major = ((dev >> 8) & 0xfff) | ((dev >> 32) & !0xfffu64);
     let minor = (dev & 0xff) | ((dev >> 12) & !0xffu64);
     (major as u32, minor as u32)

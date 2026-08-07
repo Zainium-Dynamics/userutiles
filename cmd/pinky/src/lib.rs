@@ -79,7 +79,11 @@ struct Entry {
 /// in-bounds regardless of whether a NUL is present, so this is both correct and
 /// entirely safe.
 fn fixed_cstr(buf: &[libc::c_char]) -> String {
-    let bytes: Vec<u8> = buf.iter().take_while(|&&c| c != 0).map(|&c| c as u8).collect();
+    let bytes: Vec<u8> = buf
+        .iter()
+        .take_while(|&&c| c != 0)
+        .map(|&c| c as u8)
+        .collect();
     String::from_utf8_lossy(&bytes).into_owned()
 }
 

@@ -26,6 +26,7 @@ use crate::{
     },
     progress, ui, verify,
 };
+use usercore::protect;
 
 pub fn run(args: Vec<String>) -> i32 {
     #[cfg(not(any(target_os = "linux", target_os = "redox")))]
@@ -53,10 +54,7 @@ pub fn run(args: Vec<String>) -> i32 {
     let dereference = resolve_dereference(&opts, recursive);
 
     if sources.len() > 1 && !dest.is_dir() {
-        ui::fatal(&format!(
-            "target '{}' is not a directory",
-            dest.display()
-        ));
+        ui::fatal(&format!("target '{}' is not a directory", dest.display()));
     }
 
     let file_opts = FileCopyOpts {
@@ -77,12 +75,17 @@ pub fn run(args: Vec<String>) -> i32 {
             }
         };
 
-        let effective_dest: std::path::PathBuf =
-            if dest.is_dir() && !opts.no_target_directory {
-                dest.join(src.file_name().unwrap_or_default())
-            } else {
-                dest.to_owned()
-            };
+        let effective_dest: std::path::PathBuf = if dest.is_dir() && !opts.no_target_directory {
+            dest.join(src.file_name().unwrap_or_default())
+        } else {
+            dest.to_owned()
+        };
+
+        if let Some(reason) = protect::modification_denied(&effective_dest) {
+            ui::err(&format!("cannot overwrite '{}': {}", effective_dest.display(), reason.message()));
+            status = 1;
+            continue;
+        }
 
         if opts.verbose || sources.len() > 1 {
             ui::kv("Source", &src.display().to_string());

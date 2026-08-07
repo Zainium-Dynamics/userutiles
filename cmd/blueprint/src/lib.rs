@@ -520,7 +520,10 @@ mod tests {
         std::os::unix::fs::symlink(&dir, dir.join("self_link")).expect("create symlink");
 
         let (output, stats) = generate_tree(&dir, "root", "proj").unwrap();
-        assert_eq!(stats.directories, 0, "symlink must not be counted as a directory to recurse into");
+        assert_eq!(
+            stats.directories, 0,
+            "symlink must not be counted as a directory to recurse into"
+        );
         assert!(output.contains("self_link"));
     }
 }

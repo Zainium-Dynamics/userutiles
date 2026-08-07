@@ -423,7 +423,11 @@ impl<'a> SysCpu<'a> {
         }
 
         if let Err(e) = self.write_value(&configure_path, if configure { "1" } else { "0" }) {
-            let op = if configure { "configure" } else { "deconfigure" };
+            let op = if configure {
+                "configure"
+            } else {
+                "deconfigure"
+            };
             Err(format!("CPU {cpu_index} {op} failed: {e}"))
         } else {
             Ok(format!("CPU {cpu_index} {new_state}"))
@@ -461,10 +465,7 @@ mod tests {
     fn tmp_cpu_root() -> PathBuf {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!(
-            "user-chcpu-test-{}-{n}",
-            std::process::id()
-        ));
+        let dir = std::env::temp_dir().join(format!("user-chcpu-test-{}-{n}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -486,10 +487,7 @@ mod tests {
     #[test]
     fn cpu_list_parses_mixed_commas_and_ranges() {
         let l = CpuList::parse("0,2,7,10-13").unwrap();
-        assert_eq!(
-            l.iter().collect::<Vec<_>>(),
-            vec![0, 2, 7, 10, 11, 12, 13]
-        );
+        assert_eq!(l.iter().collect::<Vec<_>>(), vec![0, 2, 7, 10, 11, 12, 13]);
     }
 
     #[test]
@@ -518,8 +516,14 @@ mod tests {
 
     #[test]
     fn dispatch_mode_parses_known_values() {
-        assert_eq!(DispatchMode::parse("horizontal").unwrap(), DispatchMode::Horizontal);
-        assert_eq!(DispatchMode::parse("vertical").unwrap(), DispatchMode::Vertical);
+        assert_eq!(
+            DispatchMode::parse("horizontal").unwrap(),
+            DispatchMode::Horizontal
+        );
+        assert_eq!(
+            DispatchMode::parse("vertical").unwrap(),
+            DispatchMode::Vertical
+        );
     }
 
     #[test]
@@ -573,7 +577,10 @@ mod tests {
         }
         let mut enabled = sys.enabled_cpu_list();
         let result = sys.enable_cpu(enabled.as_mut(), 0, false);
-        assert!(result.is_err(), "expected cpu0 disable to fail cleanly, got {result:?}");
+        assert!(
+            result.is_err(),
+            "expected cpu0 disable to fail cleanly, got {result:?}"
+        );
     }
 
     #[test]
@@ -643,9 +650,7 @@ mod tests {
 
         let sys = SysCpu::new(&root);
         let enabled = sys.enabled_cpu_list();
-        let msg = sys
-            .configure_cpu(enabled.as_ref(), 3, false)
-            .unwrap();
+        let msg = sys.configure_cpu(enabled.as_ref(), 3, false).unwrap();
         assert_eq!(msg, "CPU 3 deconfigured");
         assert_eq!(fs::read_to_string(cpu3.join("configure")).unwrap(), "0");
 
@@ -662,9 +667,7 @@ mod tests {
 
         let sys = SysCpu::new(&root);
         let enabled = sys.enabled_cpu_list();
-        let err = sys
-            .configure_cpu(enabled.as_ref(), 1, false)
-            .unwrap_err();
+        let err = sys.configure_cpu(enabled.as_ref(), 1, false).unwrap_err();
         assert!(err.contains("is enabled"));
 
         fs::remove_dir_all(&root).ok();

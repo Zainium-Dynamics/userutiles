@@ -97,7 +97,8 @@ fn snapshot_create(volume: &str, name: Option<&str>) -> Result<()> {
         }
         Err(e) => {
             print_error(&format!("Failed to execute btrfs: {e}"));
-            println!("  {} Make sure btrfs-progs is installed: {}",
+            println!(
+                "  {} Make sure btrfs-progs is installed: {}",
                 "→".bright_cyan(),
                 "pacman -S btrfs-progs".bright_blue()
             );
@@ -124,7 +125,8 @@ fn snapshot_list(volume: &str) -> Result<()> {
         return Ok(());
     }
 
-    println!("  {:<32} {:<20} {}",
+    println!(
+        "  {:<32} {:<20} {}",
         "NAME".bold().cyan(),
         "CREATED".bold().cyan(),
         "SIZE".bold().cyan(),
@@ -155,7 +157,8 @@ fn snapshot_list(volume: &str) -> Result<()> {
             .map(crate::utils::units::bytes_to_human)
             .unwrap_or_else(|| "-".to_string());
 
-        println!("  {:<32} {:<20} {}",
+        println!(
+            "  {:<32} {:<20} {}",
             name.bright_blue(),
             created.truecolor(160, 220, 255),
             size.bright_magenta(),
@@ -164,7 +167,8 @@ fn snapshot_list(volume: &str) -> Result<()> {
     }
 
     println!();
-    println!("  {} {} snapshot{}",
+    println!(
+        "  {} {} snapshot{}",
         "✓".bright_green(),
         count.to_string().bright_magenta(),
         if count == 1 { "" } else { "s" }
@@ -188,7 +192,8 @@ fn snapshot_delete(name: &str, skip_confirm: bool) -> Result<()> {
 
     if !snap_path.exists() {
         print_error(&format!("Snapshot not found: {name}"));
-        println!("  {} Run {} to see available snapshots",
+        println!(
+            "  {} Run {} to see available snapshots",
             "→".bright_cyan(),
             "drive snapshot list".bright_blue()
         );
@@ -274,7 +279,8 @@ fn snapshot_restore(name: &str, skip_confirm: bool) -> Result<()> {
     match status {
         Ok(s) if s.success() => {
             print_success(&format!("Writable restore created at {restore_target}"));
-            println!("  {} Reboot into recovery to swap subvolumes if needed",
+            println!(
+                "  {} Reboot into recovery to swap subvolumes if needed",
                 "→".bright_cyan()
             );
         }
@@ -340,12 +346,18 @@ mod tests {
         // A traversal name must be rejected by validation, never reaching
         // the snap_path.exists()/btrfs invocation.
         let result = snapshot_delete("../../etc/passwd", true);
-        assert!(result.is_ok(), "should return Ok(()) after printing an error, not Err");
+        assert!(
+            result.is_ok(),
+            "should return Ok(()) after printing an error, not Err"
+        );
     }
 
     #[test]
     fn snapshot_restore_rejects_path_traversal_before_touching_disk() {
         let result = snapshot_restore("../../etc", true);
-        assert!(result.is_ok(), "should return Ok(()) after printing an error, not Err");
+        assert!(
+            result.is_ok(),
+            "should return Ok(()) after printing an error, not Err"
+        );
     }
 }

@@ -11,8 +11,8 @@ mod utmpx;
 
 use std::collections::HashMap;
 
-use utmpx::{BOOT_TIME, DEAD_PROCESS, RUN_LVL, Record, USER_PROCESS};
 use usercore::Ui;
+use utmpx::{Record, BOOT_TIME, DEAD_PROCESS, RUN_LVL, USER_PROCESS};
 
 const HELP: &str = "Usage: last [options] [<username>...] [<tty>...]\n\
 Show a listing of last logged in users.\n\n\
@@ -155,7 +155,10 @@ pub fn run() -> i32 {
                     }
                 }
             }
-            s if s.len() > 1 && s.starts_with('-') && s[1..].chars().all(|c| c.is_ascii_digit()) => {
+            s if s.len() > 1
+                && s.starts_with('-')
+                && s[1..].chars().all(|c| c.is_ascii_digit()) =>
+            {
                 opts.limit = s[1..].parse().ok();
             }
             s if s.starts_with('-') && !s.starts_with("--") && s.len() > 1 => {
@@ -366,11 +369,19 @@ fn effective_end(s: &Session, until: Option<i64>) -> Display {
 }
 
 fn cutoff_display(kind: Kind) -> Display {
-    if kind == Kind::User { Display::Gone } else { Display::Open }
+    if kind == Kind::User {
+        Display::Gone
+    } else {
+        Display::Open
+    }
 }
 
 fn format_row(s: &Session, opts: &Options) -> String {
-    let host_resolved = if opts.dns { resolve_host(&s.host) } else { s.host.clone() };
+    let host_resolved = if opts.dns {
+        resolve_host(&s.host)
+    } else {
+        s.host.clone()
+    };
 
     let mut row = format!("{:<8} {:<12} ", s.user, s.line);
     if !opts.nohostname && !opts.hostlast {
@@ -392,7 +403,11 @@ fn format_row(s: &Session, opts: &Options) -> String {
 }
 
 fn format_time_part(s: &Session, disp: &Display, format: TimeFormat) -> String {
-    let running_word = if s.kind == Kind::User { "logged in" } else { "running" };
+    let running_word = if s.kind == Kind::User {
+        "logged in"
+    } else {
+        "running"
+    };
 
     if format == TimeFormat::NoTime {
         return match disp {
@@ -449,7 +464,11 @@ fn format_time_part(s: &Session, disp: &Display, format: TimeFormat) -> String {
 /// `"HH:MM"` — verified against the real binary across both single- and
 /// multi-day sessions.
 fn duration_paren_gap(duration: &str) -> &'static str {
-    if duration.contains('+') { " " } else { "  " }
+    if duration.contains('+') {
+        " "
+    } else {
+        "  "
+    }
 }
 
 /// In `full`/`iso` mode, the "down"/"crash"/end-datetime field is padded to
@@ -525,7 +544,11 @@ fn format_datetime(format: TimeFormat, t: i64) -> String {
     match format {
         TimeFormat::Short => format!(
             "{} {} {:2} {:02}:{:02}",
-            WEEKDAYS[tm.tm_wday as usize], MONTHS[tm.tm_mon as usize], tm.tm_mday, tm.tm_hour, tm.tm_min
+            WEEKDAYS[tm.tm_wday as usize],
+            MONTHS[tm.tm_mon as usize],
+            tm.tm_mday,
+            tm.tm_hour,
+            tm.tm_min
         ),
         TimeFormat::Full => format!(
             "{} {} {:2} {:02}:{:02}:{:02} {}",
@@ -538,7 +561,11 @@ fn format_datetime(format: TimeFormat, t: i64) -> String {
             tm.tm_year + 1900
         ),
         TimeFormat::Iso => {
-            let tz_minutes = if tm.tm_isdst < 0 { 0 } else { tm.tm_gmtoff / 60 };
+            let tz_minutes = if tm.tm_isdst < 0 {
+                0
+            } else {
+                tm.tm_gmtoff / 60
+            };
             let tz_hours = tz_minutes / 60;
             let tz_minutes = (tz_minutes % 60).abs();
             format!(
@@ -682,7 +709,11 @@ fn to_epoch(year: i32, month: i32, day: i32, hour: i32, minute: i32, second: i32
     // just fail to match any real records, which is acceptable for a CLI
     // date filter).
     let epoch = unsafe { libc::mktime(&mut tm) };
-    if epoch == -1 { None } else { Some(epoch as i64) }
+    if epoch == -1 {
+        None
+    } else {
+        Some(epoch as i64)
+    }
 }
 
 #[cfg(test)]
@@ -763,7 +794,10 @@ mod tests {
     #[test]
     fn duration_formats_days_when_present() {
         assert_eq!(format_duration(3600 * 5 + 60 * 24), "05:24");
-        assert_eq!(format_duration(86_400 * 16 + 3600 * 14 + 60 * 32), "16+14:32");
+        assert_eq!(
+            format_duration(86_400 * 16 + 3600 * 14 + 60 * 32),
+            "16+14:32"
+        );
     }
 
     #[test]

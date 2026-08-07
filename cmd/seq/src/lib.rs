@@ -184,22 +184,21 @@ mod tests {
 
     #[test]
     fn zero_increment_is_rejected() {
-        let err = parse_operands(&["1".to_string(), "0".to_string(), "9".to_string()])
-            .unwrap_err();
+        let err = parse_operands(&["1".to_string(), "0".to_string(), "9".to_string()]).unwrap_err();
         assert!(err.contains("zero increment"));
     }
 
     #[test]
     fn nan_increment_is_rejected_not_looped_forever() {
-        let err = parse_operands(&["1".to_string(), "nan".to_string(), "9".to_string()])
-            .unwrap_err();
+        let err =
+            parse_operands(&["1".to_string(), "nan".to_string(), "9".to_string()]).unwrap_err();
         assert!(err.contains("invalid floating point argument"));
     }
 
     #[test]
     fn infinite_increment_is_rejected() {
-        let err = parse_operands(&["1".to_string(), "inf".to_string(), "9".to_string()])
-            .unwrap_err();
+        let err =
+            parse_operands(&["1".to_string(), "inf".to_string(), "9".to_string()]).unwrap_err();
         assert!(err.contains("invalid floating point argument"));
     }
 

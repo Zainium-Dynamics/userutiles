@@ -50,7 +50,8 @@ pub fn run_health(device: Option<&str>, as_toml: bool) -> Result<()> {
     print_header("Health Status Report");
     println!();
 
-    println!("  {:<14} {:<16} {:<8} {:<8} {:<12} {:<10} {}",
+    println!(
+        "  {:<14} {:<16} {:<8} {:<8} {:<12} {:<10} {}",
         "DEVICE".bold().cyan(),
         "STATUS".bold().cyan(),
         "TEMP".bold().cyan(),
@@ -80,7 +81,8 @@ pub fn run_health(device: Option<&str>, as_toml: bool) -> Result<()> {
             None => "N/A".dimmed().to_string(),
         };
 
-        println!("  {:<14} {:<25} {:<17} {:<8} {:<12} {:<19} {}",
+        println!(
+            "  {:<14} {:<25} {:<17} {:<8} {:<12} {:<19} {}",
             dev.name.bright_blue(),
             status_dot,
             temp_str,

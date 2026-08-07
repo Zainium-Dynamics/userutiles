@@ -6,7 +6,7 @@ use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
 use std::io;
-use usercore::Ui;
+use usercore::{protect, Ui};
 
 /// Entry point for the `install` utility. Parses `std::env::args()` and
 /// either creates directories (`-d`) or copies SOURCE(s) to DEST, applying
@@ -105,6 +105,11 @@ pub fn run() -> i32 {
     if directory {
         let mut status = 0;
         for p in &paths {
+            if let Some(reason) = protect::modification_denied(p) {
+                ui.err(&format!("cannot create directory '{}': {}", p.display(), reason.message()));
+                status = 1;
+                continue;
+            }
             if let Err(e) = fs::create_dir_all(p) {
                 ui.err(&format!("cannot create directory '{}': {e}", p.display()));
                 status = 1;
@@ -146,6 +151,16 @@ pub fn run() -> i32 {
                     continue;
                 }
             }
+        }
+        if let Some(reason) = protect::modification_denied(&target) {
+            ui.err(&format!(
+                "cannot install '{}' to '{}': {}",
+                src.display(),
+                target.display(),
+                reason.message()
+            ));
+            status = 1;
+            continue;
         }
         if let Err(e) = copy_file(src, &target, mode.unwrap_or(0o755), preserve_ts) {
             ui.err(&format!(
@@ -315,10 +330,8 @@ mod tests {
     use std::path::PathBuf;
 
     fn scratch_dir(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "user_install_test_{tag}_{}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("user_install_test_{tag}_{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir

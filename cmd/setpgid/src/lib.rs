@@ -60,7 +60,11 @@ pub fn run() -> i32 {
     }
 
     if foreground {
-        if let Ok(tty) = std::fs::OpenOptions::new().read(true).write(true).open("/dev/tty") {
+        if let Ok(tty) = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("/dev/tty")
+        {
             // SAFETY: `tcsetpgrp`/`getpgrp` take a valid open fd and plain
             // integers; failure (e.g. no controlling tty) is reported via
             // errno only and is intentionally ignored, matching setpgid(1).

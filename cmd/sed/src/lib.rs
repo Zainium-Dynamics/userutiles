@@ -2,7 +2,8 @@
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 
-use usercore::Ui;
+use std::path::Path;
+use usercore::{protect, Ui};
 
 /// Entry point for the `sed` utility. Parses `std::env::args()` for a
 /// script (`-e SCRIPT` or the first bare operand) and zero or more input
@@ -116,14 +117,15 @@ fn parse_script(s: &str) -> Result<Vec<Cmd>, String> {
             let flags_and_rest = if parts.len() > 2 { parts[2] } else { "" };
             let flag_len: usize = flags_and_rest
                 .chars()
-                .take_while(|c| matches!(c, 'g' | 'p' | 'i' | 'I' | 'm' | 'M') || c.is_ascii_digit())
+                .take_while(|c| {
+                    matches!(c, 'g' | 'p' | 'i' | 'I' | 'm' | 'M') || c.is_ascii_digit()
+                })
                 .map(|c| c.len_utf8())
                 .sum();
             let flags = &flags_and_rest[..flag_len];
             let global = flags.contains('g');
             let delim_count = if parts.len() > 2 { 3 } else { 2 };
-            let consumed =
-                1 + delim.len_utf8() * delim_count + pat.len() + repl.len() + flag_len;
+            let consumed = 1 + delim.len_utf8() * delim_count + pat.len() + repl.len() + flag_len;
             cmds.push(Cmd::Subst { pat, repl, global });
             rest = rest
                 .get(consumed..)
@@ -177,6 +179,11 @@ fn split_delim(s: &str, d: char) -> Vec<&str> {
 /// `in_place` is set and `path` isn't `-`, the transformed lines are
 /// written back to `path` after processing.
 fn process_file(path: &str, cmds: &[Cmd], quiet: bool, in_place: bool) -> io::Result<()> {
+    if in_place && path != "-" {
+        if let Some(reason) = protect::modification_denied(Path::new(path)) {
+            return Err(io::Error::new(io::ErrorKind::PermissionDenied, reason.message()));
+        }
+    }
     let reader: Box<dyn BufRead> = if path == "-" {
         Box::new(BufReader::new(io::stdin()))
     } else {

@@ -99,13 +99,17 @@ fn parse_args(args: &[String]) -> Result<CalOptions, String> {
             "-n" | "--months" => {
                 i += 1;
                 let v = args.get(i).ok_or("option '-n' requires an argument")?;
-                months_flag =
-                    Some(v.parse::<u32>().map_err(|_| format!("bad usage: invalid months value '{v}'"))?);
+                months_flag = Some(
+                    v.parse::<u32>()
+                        .map_err(|_| format!("bad usage: invalid months value '{v}'"))?,
+                );
             }
             s if s.starts_with("--months=") => {
                 let v = &s["--months=".len()..];
-                months_flag =
-                    Some(v.parse::<u32>().map_err(|_| format!("bad usage: invalid months value '{v}'"))?);
+                months_flag = Some(
+                    v.parse::<u32>()
+                        .map_err(|_| format!("bad usage: invalid months value '{v}'"))?,
+                );
             }
             "--color" => color_opt = Some("auto".to_string()),
             s if s.starts_with("--color=") => color_opt = Some(s["--color=".len()..].to_string()),
@@ -121,7 +125,12 @@ fn parse_args(args: &[String]) -> Result<CalOptions, String> {
         return Err(format!("extra operand '{}'", positional[3]));
     }
 
-    if [year_flag, twelve_flag, months_flag.is_some()].iter().filter(|&&set| set).count() > 1 {
+    if [year_flag, twelve_flag, months_flag.is_some()]
+        .iter()
+        .filter(|&&set| set)
+        .count()
+        > 1
+    {
         return Err("not all of -y, -Y, and -n may be used at once".to_string());
     }
 
@@ -240,7 +249,11 @@ fn generate_month_lines(date: NaiveDate, options: &CalOptions) -> Vec<String> {
     } else {
         "%B %Y"
     };
-    let mut lines = vec![format!("{:^width$}", date.format(fmt).to_string(), width = line_width)];
+    let mut lines = vec![format!(
+        "{:^width$}",
+        date.format(fmt).to_string(),
+        width = line_width
+    )];
 
     let week_start = if options.monday_first {
         Weekday::Mon
@@ -331,11 +344,7 @@ fn render(options: &CalOptions) -> String {
                 .map(|month| NaiveDate::from_ymd_opt(options.date.year(), month, 1).unwrap())
                 .collect()
         }
-        DisplayMode::ThreeMonths => vec![
-            date - Months::new(1),
-            date,
-            date + Months::new(1),
-        ],
+        DisplayMode::ThreeMonths => vec![date - Months::new(1), date, date + Months::new(1)],
         DisplayMode::NMonths(count) => (0..count).map(|x| date + Months::new(x)).collect(),
     };
 
@@ -484,7 +493,10 @@ mod tests {
     #[test]
     fn parse_args_day_month_year_form_highlights_the_day() {
         let options = parse_args(&["15".to_string(), "8".to_string(), "2025".to_string()]).unwrap();
-        assert_eq!(options.highlight_date, NaiveDate::from_ymd_opt(2025, 8, 15).unwrap());
+        assert_eq!(
+            options.highlight_date,
+            NaiveDate::from_ymd_opt(2025, 8, 15).unwrap()
+        );
     }
 
     #[test]

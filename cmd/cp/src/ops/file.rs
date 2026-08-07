@@ -104,7 +104,10 @@ fn temp_path(parent: &Path, dest: &Path) -> PathBuf {
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_else(|| "cp".to_owned());
     let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
-    parent.join(format!(".{name}.usercp.{}.{unique}.tmp", std::process::id()))
+    parent.join(format!(
+        ".{name}.usercp.{}.{unique}.tmp",
+        std::process::id()
+    ))
 }
 
 fn copy_into(
@@ -155,10 +158,7 @@ fn try_ficlone(src: &Path, dest: &Path) -> std::io::Result<()> {
     const FICLONE: libc::c_ulong = 0x4004_9409;
 
     let src_file = File::open(src)?;
-    let dest_file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(dest)?;
+    let dest_file = OpenOptions::new().write(true).create_new(true).open(dest)?;
 
     // SAFETY: `dest_file`/`src_file` are open files for the duration of this
     // call and their raw fds are valid; `FICLONE` is the documented ioctl
@@ -235,12 +235,7 @@ fn file_has_holes(_path: &Path) -> Result<bool> {
 // consume blocks on disk.
 
 #[cfg(target_os = "linux")]
-fn copy_sparse(
-    src: &Path,
-    dest: &Path,
-    src_size: u64,
-    tx: &Sender<ProgressEvent>,
-) -> Result<u64> {
+fn copy_sparse(src: &Path, dest: &Path, src_size: u64, tx: &Sender<ProgressEvent>) -> Result<u64> {
     use libc::{SEEK_DATA, SEEK_HOLE};
 
     let mut src_file = File::open(src).map_err(|e| io_err(src, e))?;
@@ -405,7 +400,12 @@ fn copy_file_range_loop(
     Ok(total)
 }
 
-fn buffered_copy(src: &Path, dest: &Path, src_size: u64, tx: &Sender<ProgressEvent>) -> Result<u64> {
+fn buffered_copy(
+    src: &Path,
+    dest: &Path,
+    src_size: u64,
+    tx: &Sender<ProgressEvent>,
+) -> Result<u64> {
     let mut src_file = File::open(src).map_err(|e| io_err(src, e))?;
     let mut dest_file = OpenOptions::new()
         .write(true)

@@ -192,8 +192,7 @@ mod tests {
     #[test]
     fn split_on_multiple_patterns_searches_forward() {
         let l = lines(&["one", "two", "three", "two", "five"]);
-        let cuts =
-            find_split_points(&l, &["/two/".to_string(), "/two/".to_string()]).unwrap();
+        let cuts = find_split_points(&l, &["/two/".to_string(), "/two/".to_string()]).unwrap();
         // First /two/ matches index 1; second search resumes at pos=1 and
         // finds the same line again (skip(pos) includes pos itself).
         assert_eq!(cuts, vec![0, 1, 5]);

@@ -1,7 +1,7 @@
 //! user du — estimate file space usage.
 use std::collections::HashSet;
 use std::fs;
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{self, Write};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
@@ -258,7 +258,10 @@ mod tests {
         let total = du_path(&dir, false, true, true, false, None, 0, &mut seen).unwrap();
         // apparent size, bytes mode: exact byte sum plus the dir entry's
         // own apparent size (typically small but nonzero on most fs).
-        assert!(total >= 12, "expected at least 12 bytes of file content, got {total}");
+        assert!(
+            total >= 12,
+            "expected at least 12 bytes of file content, got {total}"
+        );
 
         fs::remove_dir_all(&dir).ok();
     }
@@ -289,8 +292,7 @@ mod tests {
         fs::hard_link(&a, &b).unwrap();
 
         let mut seen = HashSet::new();
-        let total_with_link =
-            du_path(&dir, false, true, true, false, None, 0, &mut seen).unwrap();
+        let total_with_link = du_path(&dir, false, true, true, false, None, 0, &mut seen).unwrap();
 
         let dir2 = tmp_dir("no_hardlink");
         fs::write(dir2.join("a.txt"), b"hello").unwrap();

@@ -7,7 +7,8 @@ pub fn run(_ctx: &Ctx) {
 
     let mem = memory::collect();
 
-    println!("  {} Scanning for optimization opportunities...",
+    println!(
+        "  {} Scanning for optimization opportunities...",
         theme::paint(Tone::Green, "→")
     );
 
@@ -45,7 +46,8 @@ pub fn run(_ctx: &Ctx) {
         } else {
             ("✓", Tone::Green)
         };
-        println!("  {} {}",
+        println!(
+            "  {} {}",
             theme::paint(tone, icon),
             theme::paint(Tone::Purple, action)
         );
@@ -53,23 +55,27 @@ pub fn run(_ctx: &Ctx) {
         println!();
     }
 
-    println!("  {} Available Optimizations:",
+    println!(
+        "  {} Available Optimizations:",
         theme::paint(Tone::Green, "→")
     );
     println!();
-    println!("  {} {}",
+    println!(
+        "  {} {}",
         theme::paint(Tone::Blue, "1."),
         theme::paint(Tone::Green, "Drop disk cache:")
     );
     println!("  sudo sh -c 'sync; echo 3 > /proc/sys/vm/drop_caches'");
     println!();
-    println!("  {} {}",
+    println!(
+        "  {} {}",
         theme::paint(Tone::Blue, "2."),
         theme::paint(Tone::Green, "Set CPU governor to balanced:")
     );
     println!("  sudo cpupower frequency-set -g schedutil");
     println!();
-    println!("  {} {}",
+    println!(
+        "  {} {}",
         theme::paint(Tone::Blue, "3."),
         theme::paint(Tone::Green, "Kill zombie processes:")
     );

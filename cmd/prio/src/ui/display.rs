@@ -208,7 +208,8 @@ pub fn print_process_list(processes: &[ProcessInfo]) {
     blank();
 
     // Header row
-    println!("  {} {} {} {} {}",
+    println!(
+        "  {} {} {} {} {}",
         format!("{:<7}", "PID").bright_cyan().bold(),
         format!("{:<22}", "Process").bright_cyan().bold(),
         format!("{:<6}", "Nice").bright_cyan().bold(),
@@ -227,7 +228,8 @@ pub fn print_process_list(processes: &[ProcessInfo]) {
 
         let truncated_name = truncate(&p.name, 22);
 
-        println!("  {} {} {} {} {}",
+        println!(
+            "  {} {} {} {} {}",
             format!("{:<7}", p.pid).bright_magenta(),
             format!("{:<22}", truncated_name).bright_magenta(),
             nice_out,
@@ -277,7 +279,8 @@ pub fn print_auto_update(nice: i32, temp: Option<f32>, load: Option<f32>) {
     let load_s = load
         .map(|l| format!("{:.2}", l))
         .unwrap_or_else(|| "n/a".to_string());
-    println!("  {} {} {} {} {} {}",
+    println!(
+        "  {} {} {} {} {} {}",
         label("Nice:"),
         nice_colored(nice),
         label("Temp:"),
@@ -351,7 +354,11 @@ pub fn print_error(err: &crate::error::PrioError, hint: Option<&str>) {
         CROSS.bright_red().bold(),
         "Failed to set priority".bright_red().bold()
     );
-    println!("  {:<14} {}", label("Reason :"), format!("{}", err).yellow());
+    println!(
+        "  {:<14} {}",
+        label("Reason :"),
+        format!("{}", err).yellow()
+    );
     if let Some(h) = hint {
         println!("  {:<14} {}", label("Fix :"), h.bright_cyan());
     }
@@ -384,7 +391,8 @@ pub fn print_verbose_banner(verbose: bool) {
 /// the calling process is running as root (relevant since raising priority
 /// generally requires `CAP_SYS_NICE`/root).
 pub fn print_verbose_pid_check(pid: u32, is_root: bool) {
-    println!("  {} {} {} {} {}",
+    println!(
+        "  {} {} {} {} {}",
         label("PID:"),
         value(&pid.to_string()),
         ARROW,
@@ -400,7 +408,8 @@ pub fn print_verbose_pid_check(pid: u32, is_root: bool) {
 /// Print a verbose-mode line noting that the priority change will
 /// auto-revert after `duration` (used by `--time`).
 pub fn print_waiting_for_exit(duration: std::time::Duration) {
-    println!("  {} {}",
+    println!(
+        "  {} {}",
         label("Timer:"),
         value(&format!("will revert after {}", format_duration(duration)))
     );

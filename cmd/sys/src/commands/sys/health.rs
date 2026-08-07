@@ -88,7 +88,8 @@ pub fn run(_ctx: &Ctx) {
     });
 
     // Table header
-    println!("  {} {} {} {}",
+    println!(
+        "  {} {} {} {}",
         theme::paint_pad(Tone::Green, "Component", 16),
         theme::paint_pad(Tone::Green, "Status", 14),
         theme::paint_pad(Tone::Green, "Temp", 10),
@@ -109,11 +110,12 @@ pub fn run(_ctx: &Ctx) {
             _ => Tone::Red,
         };
         let status_str = format!("{} {}", icon, e.status);
-        println!("  {} {} {} {}",
+        println!(
+            "  {} {} {} {}",
             theme::paint_pad(Tone::Purple, &e.component, 16),
             theme::paint_pad(tone, &status_str, 14),
             theme::paint_pad(Tone::Blue, &e.temp, 10),
-            &e.notes
+            e.notes
         );
     }
 
@@ -132,7 +134,8 @@ pub fn run(_ctx: &Ctx) {
         "Fair" => Tone::Blue,
         _ => Tone::Red,
     };
-    println!("  {} {}",
+    println!(
+        "  {} {}",
         theme::paint_pad(Tone::Green, "Overall Health", 16),
         theme::paint(overall_tone, overall)
     );

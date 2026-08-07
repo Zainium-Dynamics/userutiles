@@ -2,7 +2,7 @@
 use std::fs;
 use std::path::Path;
 
-use usercore::Ui;
+use usercore::{protect, Ui};
 
 /// Entry point for the `unlink` utility. Parses `std::env::args()` and
 /// removes exactly one named file by calling `unlink(2)` (via
@@ -41,6 +41,9 @@ pub fn run() -> i32 {
 /// [`fs::remove_file`] kept separate from [`run`] so it's testable without
 /// going through `std::env::args()`.
 fn unlink_file(path: &Path) -> std::io::Result<()> {
+    if let Some(reason) = protect::removal_denied(path) {
+        return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, reason.message()));
+    }
     fs::remove_file(path)
 }
 

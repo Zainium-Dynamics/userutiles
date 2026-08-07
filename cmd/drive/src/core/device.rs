@@ -301,7 +301,8 @@ pub fn run_list(as_toml: bool) -> Result<()> {
     println!();
 
     // Header row
-    println!("  {:<14} {:<8} {:<7} {:<9} {:<24} {:<11} {:<6} {}",
+    println!(
+        "  {:<14} {:<8} {:<7} {:<9} {:<24} {:<11} {:<6} {}",
         "DEVICE".bold().cyan(),
         "SIZE".bold().cyan(),
         "TYPE".bold().cyan(),
@@ -338,7 +339,8 @@ pub fn run_list(as_toml: bool) -> Result<()> {
             mp.truecolor(160, 220, 255).to_string()
         };
 
-        println!("  {:<23} {:<8} {:<7} {:<9} {:<33} {:<20} {:<6} {}",
+        println!(
+            "  {:<23} {:<8} {:<7} {:<9} {:<33} {:<20} {:<6} {}",
             dev_colored,
             size_str.bright_magenta(),
             dev.device_type().truecolor(100, 220, 180),
@@ -386,7 +388,8 @@ pub fn run_list(as_toml: bool) -> Result<()> {
     println!();
     let count = devices.len();
     if warnings > 0 {
-        println!("  {} {} physical drive{} detected - {} warning{}",
+        println!(
+            "  {} {} physical drive{} detected - {} warning{}",
             "✓".bright_green(),
             count.to_string().bright_magenta(),
             if count == 1 { "" } else { "s" },
@@ -394,7 +397,8 @@ pub fn run_list(as_toml: bool) -> Result<()> {
             if warnings == 1 { "" } else { "s" },
         );
     } else {
-        println!("  {} {} physical drive{} detected — all healthy",
+        println!(
+            "  {} {} physical drive{} detected — all healthy",
             "✓".bright_green(),
             count.to_string().bright_magenta(),
             if count == 1 { "" } else { "s" },

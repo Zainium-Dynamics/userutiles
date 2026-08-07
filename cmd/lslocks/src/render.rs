@@ -7,12 +7,17 @@ pub(crate) const ALL_COLUMNS: [&str; 13] = [
     "BLOCKER", "HOLDERS",
 ];
 
-pub(crate) const DEFAULT_COLUMNS: [&str; 9] =
-    ["COMMAND", "PID", "TYPE", "SIZE", "MODE", "M", "START", "END", "PATH"];
+pub(crate) const DEFAULT_COLUMNS: [&str; 9] = [
+    "COMMAND", "PID", "TYPE", "SIZE", "MODE", "M", "START", "END", "PATH",
+];
 
 /// `(name, type, description)` for `-H/--list-columns`, in `ALL_COLUMNS` order.
 const COLUMN_REFERENCE: [(&str, &str, &str); 13] = [
-    ("COMMAND", "string", "command of the process holding the lock"),
+    (
+        "COMMAND",
+        "string",
+        "command of the process holding the lock",
+    ),
     ("PID", "integer", "PID of the process holding the lock"),
     ("TYPE", "string", "kind of lock"),
     (
@@ -145,7 +150,10 @@ fn column_width(col: &str) -> usize {
 }
 
 fn column_right_aligned(col: &str) -> bool {
-    matches!(col, "PID" | "SIZE" | "INODE" | "M" | "START" | "END" | "BLOCKER")
+    matches!(
+        col,
+        "PID" | "SIZE" | "INODE" | "M" | "START" | "END" | "BLOCKER"
+    )
 }
 
 /// Longest path/holders text to keep on one line before truncating with a
@@ -170,7 +178,13 @@ fn truncate(s: &str, notruncate: bool, is_tty: bool) -> String {
     out
 }
 
-fn cell_for(col: &str, lock: &Lock, all_proc_locks: &[Lock], pid_locks: &[Lock], bytes: bool) -> Cell {
+fn cell_for(
+    col: &str,
+    lock: &Lock,
+    all_proc_locks: &[Lock],
+    pid_locks: &[Lock],
+    bytes: bool,
+) -> Cell {
     match col {
         "COMMAND" => Cell::Str(lock.command_name.clone()),
         "PID" => Cell::Int(Some(lock.process_id as i64)),
@@ -284,7 +298,9 @@ pub(crate) fn render_locks(
     pid_locks: &[Lock],
 ) {
     match mode {
-        OutputMode::Text => render_text(columns, bytes, noheadings, notruncate, proc_locks, pid_locks),
+        OutputMode::Text => render_text(
+            columns, bytes, noheadings, notruncate, proc_locks, pid_locks,
+        ),
         OutputMode::Raw => render_raw(columns, bytes, noheadings, proc_locks, pid_locks),
         OutputMode::Json => render_json(columns, bytes, proc_locks, pid_locks),
     }
@@ -330,7 +346,13 @@ fn pad(s: &str, width: usize, right_align: bool) -> String {
     }
 }
 
-fn render_raw(mode_columns: &[&str], bytes: bool, noheadings: bool, proc_locks: &[Lock], pid_locks: &[Lock]) {
+fn render_raw(
+    mode_columns: &[&str],
+    bytes: bool,
+    noheadings: bool,
+    proc_locks: &[Lock],
+    pid_locks: &[Lock],
+) {
     if !noheadings {
         println!("{}", mode_columns.join(" "));
     }

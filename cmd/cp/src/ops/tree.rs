@@ -214,7 +214,12 @@ fn copy_symlink(src: &Path, dest: &Path, opts: TreeCopyOpts) -> Result<()> {
     Ok(())
 }
 
-fn copy_one_file(src: &Path, dest: &Path, opts: TreeCopyOpts, tx: &Sender<ProgressEvent>) -> Result<()> {
+fn copy_one_file(
+    src: &Path,
+    dest: &Path,
+    opts: TreeCopyOpts,
+    tx: &Sender<ProgressEvent>,
+) -> Result<()> {
     if opts.no_clobber && dest.exists() {
         return Ok(());
     }

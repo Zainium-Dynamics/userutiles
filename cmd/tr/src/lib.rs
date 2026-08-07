@@ -152,11 +152,10 @@ pub fn run() -> i32 {
                 continue;
             }
             let b2 = map[b as usize].unwrap_or(b);
-            if squeeze && sq[b2 as usize] {
-                if last == Some(b2) {
+            if squeeze && sq[b2 as usize]
+                && last == Some(b2) {
                     continue;
                 }
-            }
             last = Some(b2);
             out.push(b2);
         }

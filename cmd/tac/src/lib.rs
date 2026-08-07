@@ -106,7 +106,10 @@ mod tests {
     #[test]
     fn reverses_simple_lines() {
         let lines = reversed(b"a\nb\nc\n");
-        assert_eq!(lines, vec![b"c\n".to_vec(), b"b\n".to_vec(), b"a\n".to_vec()]);
+        assert_eq!(
+            lines,
+            vec![b"c\n".to_vec(), b"b\n".to_vec(), b"a\n".to_vec()]
+        );
     }
 
     #[test]

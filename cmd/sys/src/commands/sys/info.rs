@@ -8,7 +8,8 @@ pub fn run(_ctx: &Ctx) {
 
     theme::header("Deep System Information");
 
-    println!("  {}",
+    println!(
+        "  {}",
         theme::paint(
             Tone::Green,
             "-- Operating System -----------------------------"
@@ -24,7 +25,8 @@ pub fn run(_ctx: &Ctx) {
     }
 
     println!();
-    println!("  {}",
+    println!(
+        "  {}",
         theme::paint(
             Tone::Green,
             "-- Processor ------------------------------------"
@@ -41,7 +43,8 @@ pub fn run(_ctx: &Ctx) {
     theme::kv_row("Usage", &format!("{:.1}%", sys_info.cpu_usage));
 
     println!();
-    println!("  {}",
+    println!(
+        "  {}",
         theme::paint(
             Tone::Green,
             "-- Memory ---------------------------------------"
@@ -68,7 +71,8 @@ pub fn run(_ctx: &Ctx) {
     );
 
     println!();
-    println!("  {}",
+    println!(
+        "  {}",
         theme::paint(
             Tone::Green,
             "-- Storage --------------------------------------"
@@ -83,7 +87,8 @@ pub fn run(_ctx: &Ctx) {
         let avail = disk.available_space() as f64 / gb;
         let used = total - avail;
         let fs = String::from_utf8_lossy(disk.file_system());
-        println!("  {} {} — {:.1} / {:.1} GiB used {}",
+        println!(
+            "  {} {} — {:.1} / {:.1} GiB used {}",
             theme::paint_pad(Tone::Purple, &disk.name().to_string_lossy(), 18),
             theme::paint(Tone::Green, &disk.mount_point().to_string_lossy()),
             used,
@@ -93,7 +98,8 @@ pub fn run(_ctx: &Ctx) {
     }
 
     println!();
-    println!("  {}",
+    println!(
+        "  {}",
         theme::paint(
             Tone::Green,
             "-- Network Interfaces ---------------------------"
@@ -104,7 +110,8 @@ pub fn run(_ctx: &Ctx) {
     for (name, data) in sys.networks().iter().take(6) {
         let rx_mb = data.total_received() / 1_048_576;
         let tx_mb = data.total_transmitted() / 1_048_576;
-        println!("  {} RX {} MB TX {} MB",
+        println!(
+            "  {} RX {} MB TX {} MB",
             theme::paint_pad(Tone::Purple, name, 18),
             theme::paint(Tone::Green, &rx_mb.to_string()),
             theme::paint(Tone::Blue, &tx_mb.to_string())
@@ -112,7 +119,8 @@ pub fn run(_ctx: &Ctx) {
     }
 
     println!();
-    println!("  {}",
+    println!(
+        "  {}",
         theme::paint(
             Tone::Green,
             "-- ZainiumOS ------------------------------------"

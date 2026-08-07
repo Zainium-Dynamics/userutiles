@@ -8,7 +8,7 @@ use std::path::Path;
 
 use usercore::Ui;
 
-use render::{ALL_COLUMNS, DEFAULT_COLUMNS, OutputMode, render_locks, render_column_reference};
+use render::{render_column_reference, render_locks, OutputMode, ALL_COLUMNS, DEFAULT_COLUMNS};
 
 const HELP: &str = "Usage: lslocks [options]\n\
 List local system locks.\n\n\
@@ -490,12 +490,9 @@ fn collect_pid_locks(no_inaccessible: bool) -> Result<Vec<Lock>, String> {
                 let Some(suffix) = line.strip_prefix("lock:") else {
                     continue;
                 };
-                if let Some(lock) = parse_and_resolve(
-                    no_inaccessible,
-                    suffix.trim(),
-                    Some((pid, &comm, fd)),
-                    None,
-                ) {
+                if let Some(lock) =
+                    parse_and_resolve(no_inaccessible, suffix.trim(), Some((pid, &comm, fd)), None)
+                {
                     out.push(lock);
                 }
             }
@@ -525,7 +522,10 @@ mod tests {
 
     #[test]
     fn resolve_columns_defaults_to_default_set() {
-        assert_eq!(resolve_columns(None, false).unwrap(), DEFAULT_COLUMNS.to_vec());
+        assert_eq!(
+            resolve_columns(None, false).unwrap(),
+            DEFAULT_COLUMNS.to_vec()
+        );
         assert_eq!(resolve_columns(None, true).unwrap(), ALL_COLUMNS.to_vec());
     }
 
@@ -601,8 +601,8 @@ mod tests {
         // file); it's consumed but discarded, and so is the pid field
         // present on the line, in favor of the already-known (pid, comm).
         let line = "1: FLOCK  ADVISORY  WRITE 42 00:1d:7 0 EOF";
-        let lock = parse_and_resolve(false, line, Some((4242, "myproc", 7)), None)
-            .expect("should parse");
+        let lock =
+            parse_and_resolve(false, line, Some((4242, "myproc", 7)), None).expect("should parse");
         assert_eq!(lock.id, -1);
         assert_eq!(lock.process_id, 4242);
         assert_eq!(lock.command_name.as_deref(), Some("myproc"));

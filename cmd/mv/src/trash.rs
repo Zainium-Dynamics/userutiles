@@ -93,7 +93,7 @@ impl TrashDir {
 
         // Move the file into Trash/files/. Prefer rename(2) (same device)
         // and fall back to copy+delete for cross-device cases.
-        if let Err(_) = fs::rename(&abs_path, &trash_dest) {
+        if fs::rename(&abs_path, &trash_dest).is_err() {
             // Cross-device: copy then delete.
             copy_to_trash(&abs_path, &trash_dest)?;
             fs::remove_file(&abs_path).map_err(|e| crate::error::io_err(&abs_path, e))?;

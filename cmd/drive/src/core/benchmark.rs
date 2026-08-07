@@ -202,7 +202,8 @@ fn measure_rand_read(path: &str, duration: Duration) -> Result<(f64, f64)> {
 
 fn print_results(r: &BenchResult) {
     println!();
-    println!("  {:<28} {:<20} {}",
+    println!(
+        "  {:<28} {:<20} {}",
         "TEST".bold().cyan(),
         "RESULT".bold().cyan(),
         "RATING".bold().cyan(),
@@ -242,7 +243,8 @@ fn print_results(r: &BenchResult) {
 }
 
 fn print_bench_row(label: &str, value: &str, rating: &str) {
-    println!("  {:<28} {:<30} {}",
+    println!(
+        "  {:<28} {:<30} {}",
         label.truecolor(100, 220, 200),
         value.bright_magenta(),
         rating,

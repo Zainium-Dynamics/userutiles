@@ -15,7 +15,8 @@ pub fn run(_ctx: &Ctx) {
     println!();
 
     let cpu_bar = theme::bar(sys_info.cpu_usage as f64, 18);
-    println!("  {} {} {}C/{}T {}",
+    println!(
+        "  {} {} {}C/{}T {}",
         theme::paint_pad(Tone::Green, "CPU", 18),
         theme::paint(Tone::Purple, &sys_info.cpu_name),
         sys_info.cpu_cores,
@@ -25,7 +26,8 @@ pub fn run(_ctx: &Ctx) {
     println!("  {:<18} {}", "", cpu_bar);
 
     let mem_bar = theme::bar(sys_info.memory_percent, 18);
-    println!("  {} {:.1} GiB / {:.1} GiB {}",
+    println!(
+        "  {} {:.1} GiB / {:.1} GiB {}",
         theme::paint_pad(Tone::Green, "Memory", 18),
         sys_info.used_memory_gib,
         sys_info.total_memory_gib,
@@ -37,7 +39,8 @@ pub fn run(_ctx: &Ctx) {
     println!("  {:<18} {}", "", mem_bar);
 
     let swap_bar = theme::bar(sys_info.swap_percent, 18);
-    println!("  {} {:.1} GiB / {:.1} GiB {}",
+    println!(
+        "  {} {:.1} GiB / {:.1} GiB {}",
         theme::paint_pad(Tone::Green, "Swap", 18),
         sys_info.used_swap_gib,
         sys_info.total_swap_gib,
@@ -60,7 +63,8 @@ pub fn run(_ctx: &Ctx) {
         0.0
     };
     let disk_bar = theme::bar(disk_pct, 18);
-    println!("  {} {:.1} TB / {:.1} TB {}",
+    println!(
+        "  {} {:.1} TB / {:.1} TB {}",
         theme::paint_pad(Tone::Green, "Disk", 18),
         used_b as f64 / tb,
         total_b as f64 / tb,
@@ -74,7 +78,8 @@ pub fn run(_ctx: &Ctx) {
         .take(4)
         .map(|t| format!("{} {}", t.label, theme::temp_color(t.temp, t.critical)))
         .collect();
-    println!("  {} {}",
+    println!(
+        "  {} {}",
         theme::paint_pad(Tone::Green, "Temperatures", 18),
         temp_parts.join("  •  ")
     );

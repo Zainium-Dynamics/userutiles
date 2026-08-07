@@ -15,9 +15,6 @@ impl MemoryStats {
         let rss_mb = status.vmrss.unwrap_or(0) / 1024;
         let vms_mb = status.vmsize.unwrap_or(0) / 1024;
 
-        Ok(MemoryStats {
-            rss_mb,
-            vms_mb,
-        })
+        Ok(MemoryStats { rss_mb, vms_mb })
     }
 }

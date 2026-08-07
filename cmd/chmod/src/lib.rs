@@ -1,8 +1,9 @@
 //! user chmod — change file mode bits.
 use std::fs;
-use std::io::{self, BufRead, BufReader, Read, Write};
+
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
+use usercore::protect;
 
 pub fn run() -> i32 {
     let mut recursive = false;
@@ -74,6 +75,11 @@ pub fn run() -> i32 {
 
     let mut status = 0;
     for p in &paths {
+        if let Some(reason) = protect::modification_denied(p) {
+            eprintln!("chmod: changing permissions of '{}': {}", p.display(), reason.message());
+            status = 1;
+            continue;
+        }
         if let Err(e) = chmod_path(p, &mode_str, recursive, verbose, changes) {
             eprintln!("chmod: changing permissions of '{}': {e}", p.display());
             status = 1;
@@ -240,7 +246,8 @@ mod tests {
     use super::*;
 
     fn tmp_dir(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("user_chmod_test_{tag}_{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("user_chmod_test_{tag}_{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
         dir
     }

@@ -17,13 +17,13 @@ impl ProcessInfo {
         let proc = Process::new(pid as i32)
             .map_err(|_| TraceError::ProcessNotFound(format!("PID {}", pid)))?;
 
-        let stat = proc
-            .stat()
-            .map_err(|_| TraceError::ProcessNotFound(format!("Cannot read stats for PID {}", pid)))?;
+        let stat = proc.stat().map_err(|_| {
+            TraceError::ProcessNotFound(format!("Cannot read stats for PID {}", pid))
+        })?;
 
-        let status = proc
-            .status()
-            .map_err(|_| TraceError::ProcessNotFound(format!("Cannot read status for PID {}", pid)))?;
+        let status = proc.status().map_err(|_| {
+            TraceError::ProcessNotFound(format!("Cannot read status for PID {}", pid))
+        })?;
 
         let name = stat.comm.clone();
         let memory_mb = status.vmrss.unwrap_or(0) / 1024; // Convert to MB
@@ -43,7 +43,7 @@ impl ProcessInfo {
         // Get boot time from /proc/stat
         if let Ok(boot_time) = Self::get_boot_time() {
             if let Ok(elapsed) = SystemTime::now().duration_since(
-                std::time::UNIX_EPOCH + std::time::Duration::from_secs(boot_time as u64),
+                std::time::UNIX_EPOCH + std::time::Duration::from_secs(boot_time),
             ) {
                 let secs = elapsed.as_secs();
                 let hours = secs / 3600;
@@ -72,12 +72,10 @@ impl ProcessInfo {
         let all_procs = procfs::process::all_processes()
             .map_err(|_| TraceError::ProcessNotFound(name.to_string()))?;
 
-        for proc in all_procs {
-            if let Ok(proc) = proc {
-                if let Ok(stat) = proc.stat() {
-                    if stat.comm.contains(name) {
-                        return Self::from_pid(proc.pid() as u32);
-                    }
+        for proc in all_procs.flatten() {
+            if let Ok(stat) = proc.stat() {
+                if stat.comm.contains(name) {
+                    return Self::from_pid(proc.pid() as u32);
                 }
             }
         }

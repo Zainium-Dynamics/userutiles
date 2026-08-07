@@ -14,7 +14,8 @@ pub fn run(_ctx: &Ctx) {
 
     let services = fetch_services();
 
-    println!("  {} {} {}",
+    println!(
+        "  {} {} {}",
         theme::paint_pad(Tone::Green, "Service", 28),
         theme::paint_pad(Tone::Green, "Status", 14),
         theme::paint(Tone::Green, "Description")
@@ -30,15 +31,17 @@ pub fn run(_ctx: &Ctx) {
             ("○", Tone::Red)
         };
         let status_str = format!("{} {}", icon, s.status);
-        println!("  {} {} {}",
+        println!(
+            "  {} {} {}",
             theme::paint_pad(Tone::Purple, &s.name, 28),
             theme::paint_pad(tone, &status_str, 14),
-            &s.description
+            s.description
         );
     }
 
     theme::divider();
-    println!("  {}",
+    println!(
+        "  {}",
         theme::paint(
             Tone::Blue,
             &format!("{}/{} services active", active_count, services.len())

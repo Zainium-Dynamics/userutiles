@@ -7,8 +7,8 @@
 // --no-replace src dest → ops::atomic::atomic_no_replace()
 // same device, standard → ops::rename::rename_*()
 // cross-device → ops::crossdev::move_cross_device()
-
 use std::path::Path;
+use usercore::protect;
 
 use bytesize::ByteSize;
 use clap::Parser;
@@ -106,7 +106,7 @@ pub fn run(args: Vec<String>) {
     ui::heading("mv — Move");
 
     let total_sources = sources.len();
-    for (_i, source_str) in sources.iter().enumerate() {
+    for source_str in sources.iter() {
         let src = Path::new(source_str);
 
         if !src.exists() {
@@ -126,6 +126,13 @@ pub fn run(args: Vec<String>) {
         } else {
             dest.to_owned()
         };
+
+        if let Some(reason) = protect::removal_denied(src) {
+            ui::fatal(&format!("Cannot move '{}': {}", src.display(), reason.message()));
+        }
+        if let Some(reason) = protect::modification_denied(&effective_dest) {
+            ui::fatal(&format!("Cannot overwrite '{}': {}", effective_dest.display(), reason.message()));
+        }
 
         if opts.verbose || total_sources > 1 {
             ui::kv("Source", &src.display().to_string());

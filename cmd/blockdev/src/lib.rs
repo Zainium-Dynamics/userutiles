@@ -385,9 +385,12 @@ fn partition_offset(device_file: &File) -> io::Result<u64> {
     let partition_marker = format!("/sys/dev/block/{major}:{minor}/partition");
     if Path::new(&partition_marker).exists() {
         let s = std::fs::read_to_string(format!("/sys/dev/block/{major}:{minor}/start"))?;
-        s.trim()
-            .parse()
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "unable to parse partition start offset"))
+        s.trim().parse().map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "unable to parse partition start offset",
+            )
+        })
     } else {
         Ok(0)
     }
@@ -588,7 +591,11 @@ mod tests {
     #[test]
     fn open_nonexistent_device_reports_error_not_panic() {
         let ui = Ui::new("blockdev");
-        let code = run_ops(&ui, &["/nonexistent/user-blockdev-test-device".to_string()], &[]);
+        let code = run_ops(
+            &ui,
+            &["/nonexistent/user-blockdev-test-device".to_string()],
+            &[],
+        );
         assert_eq!(code, 1);
     }
 

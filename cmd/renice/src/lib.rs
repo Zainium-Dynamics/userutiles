@@ -27,9 +27,9 @@ impl Mode {
     // the target libc.
     fn which(self) -> libc::c_int {
         match self {
-            Mode::Pid => libc::PRIO_PROCESS,
-            Mode::Pgrp => libc::PRIO_PGRP,
-            Mode::User => libc::PRIO_USER,
+            Mode::Pid => libc::PRIO_PROCESS as libc::c_int,
+            Mode::Pgrp => libc::PRIO_PGRP as libc::c_int,
+            Mode::User => libc::PRIO_USER as libc::c_int,
         }
     }
 
@@ -114,10 +114,7 @@ pub fn run() -> i32 {
                             "{ident} ({}): old priority {old}, new priority {priority}",
                             mode.noun()
                         ),
-                        None => println!(
-                            "{ident} ({}): new priority {priority}",
-                            mode.noun()
-                        ),
+                        None => println!("{ident} ({}): new priority {priority}", mode.noun()),
                     }
                 }
             }

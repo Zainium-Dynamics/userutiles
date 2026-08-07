@@ -39,9 +39,7 @@ fn fill_random(buf: &mut [u8]) {
 /// (matching util-linux's behavior).
 pub fn parse_size(s: &str) -> Result<u64, String> {
     let s = s.trim();
-    let digit_end = s
-        .find(|c: char| !c.is_ascii_digit())
-        .unwrap_or(s.len());
+    let digit_end = s.find(|c: char| !c.is_ascii_digit()).unwrap_or(s.len());
     if digit_end == 0 {
         return Err(format!("invalid size '{s}'"));
     }
@@ -243,7 +241,9 @@ mod tests {
         let digest = compute_cookie_bytes(b"anything", &[9u8; RANDOM_BYTES]);
         let hex = usercore::digest::hex_lower(&digest);
         assert_eq!(hex.len(), 32);
-        assert!(hex.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+        assert!(hex
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
     }
 
     #[test]

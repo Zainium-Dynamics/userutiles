@@ -281,7 +281,12 @@ fn parse_nsfs_root(root: &str) -> Option<(&str, u64)> {
     Some((type_str, inode))
 }
 
-fn print_table(namespaces: &[Namespace], processes: &[Process], noheadings: bool, persistent: bool) {
+fn print_table(
+    namespaces: &[Namespace],
+    processes: &[Process],
+    noheadings: bool,
+    persistent: bool,
+) {
     let by_pid: HashMap<i32, &Process> = processes.iter().map(|p| (p.pid, p)).collect();
     let mut username_cache: HashMap<u32, String> = HashMap::new();
 
@@ -297,7 +302,9 @@ fn print_table(namespaces: &[Namespace], processes: &[Process], noheadings: bool
             continue;
         }
 
-        let representative = ns.representative_pid.and_then(|pid| by_pid.get(&pid).copied());
+        let representative = ns
+            .representative_pid
+            .and_then(|pid| by_pid.get(&pid).copied());
         let uid = representative.map(|p| p.uid).unwrap_or(ns.uid_fallback);
         let user = username_cache
             .entry(uid)
@@ -395,8 +402,14 @@ mod tests {
 
     #[test]
     fn parses_nsfs_mount_root() {
-        assert_eq!(parse_nsfs_root("net:[4026531992]"), Some(("net", 4026531992)));
-        assert_eq!(parse_nsfs_root("mnt:[4026531840]"), Some(("mnt", 4026531840)));
+        assert_eq!(
+            parse_nsfs_root("net:[4026531992]"),
+            Some(("net", 4026531992))
+        );
+        assert_eq!(
+            parse_nsfs_root("mnt:[4026531840]"),
+            Some(("mnt", 4026531840))
+        );
         assert_eq!(parse_nsfs_root("not-nsfs"), None);
         assert_eq!(parse_nsfs_root("net:4026531992"), None);
     }

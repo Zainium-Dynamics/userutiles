@@ -2,7 +2,8 @@
 use std::fs::OpenOptions;
 use std::os::unix::fs::MetadataExt;
 
-use usercore::Ui;
+use std::path::Path;
+use usercore::{protect, Ui};
 
 /// A parsed `-s`/`--size` argument: either an absolute target size, or a
 /// size to add to / subtract from the file's current size.
@@ -127,15 +128,16 @@ fn resize_one(
     io_blocks: bool,
     create: bool,
 ) -> Result<(), String> {
+    if let Some(reason) = protect::modification_denied(Path::new(path)) {
+        return Err(reason.message().to_string());
+    }
+
     let meta = std::fs::metadata(path);
     if meta.is_err() && !create {
         return Ok(());
     }
     let cur = meta.as_ref().map(|m| m.len()).unwrap_or(0);
-    let blksize = meta
-        .as_ref()
-        .map(|m| m.blksize().max(1))
-        .unwrap_or(4096);
+    let blksize = meta.as_ref().map(|m| m.blksize().max(1)).unwrap_or(4096);
 
     let new_len = match reference {
         Some(r) => {
@@ -168,7 +170,13 @@ fn resize_one(
 /// filesystem's IO block size (`-o`/`--io-blocks`). Uses saturating
 /// arithmetic throughout since sizes come from untrusted CLI input.
 fn apply_spec(base: u64, spec: SizeSpec, io_blocks: bool, blksize: u64) -> u64 {
-    let scale = |n: u64| if io_blocks { n.saturating_mul(blksize) } else { n };
+    let scale = |n: u64| {
+        if io_blocks {
+            n.saturating_mul(blksize)
+        } else {
+            n
+        }
+    };
     match spec {
         SizeSpec::Absolute(n) => scale(n),
         SizeSpec::RelPlus(n) => base.saturating_add(scale(n)),
@@ -321,10 +329,7 @@ mod tests {
 
     #[test]
     fn resize_one_no_create_skips_missing_file() {
-        let missing = format!(
-            "/nonexistent_user_truncate_test_{}",
-            std::process::id()
-        );
+        let missing = format!("/nonexistent_user_truncate_test_{}", std::process::id());
         let r = resize_one(&missing, Some(SizeSpec::Absolute(5)), None, false, false);
         assert!(r.is_ok());
         assert!(std::fs::metadata(&missing).is_err());

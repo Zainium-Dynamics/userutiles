@@ -117,7 +117,7 @@ fn format_time(epoch: i64) -> String {
     // `localtime_r` below fully populates the fields we read before we use
     // them.
     let mut tm = unsafe { std::mem::zeroed::<libc::tm>() };
-    let mut t = epoch as libc::time_t;
+    let t = epoch as libc::time_t;
     // SAFETY: `&t` and `&mut tm` are valid, non-null, properly aligned
     // pointers to a live `time_t` and a live `libc::tm`. `localtime_r` is
     // the reentrant variant so it touches no shared global state, and it

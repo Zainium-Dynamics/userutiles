@@ -67,7 +67,10 @@ mod tests {
         fs::hard_link(&a, &b).unwrap();
         assert_eq!(fs::read(&b).unwrap(), b"payload");
         use std::os::unix::fs::MetadataExt;
-        assert_eq!(fs::metadata(&a).unwrap().ino(), fs::metadata(&b).unwrap().ino());
+        assert_eq!(
+            fs::metadata(&a).unwrap().ino(),
+            fs::metadata(&b).unwrap().ino()
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 

@@ -138,9 +138,7 @@ fn create_unique(full_tmpl: &str, directory: bool, dry_run: bool) -> Result<Stri
             Err(e) => return Err(e.to_string()),
         }
     }
-    Err(format!(
-        "failed to create file via template '{full_tmpl}'"
-    ))
+    Err(format!("failed to create file via template '{full_tmpl}'"))
 }
 
 /// Fill the last run of (at least 3) consecutive `X`s in `tmpl` with random

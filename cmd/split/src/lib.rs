@@ -187,7 +187,11 @@ fn next_name(pref: &str, a: &mut u8, b: &mut u8) -> PathBuf {
 /// `u64` is rejected rather than silently falling back to a default.
 fn parse_count(s: &str) -> Option<u64> {
     let n: u64 = s.parse().ok()?;
-    if n == 0 { None } else { Some(n) }
+    if n == 0 {
+        None
+    } else {
+        Some(n)
+    }
 }
 
 /// Parse a `-b`-style byte count with an optional `K`/`M`/`G` (powers of

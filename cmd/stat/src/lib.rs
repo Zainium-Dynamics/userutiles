@@ -2,7 +2,7 @@
 use colored::Colorize;
 use std::fs;
 use std::io;
-use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
+use std::os::unix::fs::{FileTypeExt, MetadataExt};
 
 use usercore::Ui;
 
@@ -179,7 +179,7 @@ fn print_fs(path: &str) -> io::Result<()> {
     // sound only on this success path (the early `return` above prevents
     // reaching here on failure).
     let st = unsafe { st.assume_init() };
-    let bsize = st.f_frsize as u64;
+    let bsize = st.f_frsize;
     println!(
         " {} {}",
         "File:".bright_green(),
@@ -197,14 +197,14 @@ fn print_fs(path: &str) -> io::Result<()> {
         "Block size:".bright_green(),
         bsize.to_string().bright_magenta(),
         "Blocks:".bright_green(),
-        (st.f_blocks as u64).to_string().bright_magenta()
+        (st.f_blocks).to_string().bright_magenta()
     );
     println!(
         " {} {} {} {}",
         "Free:".bright_green(),
-        (st.f_bfree as u64).to_string().bright_magenta(),
+        (st.f_bfree).to_string().bright_magenta(),
         "Available:".bright_green(),
-        (st.f_bavail as u64).to_string().bright_magenta()
+        (st.f_bavail).to_string().bright_magenta()
     );
     Ok(())
 }

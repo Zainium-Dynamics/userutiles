@@ -66,10 +66,7 @@ pub fn run() -> i32 {
                 );
                 eprintln!("   Quick fixes:");
                 eprintln!("   - Check process name spelling");
-                eprintln!(
-                    "   - Use PID instead: {} --pid 1234",
-                    "trace".bold()
-                );
+                eprintln!("   - Use PID instead: {} --pid 1234", "trace".bold());
                 eprintln!(
                     "   - List running processes: {} processes\n",
                     "trace".bold()
@@ -86,10 +83,7 @@ pub fn run() -> i32 {
                 );
                 eprintln!("   Quick fixes:");
                 eprintln!("   - Verify the PID is correct");
-                eprintln!(
-                    "   - List running processes: {} processes",
-                    "trace".bold()
-                );
+                eprintln!("   - List running processes: {} processes", "trace".bold());
                 eprintln!("   - Check your permissions (may need elevate)\n");
                 return 1;
             }
@@ -126,10 +120,8 @@ pub fn run() -> i32 {
                     println!("{formatted}");
 
                     if let Some(output_dir) = &cli.output {
-                        let filename = utils::generate_filename(
-                            &data.process.name,
-                            output_format.extension(),
-                        );
+                        let filename =
+                            utils::generate_filename(&data.process.name, output_format.extension());
                         match utils::write_output_file(output_dir, &filename, &formatted) {
                             Ok(path) => {
                                 println!("Output saved: {}", path.green());
@@ -187,11 +179,9 @@ fn handle_processes() -> TraceResult<()> {
     println!("\n{}\n", "Running Processes".green().bold().underline());
 
     if let Ok(procs) = procfs::process::all_processes() {
-        for proc in procs.take(20) {
-            if let Ok(proc) = proc {
-                if let Ok(stat) = proc.stat() {
-                    println!("  {} - {} (UID: {})", proc.pid(), stat.comm, proc.uid()?);
-                }
+        for proc in procs.take(20).flatten() {
+            if let Ok(stat) = proc.stat() {
+                println!("  {} - {} (UID: {})", proc.pid(), stat.comm, proc.uid()?);
             }
         }
         println!("\n(Showing first 20 processes)\n");

@@ -1,8 +1,9 @@
 //! user ln — make hard and symbolic links between files.
 use std::fs;
-use std::io::{self, BufRead, BufReader, Read, Write};
+use std::io::{self, Write};
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
+use usercore::protect;
 
 pub fn run() -> i32 {
     let mut symbolic = false;
@@ -111,6 +112,12 @@ pub fn run() -> i32 {
         } else {
             link_dir_or_name.clone()
         };
+
+        if let Some(reason) = protect::modification_denied(&link_path) {
+            eprintln!("ln: failed to create link '{}': {}", link_path.display(), reason.message());
+            status = 1;
+            continue;
+        }
 
         // Try the create directly first — symlink(2)/link(2) already fail
         // atomically with EEXIST if link_path exists, so the common

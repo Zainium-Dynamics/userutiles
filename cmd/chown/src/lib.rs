@@ -2,8 +2,8 @@
 
 use std::ffi::{CStr, CString};
 use std::fs;
-use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
+use usercore::protect;
 
 pub fn run() -> i32 {
     let mut recursive = false;
@@ -74,6 +74,11 @@ pub fn run() -> i32 {
 
     let mut status = 0;
     for p in &paths {
+        if let Some(reason) = protect::modification_denied(p) {
+            eprintln!("chown: changing ownership of '{}': {}", p.display(), reason.message());
+            status = 1;
+            continue;
+        }
         if let Err(e) = chown_path(p, uid, gid, recursive, verbose) {
             eprintln!("chown: changing ownership of '{}': {e}", p.display());
             status = 1;
@@ -245,7 +250,8 @@ mod tests {
     use super::*;
 
     fn tmp_dir(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("user_chown_test_{tag}_{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("user_chown_test_{tag}_{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -271,7 +277,10 @@ mod tests {
     #[test]
     fn parse_owner_group_colon_form() {
         // Numeric ids avoid depending on real user/group names existing.
-        assert_eq!(parse_owner_group("1000:1000").unwrap(), (Some(1000), Some(1000)));
+        assert_eq!(
+            parse_owner_group("1000:1000").unwrap(),
+            (Some(1000), Some(1000))
+        );
         assert_eq!(parse_owner_group("1000:").unwrap(), (Some(1000), None));
         assert_eq!(parse_owner_group(":1000").unwrap(), (None, Some(1000)));
         assert_eq!(parse_owner_group("1000").unwrap(), (Some(1000), None));
@@ -279,7 +288,10 @@ mod tests {
 
     #[test]
     fn parse_owner_group_dot_form() {
-        assert_eq!(parse_owner_group("1000.1000").unwrap(), (Some(1000), Some(1000)));
+        assert_eq!(
+            parse_owner_group("1000.1000").unwrap(),
+            (Some(1000), Some(1000))
+        );
     }
 
     #[test]

@@ -247,7 +247,9 @@ fn parse_bytes(s: &str) -> Result<u64, String> {
         Some(b'M') => (&s[..s.len() - 1], 1024 * 1024),
         _ => (s, 1),
     };
-    let n: u64 = num.parse().map_err(|_| format!("invalid byte count '{s}'"))?;
+    let n: u64 = num
+        .parse()
+        .map_err(|_| format!("invalid byte count '{s}'"))?;
     n.checked_mul(mult)
         .ok_or_else(|| format!("byte count '{s}' overflows"))
 }

@@ -137,10 +137,8 @@ mod tests {
     fn tmp_file(contents: &str) -> std::path::PathBuf {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!(
-            "user-ctrlaltdel-test-{}-{n}",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("user-ctrlaltdel-test-{}-{n}", std::process::id()));
         std::fs::write(&path, contents).unwrap();
         path
     }

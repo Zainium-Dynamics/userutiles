@@ -152,11 +152,8 @@ mod tests {
         // fallback function itself succeeds when HOME is a writable scratch
         // dir and the primary open target is deliberately unwritable via a
         // read-only directory.
-        let ro_dir = env::temp_dir().join(format!(
-            "user_nohup_test_ro_{}_{}",
-            std::process::id(),
-            "b"
-        ));
+        let ro_dir =
+            env::temp_dir().join(format!("user_nohup_test_ro_{}_{}", std::process::id(), "b"));
         std::fs::create_dir_all(&ro_dir).unwrap();
         let home_dir = env::temp_dir().join(format!(
             "user_nohup_test_home_{}_{}",

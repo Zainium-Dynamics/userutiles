@@ -269,7 +269,9 @@ fn ver_cmp(a: &str, b: &str) -> Ordering {
                 let mut an = 0u64;
                 while let Some(c) = ai.peek().copied() {
                     if c.is_ascii_digit() {
-                        an = an.saturating_mul(10).saturating_add((c as u8 - b'0') as u64);
+                        an = an
+                            .saturating_mul(10)
+                            .saturating_add((c as u8 - b'0') as u64);
                         ai.next();
                     } else {
                         break;
@@ -278,7 +280,9 @@ fn ver_cmp(a: &str, b: &str) -> Ordering {
                 let mut bn = 0u64;
                 while let Some(c) = bi.peek().copied() {
                     if c.is_ascii_digit() {
-                        bn = bn.saturating_mul(10).saturating_add((c as u8 - b'0') as u64);
+                        bn = bn
+                            .saturating_mul(10)
+                            .saturating_add((c as u8 - b'0') as u64);
                         bi.next();
                     } else {
                         break;

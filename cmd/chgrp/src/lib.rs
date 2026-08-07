@@ -5,7 +5,7 @@ use std::io;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
-use usercore::Ui;
+use usercore::{protect, Ui};
 
 /// Entry point for the `chgrp` utility. Parses `std::env::args()` and
 /// changes the group ownership of each `FILE` to `GROUP` (a group name
@@ -69,6 +69,11 @@ pub fn run() -> i32 {
     };
     let mut status = 0;
     for p in &paths {
+        if let Some(reason) = protect::modification_denied(p) {
+            ui.err(&format!("changing group of '{}': {}", p.display(), reason.message()));
+            status = 1;
+            continue;
+        }
         if let Err(e) = chgrp_path(p, gid, recursive, verbose, &group) {
             ui.err(&format!("changing group of '{}': {e}", p.display()));
             status = 1;
@@ -217,13 +222,16 @@ mod tests {
         let gid = own_gid();
         chgrp_path(&dir, gid, true, false, "self").unwrap();
         assert_eq!(fs::metadata(dir.join("a.txt")).unwrap().gid(), gid);
-        assert_eq!(fs::metadata(dir.join("sub").join("b.txt")).unwrap().gid(), gid);
+        assert_eq!(
+            fs::metadata(dir.join("sub").join("b.txt")).unwrap().gid(),
+            gid
+        );
     }
 
     #[test]
     fn chgrp_path_missing_file_errors() {
-        let missing = std::env::temp_dir()
-            .join(format!("user_chgrp_missing_{}", std::process::id()));
+        let missing =
+            std::env::temp_dir().join(format!("user_chgrp_missing_{}", std::process::id()));
         assert!(chgrp_path(&missing, own_gid(), false, false, "self").is_err());
     }
 

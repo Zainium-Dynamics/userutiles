@@ -163,10 +163,7 @@ mod tests {
 
     #[test]
     fn read_all_missing_file_errors() {
-        let missing = format!(
-            "/nonexistent_user_sum_test_path_{}",
-            std::process::id()
-        );
+        let missing = format!("/nonexistent_user_sum_test_path_{}", std::process::id());
         assert!(read_all(&missing).is_err());
     }
 }

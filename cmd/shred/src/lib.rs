@@ -3,7 +3,7 @@ use std::fs::{self, OpenOptions};
 use std::io::{Seek, SeekFrom, Write};
 use std::path::Path;
 
-use usercore::Ui;
+use usercore::{protect, Ui};
 
 /// Entry point for the `shred` utility. Parses `std::env::args()` and
 /// overwrites each given file `-n` times (default 3) with random data,
@@ -113,6 +113,9 @@ fn shred_file(
     verbose: bool,
     size: Option<u64>,
 ) -> std::io::Result<()> {
+    if let Some(reason) = protect::modification_denied(path) {
+        return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, reason.message()));
+    }
     let meta = fs::metadata(path)?;
     let len = size.unwrap_or(meta.len());
     let mut file = OpenOptions::new().write(true).open(path)?;
@@ -241,7 +244,14 @@ mod tests {
 
     #[test]
     fn shred_file_missing_file_errors() {
-        let result = shred_file(Path::new("/nonexistent/user-shred-missing"), 1, false, false, false, None);
+        let result = shred_file(
+            Path::new("/nonexistent/user-shred-missing"),
+            1,
+            false,
+            false,
+            false,
+            None,
+        );
         assert!(result.is_err());
     }
 

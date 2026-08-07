@@ -1,7 +1,7 @@
 //! user which — locate a command on PATH (Zainium: /overlayer/syshub/{bin,sbin}).
 use std::env;
 use std::fs;
-use std::io::{self, BufRead, BufReader, Read, Write};
+
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 

@@ -6,7 +6,8 @@ fn main() {
         panic!("trace targets Zainium OS only. Target OS: {target_os}");
     }
 
-    let target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").expect("CARGO_CFG_TARGET_ARCH not set");
+    let target_arch =
+        std::env::var("CARGO_CFG_TARGET_ARCH").expect("CARGO_CFG_TARGET_ARCH not set");
 
     match target_arch.as_str() {
         "x86_64" | "aarch64" | "arm" => {

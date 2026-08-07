@@ -6,7 +6,8 @@ pub fn run(_ctx: &Ctx) {
     let sensors = temperature::collect();
 
     theme::header("Thermal Status");
-    println!("  {} {} {}",
+    println!(
+        "  {} {} {}",
         theme::paint_pad(Tone::Green, "Sensor", 26),
         theme::paint_pad(Tone::Green, "Temp", 12),
         theme::paint(Tone::Green, "Status")
@@ -28,7 +29,8 @@ pub fn run(_ctx: &Ctx) {
             }
             _ => Tone::Black,
         };
-        println!("  {} {} {}",
+        println!(
+            "  {} {} {}",
             theme::paint_pad(Tone::Purple, &s.label, 26),
             format!("{:<12}", theme::temp_color(s.temp, s.critical)),
             theme::paint(tone, label)
@@ -41,7 +43,8 @@ pub fn run(_ctx: &Ctx) {
     for s in &sensors {
         let pct = (s.temp as f64 / s.critical.unwrap_or(100.0) as f64) * 100.0;
         let bar = theme::bar(pct.min(100.0), 20);
-        println!("  {} {} {:.0}°C",
+        println!(
+            "  {} {} {:.0}°C",
             theme::paint_pad(Tone::Green, &s.label, 20),
             bar,
             s.temp

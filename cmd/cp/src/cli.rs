@@ -91,7 +91,11 @@ pub struct Opts {
     pub target_directory: Option<String>,
 
     /// Treat DEST as a normal file, not a directory (rejects >1 source)
-    #[arg(short = 'T', long = "no-target-directory", conflicts_with = "target_directory")]
+    #[arg(
+        short = 'T',
+        long = "no-target-directory",
+        conflicts_with = "target_directory"
+    )]
     pub no_target_directory: bool,
 
     /// Stay on the source filesystem — do not descend into other mount points

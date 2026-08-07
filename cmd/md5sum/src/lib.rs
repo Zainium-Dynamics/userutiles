@@ -74,7 +74,10 @@ fn parse_check_line(line: &str) -> Option<(&str, &str)> {
     if hash.is_empty() || rest.is_empty() {
         return None;
     }
-    let file = rest.strip_prefix('*').or_else(|| rest.strip_prefix(' ')).unwrap_or(rest);
+    let file = rest
+        .strip_prefix('*')
+        .or_else(|| rest.strip_prefix(' '))
+        .unwrap_or(rest);
     if file.is_empty() {
         return None;
     }

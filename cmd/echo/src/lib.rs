@@ -19,8 +19,7 @@ pub fn run() -> i32 {
     let args: Vec<OsString> = std::env::args_os().skip(1).collect();
     let byte_args: Vec<&[u8]> = args.iter().map(|a| a.as_bytes()).collect();
     let posix_escape_default = std::env::var_os("POSIXLY_CORRECT").is_some();
-    let (mut trailing_nl, escape, start) =
-        parse_leading_options(&byte_args, posix_escape_default);
+    let (mut trailing_nl, escape, start) = parse_leading_options(&byte_args, posix_escape_default);
 
     let mut out = Vec::new();
     for (j, arg) in byte_args[start..].iter().enumerate() {

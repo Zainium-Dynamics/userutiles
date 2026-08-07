@@ -404,10 +404,8 @@ mod tests {
 
     #[test]
     fn round_trip_create_list_extract() {
-        let root = std::env::temp_dir().join(format!(
-            "user_tar_test_{}_roundtrip",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("user_tar_test_{}_roundtrip", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         let src_dir = root.join("src");
         fs::create_dir_all(&src_dir).unwrap();

@@ -256,7 +256,12 @@ mod tests {
     fn split_list_handles_colon_and_whitespace() {
         assert_eq!(
             split_list("a:b c  d"),
-            vec!["a".to_string(), "b".to_string(), "c".to_string(), "d".to_string()]
+            vec![
+                "a".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+                "d".to_string()
+            ]
         );
     }
 
@@ -266,10 +271,8 @@ mod tests {
     }
 
     fn tmp_dir(name: &str) -> PathBuf {
-        let p = std::env::temp_dir().join(format!(
-            "user_updatedb_test_{}_{name}",
-            std::process::id()
-        ));
+        let p =
+            std::env::temp_dir().join(format!("user_updatedb_test_{}_{name}", std::process::id()));
         let _ = fs::remove_dir_all(&p);
         fs::create_dir_all(&p).unwrap();
         p

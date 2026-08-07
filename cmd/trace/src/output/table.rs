@@ -7,9 +7,11 @@ pub fn format_table(data: &TraceData) -> crate::utils::TraceResult<String> {
     // Header with process name and PID
     output.push_str(&format!(
         "\n{}\n\n",
-        format!("Trace started on process: {} (PID: {})", 
-                data.process.name.cyan().bold(),
-                data.process.pid.to_string().cyan().bold())
+        format!(
+            "Trace started on process: {} (PID: {})",
+            data.process.name.cyan().bold(),
+            data.process.pid.to_string().cyan().bold()
+        )
     ));
 
     // Process Information Section
@@ -18,15 +20,23 @@ pub fn format_table(data: &TraceData) -> crate::utils::TraceResult<String> {
     output.push_str(&format_row("Name", &data.process.name, 15));
     output.push_str(&format_row("Status", &data.process.status, 15));
     output.push_str(&format_row("Uptime", &data.process.uptime, 15));
-    output.push_str(&format_row("Memory", &format!("{} MB (RSS)", data.memory.rss_mb), 15));
-    output.push_str(&format_row("CPU Usage", &format!("{:.1}%", data.process.cpu_percent), 15));
+    output.push_str(&format_row(
+        "Memory",
+        &format!("{} MB (RSS)", data.memory.rss_mb),
+        15,
+    ));
+    output.push_str(&format_row(
+        "CPU Usage",
+        &format!("{:.1}%", data.process.cpu_percent),
+        15,
+    ));
 
     // Syscall Summary Section
     output.push_str(&format!("\n{}\n", "Syscall Summary".bold()));
     let stats = data.syscalls.get_stats();
     let total = data.syscalls.total_syscalls();
     let unique = data.syscalls.unique_syscalls();
-    
+
     let top_3 = if stats.is_empty() {
         "—".to_string()
     } else {
@@ -39,14 +49,30 @@ pub fn format_table(data: &TraceData) -> crate::utils::TraceResult<String> {
     };
 
     output.push_str(&format_row("Total syscalls", &format_count(total), 18));
-    output.push_str(&format_row("Unique syscalls", &format_count(unique as u64), 18));
+    output.push_str(&format_row(
+        "Unique syscalls",
+        &format_count(unique as u64),
+        18,
+    ));
     output.push_str(&format_row("Top 3 syscalls", &top_3, 18));
 
     // Network Activity Section
     output.push_str(&format!("\n{}\n", "Network Activity".bold()));
-    output.push_str(&format_row("Connections", &format!("{} active", data.network.active_connections), 15));
-    output.push_str(&format_row("Bytes sent", &format_bytes(data.network.bytes_sent), 15));
-    output.push_str(&format_row("Bytes received", &format_bytes(data.network.bytes_received), 15));
+    output.push_str(&format_row(
+        "Connections",
+        &format!("{} active", data.network.active_connections),
+        15,
+    ));
+    output.push_str(&format_row(
+        "Bytes sent",
+        &format_bytes(data.network.bytes_sent),
+        15,
+    ));
+    output.push_str(&format_row(
+        "Bytes received",
+        &format_bytes(data.network.bytes_received),
+        15,
+    ));
 
     // Footer
     output.push_str(&format!(

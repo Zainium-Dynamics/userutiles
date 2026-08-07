@@ -191,10 +191,8 @@ mod tests {
     use std::path::PathBuf;
 
     fn scratch_file(tag: &str, contents: &str) -> PathBuf {
-        let path = std::env::temp_dir().join(format!(
-            "user_paste_test_{tag}_{}",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("user_paste_test_{tag}_{}", std::process::id()));
         std::fs::write(&path, contents).unwrap();
         path
     }
@@ -248,7 +246,10 @@ mod tests {
         let f2 = scratch_file("par2", "a\nb\nc\n");
         let mut out = Vec::new();
         paste_parallel(
-            &[f1.to_str().unwrap().to_string(), f2.to_str().unwrap().to_string()],
+            &[
+                f1.to_str().unwrap().to_string(),
+                f2.to_str().unwrap().to_string(),
+            ],
             b"\t",
             &mut out,
         )
@@ -264,7 +265,10 @@ mod tests {
         let f2 = scratch_file("ragged2", "a\n");
         let mut out = Vec::new();
         paste_parallel(
-            &[f1.to_str().unwrap().to_string(), f2.to_str().unwrap().to_string()],
+            &[
+                f1.to_str().unwrap().to_string(),
+                f2.to_str().unwrap().to_string(),
+            ],
             b"\t",
             &mut out,
         )

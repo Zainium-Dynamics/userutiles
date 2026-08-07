@@ -2,7 +2,8 @@
 use std::fs::OpenOptions;
 use std::io::{self, Read, Write};
 
-use usercore::Ui;
+use std::path::Path;
+use usercore::{protect, Ui};
 
 /// Entry point for the `tee` utility. Parses `std::env::args()`, opens each
 /// named file (creating/truncating or appending per `-a`), then copies
@@ -110,6 +111,9 @@ fn print_help() {
 /// Open `path` for `tee` output: created if missing, truncated unless
 /// `append` is set (in which case writes are appended instead).
 fn open_output(path: &str, append: bool) -> io::Result<std::fs::File> {
+    if let Some(reason) = protect::modification_denied(Path::new(path)) {
+        return Err(io::Error::new(io::ErrorKind::PermissionDenied, reason.message()));
+    }
     OpenOptions::new()
         .create(true)
         .write(true)
