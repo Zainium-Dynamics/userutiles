@@ -1,0 +1,23 @@
+[package]
+name = "user_findmnt"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX findmnt — list or search mounted filesystems"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_findmnt"
+path = "src/lib.rs"
+
+[[bin]]
+name = "findmnt"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+
+[lints]
+workspace = true

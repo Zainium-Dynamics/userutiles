@@ -7,6 +7,24 @@ detailed per-utility rationale and file list behind each item.
 
 ## [Unreleased]
 
+### Added (2026-08-25 — mount / umount / pivot_root / switch_root / findmnt / losetup / swapon / swapoff)
+- Own implementation against `mount(2)`/`umount2(2)`/`pivot_root(2)` and
+  the loop/swap ioctl ABIs (no `libblkid`/`libmount` equivalent exists in
+  this workspace, so `mount`'s fstype auto-detection is a fixed candidate
+  list, not real superblock probing). See `checklist/mount-storage-p0.md`.
+- `mount`: direct mounts, `-t`/`-o`, `/etc/fstab` lookup, `-a`,
+  `--bind`/`--rbind`/`--move`.
+- `umount`: mountpoint-or-device argument, `-f`/`-l`/`-R`/`-a`.
+- `pivot_root`, `switch_root` (core move+chroot+exec mechanism;
+  deliberately skips the old-root recursive-delete step real
+  `switch_root` does as a RAM-reclaim optimization).
+- `findmnt`: reads `/proc/self/mounts`; found and fixed a real bug in its
+  own longest-prefix matching where `/` never matched anything since
+  `format!("{}/", "/")` produces `"//"`.
+- `losetup`, `swapon`, `swapoff`.
+- All of `mount`/`umount`/`switch_root`'s target-modifying paths go
+  through the same `usercore::protect` guard `chmod`/`chown`/`chattr` use.
+
 ### Added (2026-08-25 — chattr / lsattr)
 - Ported `chattr`/`lsattr` from e2fsprogs 1.47.4's `misc/chattr.c` and
   `misc/lsattr.c`: full flag set, `-p`/`-v` project/version, recursive

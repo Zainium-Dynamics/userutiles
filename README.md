@@ -21,7 +21,7 @@ Each `cmd/*` crate builds its own standalone executable directly.
 ## Highlights
 
 - **Discrete binaries** — every utility is its own standalone executable, built directly from its `cmd/*` crate
-- **150+ utilities**, each a `cmd/<name>` crate exporting `pub fn run() -> i32`
+- **160+ utilities**, each a `cmd/<name>` crate exporting `pub fn run() -> i32`
 - **Zainium-first layout** — installs under `/overlayer/syshub`, never assumes `/usr/bin`
 - **Coreutils, modernized** — the classic GNU coreutils surface (`cat`, `ls`, `cp`, `sort`, …), reimplemented from scratch in Rust with real syscalls and complete common flag sets, not a thin wrapper
 - **util-linux suite** — system/diagnostic tools (`lsns`, `lslocks`, `lsipc`, `last`, `lscpu`, `lsmem`, `dmesg`, `uuidgen`, `cal`, `hexdump`, `blockdev`, …) each verified flag-by-flag against the [uutils/util-linux](https://github.com/uutils/util-linux) reference **and** byte-for-byte diffed against the real system binaries — see [`DEVPLAN.md`](DEVPLAN.md) / [`checklist/`](checklist/) for the full parity log, and [`MISSING.md`](MISSING.md) for what's still missing
@@ -300,6 +300,14 @@ gap against upstream util-linux is tracked in [`MISSING.md`](MISSING.md).
 | `setpgid` | Run a program in a new process group |
 | `setsid` | Run a program in a new session |
 | `uuidgen` | Generate a new UUID (v1 time-based, v3/v5 name-based, v4 random) |
+| `mount` | Mount a filesystem |
+| `umount` | Unmount a filesystem |
+| `findmnt` | List or search mounted filesystems |
+| `losetup` | Set up and control loop devices |
+| `pivot_root` | Change the root filesystem |
+| `switch_root` | Switch to another filesystem as root (initramfs) |
+| `swapon` | Enable a swap area |
+| `swapoff` | Disable a swap area |
 | `chattr` | Change ext2/3/4 file attributes (immutable, append-only, …) |
 | `lsattr` | List ext2/3/4 file attributes |
 
@@ -333,7 +341,7 @@ lscpu -J
 
 **Findutils:** `find` `xargs` `locate` `updatedb`
 
-**util-linux (system/diagnostic):** `lscpu` `lsmem` `lsns` `lslocks` `lsipc` `last` `dmesg` `hexdump` `blockdev` `cal` `chcpu` `ctrlaltdel` `fsfreeze` `mcookie` `mesg` `mountpoint` `nologin` `renice` `rev` `setpgid` `setsid` `uuidgen` — see [util-linux suite](#util-linux-suite) above for descriptions
+**util-linux (system/diagnostic):** `lscpu` `lsmem` `lsns` `lslocks` `lsipc` `last` `dmesg` `hexdump` `blockdev` `cal` `chcpu` `ctrlaltdel` `fsfreeze` `mcookie` `mesg` `mountpoint` `nologin` `renice` `rev` `setpgid` `setsid` `uuidgen` `mount` `umount` `findmnt` `losetup` `pivot_root` `switch_root` `swapon` `swapoff` — see [util-linux suite](#util-linux-suite) above for descriptions
 
 Full list: `ls cmd/` (one crate per utility name).
 

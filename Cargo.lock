@@ -1950,6 +1950,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "user_findmnt"
+version = "0.1.0"
+dependencies = [
+ "usercore",
+]
+
+[[package]]
 name = "user_fmt"
 version = "0.1.0"
 dependencies = [
@@ -2102,6 +2109,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "user_losetup"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "usercore",
+]
+
+[[package]]
 name = "user_ls"
 version = "0.1.0"
 dependencies = [
@@ -2209,6 +2224,14 @@ dependencies = [
 
 [[package]]
 name = "user_more"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "usercore",
+]
+
+[[package]]
+name = "user_mount"
 version = "0.1.0"
 dependencies = [
  "libc",
@@ -2327,6 +2350,14 @@ dependencies = [
 
 [[package]]
 name = "user_pinky"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "usercore",
+]
+
+[[package]]
+name = "user_pivot_root"
 version = "0.1.0"
 dependencies = [
  "libc",
@@ -2587,6 +2618,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "user_swapoff"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "usercore",
+]
+
+[[package]]
+name = "user_swapon"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "usercore",
+]
+
+[[package]]
+name = "user_switch_root"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "usercore",
+]
+
+[[package]]
 name = "user_sync"
 version = "0.1.0"
 dependencies = [
@@ -2718,6 +2773,14 @@ dependencies = [
 
 [[package]]
 name = "user_tty"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "usercore",
+]
+
+[[package]]
+name = "user_umount"
 version = "0.1.0"
 dependencies = [
  "libc",
