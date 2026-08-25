@@ -277,7 +277,7 @@ fn print_row(
         let total = st.files;
         let free = st.ffree;
         let used = total.saturating_sub(free);
-        let pct = if total == 0 { 0 } else { (used * 100) / total };
+        let pct = (used * 100).checked_div(total).unwrap_or(0);
         let line = format!(
             "{:<20} {:>10} {:>10} {:>10} {:>4}% {}",
             trunc(source, 20),
@@ -294,11 +294,7 @@ fn print_row(
     let avail_b = st.bavail.saturating_mul(st.bsize);
     let free_b = st.bfree.saturating_mul(st.bsize);
     let used_b = total_b.saturating_sub(free_b);
-    let pct = if total_b == 0 {
-        0
-    } else {
-        (used_b * 100) / total_b
-    };
+    let pct = (used_b * 100).checked_div(total_b).unwrap_or(0);
     let (ts, us, as_) = if human {
         (human_size(total_b), human_size(used_b), human_size(avail_b))
     } else {

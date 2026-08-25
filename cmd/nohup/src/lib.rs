@@ -126,8 +126,13 @@ mod tests {
     use super::*;
     use std::env;
 
+    // Both tests below mutate the process-wide cwd; the default test
+    // harness runs them concurrently, so without serializing they race.
+    static CWD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn open_nohup_out_prefers_cwd_when_writable() {
+        let _guard = CWD_LOCK.lock().unwrap();
         let scratch = env::temp_dir().join(format!(
             "user_nohup_test_cwd_{}_{}",
             std::process::id(),
@@ -146,6 +151,7 @@ mod tests {
 
     #[test]
     fn open_nohup_out_falls_back_to_home_when_cwd_unwritable() {
+        let _guard = CWD_LOCK.lock().unwrap();
         // Use a cwd that doesn't exist by chdir-ing to a directory then
         // removing it out from under us isn't portable in tests; instead
         // simulate the "cwd write fails" branch directly by asserting the

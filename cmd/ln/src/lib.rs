@@ -114,7 +114,11 @@ pub fn run() -> i32 {
         };
 
         if let Some(reason) = protect::modification_denied(&link_path) {
-            eprintln!("ln: failed to create link '{}': {}", link_path.display(), reason.message());
+            eprintln!(
+                "ln: failed to create link '{}': {}",
+                link_path.display(),
+                reason.message()
+            );
             status = 1;
             continue;
         }

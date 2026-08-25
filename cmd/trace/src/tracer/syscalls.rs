@@ -23,7 +23,6 @@ pub struct SyscallTracer {
 
 impl SyscallTracer {
     pub fn new() -> Self {
-        
         SyscallTracer {
             stats: HashMap::new(),
             syscall_names: Self::init_syscall_names(),
@@ -181,7 +180,7 @@ impl SyscallTracer {
 
     pub fn get_stats(&self) -> Vec<SyscallStats> {
         let mut stats: Vec<_> = self.stats.values().cloned().collect();
-        stats.sort_by(|a, b| b.count.cmp(&a.count));
+        stats.sort_by_key(|s| std::cmp::Reverse(s.count));
         stats
     }
 

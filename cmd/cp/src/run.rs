@@ -82,7 +82,11 @@ pub fn run(args: Vec<String>) -> i32 {
         };
 
         if let Some(reason) = protect::modification_denied(&effective_dest) {
-            ui::err(&format!("cannot overwrite '{}': {}", effective_dest.display(), reason.message()));
+            ui::err(&format!(
+                "cannot overwrite '{}': {}",
+                effective_dest.display(),
+                reason.message()
+            ));
             status = 1;
             continue;
         }

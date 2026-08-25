@@ -1,0 +1,24 @@
+[package]
+name = "user_chattr"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX chattr — change ext2/3/4 file attributes"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_chattr"
+path = "src/lib.rs"
+
+[[bin]]
+name = "chattr"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+libc = "0.2"
+
+[lints]
+workspace = true

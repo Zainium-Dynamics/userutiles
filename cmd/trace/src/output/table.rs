@@ -6,12 +6,9 @@ pub fn format_table(data: &TraceData) -> crate::utils::TraceResult<String> {
 
     // Header with process name and PID
     output.push_str(&format!(
-        "\n{}\n\n",
-        format!(
-            "Trace started on process: {} (PID: {})",
-            data.process.name.cyan().bold(),
-            data.process.pid.to_string().cyan().bold()
-        )
+        "\nTrace started on process: {} (PID: {})\n\n",
+        data.process.name.cyan().bold(),
+        data.process.pid.to_string().cyan().bold()
     ));
 
     // Process Information Section

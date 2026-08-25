@@ -34,13 +34,12 @@ pub fn run(_ctx: &Ctx) {
             Tone::Green
         };
         let status = format!("{:?}", proc.status());
+        let pid = proc.pid();
         println!(
-            "  {} {} {} {} {}",
-            format!("{:<8}", proc.pid()),
+            "  {pid:<8} {} {} {} {status}",
             theme::paint_pad(Tone::Purple, proc.name(), 28),
             theme::paint_pad(cpu_tone, &format!("{:.1}%", cpu), 10),
             theme::paint_pad(Tone::Blue, &format!("{} MB", mem_mb), 12),
-            status
         );
     }
 

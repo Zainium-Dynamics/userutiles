@@ -1681,6 +1681,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "user_chattr"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "usercore",
+]
+
+[[package]]
 name = "user_chcpu"
 version = "0.1.0"
 dependencies = [
@@ -2098,6 +2106,14 @@ name = "user_ls"
 version = "0.1.0"
 dependencies = [
  "colored",
+ "libc",
+ "usercore",
+]
+
+[[package]]
+name = "user_lsattr"
+version = "0.1.0"
+dependencies = [
  "libc",
  "usercore",
 ]

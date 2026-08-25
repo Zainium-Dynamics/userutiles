@@ -593,7 +593,7 @@ mod tests {
             let config = create_test_config(false, DEF_TAB_SIZE);
             let mut buf = vec![];
             process_half_line(b"\t \t", 10, false, false, &config, &mut buf).unwrap();
-            assert_eq!(buf, vec![b'\t', b' ', b' ', b'\t', b' ', b' ', b' ']);
+            assert_eq!(buf, b"\t \t   ");
         }
 
         #[test]
@@ -602,7 +602,7 @@ mod tests {
             let mut buf = vec![];
             let s = "日本語".as_bytes();
             process_half_line(s, 5, false, false, &config, &mut buf).unwrap();
-            assert_eq!(buf, "日本 ".as_bytes());
+            assert_eq!(buf, "日本  ".as_bytes());
         }
 
         #[test]
@@ -611,7 +611,7 @@ mod tests {
             let mut buf = vec![];
             let s = b"abc";
             process_half_line(s, 3, false, true, &config, &mut buf).unwrap();
-            assert_eq!(buf, b"abc\t ");
+            assert_eq!(buf, b"abc\t  ");
         }
 
         #[test]
@@ -620,7 +620,7 @@ mod tests {
             let mut buf = vec![];
             let s = b"abc";
             process_half_line(s, 10, false, false, &config, &mut buf).unwrap();
-            assert_eq!(buf, b"abc ")
+            assert_eq!(buf, b"abc        ")
         }
 
         #[test]
@@ -629,7 +629,7 @@ mod tests {
             let mut buf = vec![];
             let s = b"abc";
             process_half_line(s, 10, false, true, &config, &mut buf).unwrap();
-            assert_eq!(buf, b"abc ")
+            assert_eq!(buf, b"abc          ")
         }
 
         #[test]
@@ -665,7 +665,7 @@ mod tests {
             let mut buf = vec![];
             let s = b" \t \t ";
             process_half_line(s, 10, false, false, &config, &mut buf).unwrap();
-            assert_eq!(buf, b" \t \t ");
+            assert_eq!(buf, b" \t \t   ");
         }
 
         #[test]
@@ -674,7 +674,7 @@ mod tests {
             let mut buf = vec![];
             let s = b" \t \t ";
             process_half_line(s, 10, false, false, &config, &mut buf).unwrap();
-            assert_eq!(buf, b" ");
+            assert_eq!(buf, b"           ");
         }
 
         #[test]
@@ -683,7 +683,7 @@ mod tests {
             let mut buf = vec![];
             let s = b" \t \t ";
             process_half_line(s, 10, false, true, &config, &mut buf).unwrap();
-            assert_eq!(buf, b" ");
+            assert_eq!(buf, b"             ");
         }
 
         #[test]
@@ -692,7 +692,7 @@ mod tests {
             let mut buf = vec![];
             let s = "\u{200B}".as_bytes();
             process_half_line(s, 10, false, false, &config, &mut buf).unwrap();
-            assert_eq!(buf, "\u{200B}\t\t ".as_bytes());
+            assert_eq!(buf, "\u{200B}\t\t   ".as_bytes());
         }
 
         #[test]
@@ -730,7 +730,7 @@ mod tests {
             let s = b"abc\xFF\xFEdef";
             process_half_line(s, 10, false, false, &config, &mut buf).unwrap();
             assert!(String::from_utf8(s.to_vec()).is_err());
-            assert_eq!(buf, b"abc\xFF\xFEdef ");
+            assert_eq!(buf, b"abc\xFF\xFEdef   ");
         }
 
         #[test]
@@ -766,7 +766,7 @@ mod tests {
             let mut buf = vec![];
             let s = b"a\tb\tc\t";
             process_half_line(s, 10, false, false, &config, &mut buf).unwrap();
-            assert_eq!(buf, b"a\tb\tc ");
+            assert_eq!(buf, b"a\tb\tc  ");
         }
 
         #[test]
@@ -784,7 +784,7 @@ mod tests {
             let mut buf = vec![];
             let s = b"a\tb\tc\t";
             process_half_line(s, 10, false, false, &config, &mut buf).unwrap();
-            assert_eq!(buf, b"a b c ");
+            assert_eq!(buf, b"a   b   c  ");
         }
 
         #[test]
@@ -793,7 +793,7 @@ mod tests {
             let mut buf = vec![];
             let s = b"a\tb\tc\t";
             process_half_line(s, 10, false, true, &config, &mut buf).unwrap();
-            assert_eq!(buf, b"a b c ");
+            assert_eq!(buf, b"a   b   c    ");
         }
 
         #[test]
@@ -812,7 +812,7 @@ mod tests {
             let mut buf = vec![];
             let s = b"abc";
             process_half_line(s, 10, false, false, &config, &mut buf).unwrap();
-            assert_eq!(buf, b"abc\t\t ");
+            assert_eq!(buf, b"abc\t\t   ");
         }
     }
 
@@ -839,7 +839,7 @@ mod tests {
             let symbol = b'>';
             let mut buf = vec![];
             push_output(&left_ln[..], &right_ln[..], symbol, &mut buf, &config).unwrap();
-            assert_eq!(buf, b"\t\t\t\t\t\t\t >\tbar\n");
+            assert_eq!(buf, b"\t\t\t\t\t\t\t      >\tbar\n");
         }
 
         #[test]
@@ -850,7 +850,7 @@ mod tests {
             let symbol = b'>';
             let mut buf = vec![];
             push_output(&left_ln[..], &right_ln[..], symbol, &mut buf, &config).unwrap();
-            assert_eq!(buf, b"bar\t\t\t\t\t\t\t >\n");
+            assert_eq!(buf, b"bar\t\t\t\t\t\t\t      >\n");
         }
 
         #[test]
@@ -901,7 +901,7 @@ mod tests {
             let symbol = b'<'; // impossible case, just to use different symbol
             let mut buf = vec![];
             push_output(left_ln, right_ln, symbol, &mut buf, &config).unwrap();
-            assert_eq!(buf, "data\t\t\t\t\t\t\t <\n".as_bytes());
+            assert_eq!(buf, "data\t\t\t\t\t\t\t      <\n".as_bytes());
         }
 
         #[test]
@@ -932,12 +932,9 @@ mod tests {
             let symbol = b' ';
             let mut buf = vec![];
             push_output(left_ln, right_ln, symbol, &mut buf, &config).unwrap();
-            let expected_left = " left".to_string() + &" ".repeat(61 - 12);
-            let expected_right = " right";
-            assert_eq!(
-                buf,
-                format!("{}{}{}\n", expected_left, " ", expected_right).as_bytes()
-            );
+            let expected_left = " ".repeat(8) + "left" + &" ".repeat(60);
+            let expected_right = "right";
+            assert_eq!(buf, format!("{expected_left}{expected_right}\n").as_bytes());
         }
 
         #[test]

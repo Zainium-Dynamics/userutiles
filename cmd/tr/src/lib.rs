@@ -122,10 +122,9 @@ pub fn run() -> i32 {
     }
 
     if squeeze {
-        let sq_set = if set2.is_some() && !delete {
-            set2.as_ref().unwrap()
-        } else {
-            &set1
+        let sq_set = match &set2 {
+            Some(s2) if !delete => s2,
+            _ => &set1,
         };
         for &b in sq_set {
             sq[b as usize] = true;
@@ -152,10 +151,9 @@ pub fn run() -> i32 {
                 continue;
             }
             let b2 = map[b as usize].unwrap_or(b);
-            if squeeze && sq[b2 as usize]
-                && last == Some(b2) {
-                    continue;
-                }
+            if squeeze && sq[b2 as usize] && last == Some(b2) {
+                continue;
+            }
             last = Some(b2);
             out.push(b2);
         }

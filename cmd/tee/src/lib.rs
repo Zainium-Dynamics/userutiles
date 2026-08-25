@@ -112,7 +112,10 @@ fn print_help() {
 /// `append` is set (in which case writes are appended instead).
 fn open_output(path: &str, append: bool) -> io::Result<std::fs::File> {
     if let Some(reason) = protect::modification_denied(Path::new(path)) {
-        return Err(io::Error::new(io::ErrorKind::PermissionDenied, reason.message()));
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            reason.message(),
+        ));
     }
     OpenOptions::new()
         .create(true)

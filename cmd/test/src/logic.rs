@@ -21,8 +21,23 @@ pub fn eval(args: &[String], bracket: bool) -> i32 {
     if args.len() == 2 {
         return unary(&args[0], &args[1], bracket);
     }
-    // binary
+    // binary — except `-a`/`-o`, which at this arity are logical AND/OR of
+    // the two single-string truth tests either side, not comparison ops.
     if args.len() == 3 {
+        if args[1] == "-a" {
+            return if eval(&args[..1], bracket) == 0 && eval(&args[2..], bracket) == 0 {
+                0
+            } else {
+                1
+            };
+        }
+        if args[1] == "-o" {
+            return if eval(&args[..1], bracket) == 0 || eval(&args[2..], bracket) == 0 {
+                0
+            } else {
+                1
+            };
+        }
         return binary(&args[0], &args[1], &args[2], bracket);
     }
     // ! EXPR

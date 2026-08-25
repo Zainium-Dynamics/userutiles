@@ -114,7 +114,10 @@ fn shred_file(
     size: Option<u64>,
 ) -> std::io::Result<()> {
     if let Some(reason) = protect::modification_denied(path) {
-        return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, reason.message()));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            reason.message(),
+        ));
     }
     let meta = fs::metadata(path)?;
     let len = size.unwrap_or(meta.len());

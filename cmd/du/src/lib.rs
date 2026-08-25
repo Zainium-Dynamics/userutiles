@@ -80,10 +80,17 @@ pub fn run() -> i32 {
         max_depth = Some(0);
     }
 
+    let opts = DuOpts {
+        human,
+        bytes,
+        apparent,
+        all,
+        max_depth,
+    };
     let mut status = 0;
     let mut seen = HashSet::new();
     for p in &paths {
-        match du_path(p, human, bytes, apparent, all, max_depth, 0, &mut seen) {
+        match du_path(p, opts, 0, &mut seen) {
             Ok(_total) => {}
             Err(e) => {
                 ui.err(&format!("{}: {e}", p.display()));
@@ -124,16 +131,28 @@ fn print_help() {
 /// directory's own block only once per traversal path is correct (dirs
 /// aren't typically hard-linked, and excluding them keeps the total's
 /// self-size contribution simple).
-fn du_path(
-    path: &Path,
+#[derive(Clone, Copy, Default)]
+struct DuOpts {
     human: bool,
     bytes: bool,
     apparent: bool,
     all: bool,
     max_depth: Option<usize>,
+}
+
+fn du_path(
+    path: &Path,
+    opts: DuOpts,
     depth: usize,
     seen: &mut HashSet<(u64, u64)>,
 ) -> io::Result<u64> {
+    let DuOpts {
+        human,
+        bytes,
+        apparent,
+        all,
+        max_depth,
+    } = opts;
     let meta = fs::symlink_metadata(path)?;
     // hardlink de-dup
     let key = (meta.dev(), meta.ino());
@@ -167,16 +186,7 @@ fn du_path(
     let mut total = self_size;
     for entry in fs::read_dir(path)? {
         let entry = entry?;
-        total += du_path(
-            &entry.path(),
-            human,
-            bytes,
-            apparent,
-            all,
-            max_depth,
-            depth + 1,
-            seen,
-        )?;
+        total += du_path(&entry.path(), opts, depth + 1, seen)?;
     }
 
     let show = match max_depth {
@@ -241,7 +251,7 @@ mod tests {
         std::os::unix::fs::symlink(&dir, &loop_link).unwrap();
 
         let mut seen = HashSet::new();
-        let result = du_path(&dir, false, false, false, false, None, 0, &mut seen);
+        let result = du_path(&dir, DuOpts::default(), 0, &mut seen);
         assert!(result.is_ok(), "du_path must terminate: {result:?}");
 
         fs::remove_file(&loop_link).ok();
@@ -255,7 +265,12 @@ mod tests {
         fs::write(dir.join("b.txt"), b"world!!").unwrap();
 
         let mut seen = HashSet::new();
-        let total = du_path(&dir, false, true, true, false, None, 0, &mut seen).unwrap();
+        let opts = DuOpts {
+            bytes: true,
+            apparent: true,
+            ..DuOpts::default()
+        };
+        let total = du_path(&dir, opts, 0, &mut seen).unwrap();
         // apparent size, bytes mode: exact byte sum plus the dir entry's
         // own apparent size (typically small but nonzero on most fs).
         assert!(
@@ -273,7 +288,7 @@ mod tests {
             std::process::id()
         ));
         let mut seen = HashSet::new();
-        let result = du_path(&missing, false, false, false, false, None, 0, &mut seen);
+        let result = du_path(&missing, DuOpts::default(), 0, &mut seen);
         assert!(result.is_err());
     }
 
@@ -292,15 +307,19 @@ mod tests {
         fs::hard_link(&a, &b).unwrap();
 
         let mut seen = HashSet::new();
-        let total_with_link = du_path(&dir, false, true, true, false, None, 0, &mut seen).unwrap();
+        let opts = DuOpts {
+            bytes: true,
+            apparent: true,
+            ..DuOpts::default()
+        };
+        let total_with_link = du_path(&dir, opts, 0, &mut seen).unwrap();
 
         let dir2 = tmp_dir("no_hardlink");
         fs::write(dir2.join("a.txt"), b"hello").unwrap();
         fs::write(dir2.join("c.txt"), b"world").unwrap();
 
         let mut seen2 = HashSet::new();
-        let total_without_link =
-            du_path(&dir2, false, true, true, false, None, 0, &mut seen2).unwrap();
+        let total_without_link = du_path(&dir2, opts, 0, &mut seen2).unwrap();
 
         assert_eq!(total_without_link, total_with_link + 5);
 

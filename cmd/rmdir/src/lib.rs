@@ -77,7 +77,11 @@ pub fn run() -> i32 {
 /// `ignore_fail` is set, in which case it's silently skipped.
 fn remove_one(d: &std::path::Path, ignore_fail: bool, verbose: bool, ui: &Ui, status: &mut i32) {
     if let Some(reason) = protect::removal_denied(d) {
-        ui.err(&format!("failed to remove '{}': {}", d.display(), reason.message()));
+        ui.err(&format!(
+            "failed to remove '{}': {}",
+            d.display(),
+            reason.message()
+        ));
         *status = 1;
         return;
     }
@@ -109,7 +113,11 @@ fn remove_with_ancestors(
     let mut cur = d.to_path_buf();
     loop {
         if let Some(reason) = protect::removal_denied(&cur) {
-            ui.err(&format!("failed to remove '{}': {}", cur.display(), reason.message()));
+            ui.err(&format!(
+                "failed to remove '{}': {}",
+                cur.display(),
+                reason.message()
+            ));
             *status = 1;
             break;
         }

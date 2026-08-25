@@ -72,7 +72,7 @@ impl Sha1 {
         }
         let (mut a, mut b, mut c, mut d, mut e) =
             (self.h[0], self.h[1], self.h[2], self.h[3], self.h[4]);
-        for i in 0..80 {
+        for (i, &wi) in w.iter().enumerate() {
             let (f, k) = if i < 20 {
                 ((b & c) | ((!b) & d), 0x5a827999)
             } else if i < 40 {
@@ -87,7 +87,7 @@ impl Sha1 {
                 .wrapping_add(f)
                 .wrapping_add(e)
                 .wrapping_add(k)
-                .wrapping_add(w[i]);
+                .wrapping_add(wi);
             e = d;
             d = c;
             c = b.rotate_left(30);

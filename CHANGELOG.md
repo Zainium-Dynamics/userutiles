@@ -7,6 +7,52 @@ detailed per-utility rationale and file list behind each item.
 
 ## [Unreleased]
 
+### Added (2026-08-25 — chattr / lsattr)
+- Ported `chattr`/`lsattr` from e2fsprogs 1.47.4's `misc/chattr.c` and
+  `misc/lsattr.c`: full flag set, `-p`/`-v` project/version, recursive
+  walk, `-l` long display. See `checklist/chattr-lsattr.md`. `chattr` also
+  refuses to touch `/overlayer/syshub`/`/overlayer/zaisys`, the same guard
+  `chmod`/`chown` already use.
+
+### Fixed (2026-08-25 — cargo build regression, full clippy/fmt cleanup, real bugs)
+- `.cargo/config.toml`: the previous commit's `[build] target =
+  "targets/x86_64-zainium-linux-musl.json"` default broke every plain
+  `cargo build`/`test`/`clippy`/`fmt` on the normal stable toolchain (that
+  target only resolves with `-Z json-target-spec -Z build-std` on
+  nightly, which `scripts/build-zainium.sh` already passes explicitly and
+  never needed the config default for). Removed the default; kept the
+  linker sections.
+- `scripts/clippy.sh --strict`: `--exclude zex_diffutils` was stale after
+  the rename (package is `user_diffutils`), so it silently stopped
+  excluding the vendored crate. Fixed the name; added a targeted
+  `#![allow(clippy::incompatible_msrv)]` in `cmd/diffutils` for its one
+  real MSRV mismatch (vendored, not hand-maintained for lint cleanliness).
+- Full workspace now passes `cargo clippy --workspace --all-targets -D
+  warnings` and `cargo fmt --all -- --check` with zero findings (was
+  previously unverifiable — nothing built). Fixes across `core` (two
+  `needless_range_loop`s in `blake2b`/`sha1`), `cmd/sys`, `cmd/trace`,
+  `cmd/df`, `cmd/du` (grouped `du_path`'s flags into `DuOpts` to clear
+  `too_many_arguments`), `cmd/rm` (MSRV-incompatible `ErrorKind::
+  IsADirectory`; `force` was dead in `remove_dir_recursive` — now actually
+  makes `-f` ignore a child that vanished mid-walk), `cmd/find` (`root`
+  param was fully unused — removed; a test module was placed before other
+  items), `cmd/comm`, `cmd/tr`, `cmd/tar`, `cmd/chgrp` (missing `# SAFETY`
+  comment), `cmd/trigger/benches/discovery_bench.rs` (imported a
+  never-renamed crate as `user_trigger`).
+- Real bugs found once tests could finally run (`cargo test --workspace`):
+  `cmd/sha1sum`'s test literal for `SHA1("abc")` was missing its last hex
+  digit; `cmd/tail`'s `tail_lines_from(_, 0, _)` printed the last line
+  instead of nothing; `cmd/test`'s 3-arg `EXPR1 -a EXPR2`/`-o` fell through
+  to the binary-operator table instead of being evaluated as logical
+  AND/OR; `cmd/nohup`'s two cwd-mutating tests raced each other (added a
+  `Mutex` to serialize them); `cmd/trigger/src/platform.rs`'s Linux/Redox
+  app and handler search paths were doubled
+  (`/overlayer/syshub/overlayer/syshub/bin`) from the zex→user rename
+  sweep, so app/handler discovery silently found nothing.
+- `cmd/chroot`'s `resolve_shell()` now tries `bash`, then `sh`, then
+  `dash` (was `sh` only) via Zainium's `PATH` directories before falling
+  back to `$SHELL`/`/bin/sh`.
+
 ### Changed (2026-08-05 — project renamed, multicall removed)
 - Project renamed `zex-utils` → `user_utils`. Every Cargo package/lib name
   containing `zex` was renamed to `user` (`zexcore` → `usercore`, all 149

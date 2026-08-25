@@ -9,7 +9,11 @@
 // Bright Green — success tick (✓)
 // Bright Red — error indicator (only in ui.rs)
 
-use std::{collections::HashMap, path::{Path, PathBuf}, time::Duration};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use bytesize::ByteSize;
 use crossbeam_channel::Receiver;

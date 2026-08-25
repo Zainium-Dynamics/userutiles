@@ -178,7 +178,10 @@ mod tests {
     #[test]
     fn zexlib_allowed() {
         assert_eq!(removal_denied_resolved(Path::new("/zexlib")), None);
-        assert_eq!(removal_denied_resolved(Path::new("/overlayer/zexlib")), None);
+        assert_eq!(
+            removal_denied_resolved(Path::new("/overlayer/zexlib")),
+            None
+        );
     }
 
     #[test]
@@ -214,17 +217,22 @@ mod tests {
             modification_denied_resolved(Path::new("/overlayer/zaisys")),
             Some(ProtectReason::OverlayerTree)
         );
-
     }
 
     #[test]
     fn modification_denied_zexlib_exception() {
-        assert_eq!(modification_denied_resolved(Path::new("/overlayer/zexlib")), None);
+        assert_eq!(
+            modification_denied_resolved(Path::new("/overlayer/zexlib")),
+            None
+        );
     }
 
     #[test]
     fn modification_denied_allows_unrelated() {
         assert_eq!(modification_denied_resolved(Path::new("/tmp/foo")), None);
-        assert_eq!(modification_denied_resolved(Path::new("/overlayer-backup")), None);
+        assert_eq!(
+            modification_denied_resolved(Path::new("/overlayer-backup")),
+            None
+        );
     }
 }

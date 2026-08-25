@@ -42,9 +42,9 @@ impl ProcessInfo {
     fn calculate_uptime(_stat: &procfs::process::Stat) -> String {
         // Get boot time from /proc/stat
         if let Ok(boot_time) = Self::get_boot_time() {
-            if let Ok(elapsed) = SystemTime::now().duration_since(
-                std::time::UNIX_EPOCH + std::time::Duration::from_secs(boot_time),
-            ) {
+            if let Ok(elapsed) = SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH + std::time::Duration::from_secs(boot_time))
+            {
                 let secs = elapsed.as_secs();
                 let hours = secs / 3600;
                 let minutes = (secs % 3600) / 60;

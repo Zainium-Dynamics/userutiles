@@ -21,7 +21,7 @@ Each `cmd/*` crate builds its own standalone executable directly.
 ## Highlights
 
 - **Discrete binaries** — every utility is its own standalone executable, built directly from its `cmd/*` crate
-- **148+ utilities**, each a `cmd/<name>` crate exporting `pub fn run() -> i32`
+- **150+ utilities**, each a `cmd/<name>` crate exporting `pub fn run() -> i32`
 - **Zainium-first layout** — installs under `/overlayer/syshub`, never assumes `/usr/bin`
 - **Coreutils, modernized** — the classic GNU coreutils surface (`cat`, `ls`, `cp`, `sort`, …), reimplemented from scratch in Rust with real syscalls and complete common flag sets, not a thin wrapper
 - **util-linux suite** — system/diagnostic tools (`lsns`, `lslocks`, `lsipc`, `last`, `lscpu`, `lsmem`, `dmesg`, `uuidgen`, `cal`, `hexdump`, `blockdev`, …) each verified flag-by-flag against the [uutils/util-linux](https://github.com/uutils/util-linux) reference **and** byte-for-byte diffed against the real system binaries — see [`DEVPLAN.md`](DEVPLAN.md) / [`checklist/`](checklist/) for the full parity log, and [`MISSING.md`](MISSING.md) for what's still missing
@@ -300,6 +300,12 @@ gap against upstream util-linux is tracked in [`MISSING.md`](MISSING.md).
 | `setpgid` | Run a program in a new process group |
 | `setsid` | Run a program in a new session |
 | `uuidgen` | Generate a new UUID (v1 time-based, v3/v5 name-based, v4 random) |
+| `chattr` | Change ext2/3/4 file attributes (immutable, append-only, …) |
+| `lsattr` | List ext2/3/4 file attributes |
+
+`chattr`/`lsattr` are ported from **e2fsprogs**, not util-linux, but live
+here since that's where the rest of the ext2/3/4-attribute tooling is —
+see [`checklist/chattr-lsattr.md`](checklist/chattr-lsattr.md).
 
 ```bash
 lsns
@@ -317,7 +323,7 @@ lscpu -J
 
 **Text & filters:** `cat` `head` `tail` `wc` `cut` `tr` `tee` `paste` `sort` `uniq` `expand` `unexpand` `fold` `fmt` `nl` `tac` `od` `comm` `join` `pr` `ptx` `csplit` `printf` `echo` `yes` `grep` `sed` `more`
 
-**Paths & FS:** `ls` `dir` `vdir` `dircolors` `cp` `rm` `rmdir` `ln` `link` `unlink` `chmod` `chown` `chgrp` `df` `du` `stat` `readlink` `realpath` `basename` `dirname` `pathchk` `mktemp` `mkfifo` `mknod` `truncate` `shred` `install` `sync` `dd` `tar` `chroot`
+**Paths & FS:** `ls` `dir` `vdir` `dircolors` `cp` `rm` `rmdir` `ln` `link` `unlink` `chmod` `chown` `chgrp` `chattr` `lsattr` `df` `du` `stat` `readlink` `realpath` `basename` `dirname` `pathchk` `mktemp` `mkfifo` `mknod` `truncate` `shred` `install` `sync` `dd` `tar` `chroot`
 
 **Checksums:** `md5sum` `sha1sum` `sha224sum` `sha256sum` `sha384sum` `sha512sum` `b2sum` `sum` `cksum` `basenc` `base32` `base64`
 

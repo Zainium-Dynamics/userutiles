@@ -29,10 +29,10 @@ pub fn run(_ctx: &Ctx) {
             }
             _ => Tone::Black,
         };
+        let temp_color = theme::temp_color(s.temp, s.critical);
         println!(
-            "  {} {} {}",
+            "  {} {temp_color:<12} {}",
             theme::paint_pad(Tone::Purple, &s.label, 26),
-            format!("{:<12}", theme::temp_color(s.temp, s.critical)),
             theme::paint(tone, label)
         );
     }

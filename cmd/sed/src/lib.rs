@@ -181,7 +181,10 @@ fn split_delim(s: &str, d: char) -> Vec<&str> {
 fn process_file(path: &str, cmds: &[Cmd], quiet: bool, in_place: bool) -> io::Result<()> {
     if in_place && path != "-" {
         if let Some(reason) = protect::modification_denied(Path::new(path)) {
-            return Err(io::Error::new(io::ErrorKind::PermissionDenied, reason.message()));
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                reason.message(),
+            ));
         }
     }
     let reader: Box<dyn BufRead> = if path == "-" {

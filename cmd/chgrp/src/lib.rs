@@ -70,7 +70,11 @@ pub fn run() -> i32 {
     let mut status = 0;
     for p in &paths {
         if let Some(reason) = protect::modification_denied(p) {
-            ui.err(&format!("changing group of '{}': {}", p.display(), reason.message()));
+            ui.err(&format!(
+                "changing group of '{}': {}",
+                p.display(),
+                reason.message()
+            ));
             status = 1;
             continue;
         }
@@ -180,6 +184,7 @@ mod tests {
     /// few group changes an unprivileged test process is guaranteed to be
     /// allowed to make.
     fn own_gid() -> u32 {
+        // SAFETY: takes no arguments, cannot fail.
         unsafe { libc::getegid() }
     }
 

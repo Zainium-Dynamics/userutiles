@@ -128,7 +128,7 @@ impl Platform {
     fn linux_paths() -> (Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>) {
         // Application search paths - Linux FHS + package managers
         let app_paths = vec![
-            PathBuf::from("/overlayer/syshub/overlayer/syshub/bin"),
+            PathBuf::from("/overlayer/syshub/bin"),
             PathBuf::from("/overlayer/syshub/sbin"),
             PathBuf::from("/opt/overlayer/syshub/bin"),
             PathBuf::from("/snap/overlayer/syshub/bin"), // Snap packages
@@ -178,7 +178,7 @@ impl Platform {
 
         // Handler search paths - where interpreters are located
         let handler_paths = vec![
-            PathBuf::from("/overlayer/syshub/overlayer/syshub/bin"),
+            PathBuf::from("/overlayer/syshub/bin"),
             PathBuf::from("/overlayer/syshub/sbin"),
             PathBuf::from("/opt/overlayer/syshub/bin"),
         ];
@@ -191,7 +191,7 @@ impl Platform {
         // Application search paths - Redox native paths
         let app_paths = vec![
             PathBuf::from("/overlayer/syshub/bin"),
-            PathBuf::from("/overlayer/syshub/overlayer/syshub/bin"),
+            PathBuf::from("/overlayer/syshub/bin"),
             PathBuf::from("/opt/overlayer/syshub/bin"),
         ];
 
@@ -213,7 +213,7 @@ impl Platform {
         // Handler search paths
         let handler_paths = vec![
             PathBuf::from("/overlayer/syshub/bin"),
-            PathBuf::from("/overlayer/syshub/overlayer/syshub/bin"),
+            PathBuf::from("/overlayer/syshub/bin"),
             PathBuf::from("/opt/overlayer/syshub/bin"),
         ];
 
@@ -224,13 +224,13 @@ impl Platform {
     fn default_paths() -> (Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>) {
         (
             vec![
-                PathBuf::from("/overlayer/syshub/overlayer/syshub/bin"),
+                PathBuf::from("/overlayer/syshub/bin"),
                 PathBuf::from("/overlayer/syshub/sbin"),
             ],
             vec![PathBuf::from("/etc/trigger")],
             vec![],
             vec![
-                PathBuf::from("/overlayer/syshub/overlayer/syshub/bin"),
+                PathBuf::from("/overlayer/syshub/bin"),
                 PathBuf::from("/overlayer/syshub/sbin"),
             ],
         )

@@ -12,7 +12,7 @@ if [ "${1:-}" = "--strict" ]; then
   # cmd/diffutils is vendored from uutils/diffutils — it must still build and
   # pass tests, but we don't hand-maintain its lint cleanliness, so it's
   # excluded from the strict (-D warnings) pass.
-  cargo clippy --workspace --all-targets --exclude zex_diffutils -- -D warnings
+  cargo clippy --workspace --all-targets --exclude user_diffutils -- -D warnings
 else
   cargo clippy --workspace --all-targets
 fi

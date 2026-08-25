@@ -152,7 +152,7 @@ mod tests {
         h.update(b"abc");
         assert_eq!(
             usercore::digest::hex_lower(&h.finalize()),
-            "a9993e364706816aba3e25717850c26c9cd0d89"
+            "a9993e364706816aba3e25717850c26c9cd0d89d"
         );
     }
 
@@ -163,7 +163,7 @@ mod tests {
         let path = dir.join("in.txt");
         std::fs::write(&path, b"abc").unwrap();
         let h = hash_file(path.to_str().unwrap()).unwrap();
-        assert_eq!(h, "a9993e364706816aba3e25717850c26c9cd0d89");
+        assert_eq!(h, "a9993e364706816aba3e25717850c26c9cd0d89d");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

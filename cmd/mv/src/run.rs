@@ -128,10 +128,18 @@ pub fn run(args: Vec<String>) {
         };
 
         if let Some(reason) = protect::removal_denied(src) {
-            ui::fatal(&format!("Cannot move '{}': {}", src.display(), reason.message()));
+            ui::fatal(&format!(
+                "Cannot move '{}': {}",
+                src.display(),
+                reason.message()
+            ));
         }
         if let Some(reason) = protect::modification_denied(&effective_dest) {
-            ui::fatal(&format!("Cannot overwrite '{}': {}", effective_dest.display(), reason.message()));
+            ui::fatal(&format!(
+                "Cannot overwrite '{}': {}",
+                effective_dest.display(),
+                reason.message()
+            ));
         }
 
         if opts.verbose || total_sources > 1 {

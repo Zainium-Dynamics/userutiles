@@ -129,8 +129,8 @@ fn emit(out: &mut impl Write, line: &str, col: usize, suppress: &[bool; 3]) {
         return;
     }
     let mut prefix = String::new();
-    for c in 0..col {
-        if !suppress[c] {
+    for s in suppress.iter().take(col) {
+        if !s {
             prefix.push('\t');
         }
     }

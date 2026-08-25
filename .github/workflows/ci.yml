@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  RUST_BACKTRACE: "1"
+
+jobs:
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  fmt:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace
+
+  build-host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: ./scripts/build.sh
+      - run: test -x target/release/cat && test -x target/release/ls
+      - uses: actions/upload-artifact@v4
+        with:
+          name: user_utils-host-${{ github.sha }}
+          path: target/release/
+          retention-days: 7
+
+  build-musl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools
+      - run: TARGET=x86_64-unknown-linux-musl ./scripts/build.sh
+      - run: test -x target/x86_64-unknown-linux-musl/release/cat
+      - uses: actions/upload-artifact@v4
+        with:
+          name: user_utils-musl-${{ github.sha }}
+          path: target/x86_64-unknown-linux-musl/release/
+          retention-days: 7
+
+  # Zainium's own native musl target (targets/x86_64-zainium-linux-musl.json)
+  # needs the crosstool-NG toolchain + pinned nightly from zairoot, which
+  # only exists on a self-hosted runner — never on GitHub-hosted ones.
+  # Mirrors .gitlab-ci.yml's build:zainium-musl (tagged, allow_failure).
+  build-zainium-musl:
+    runs-on: [self-hosted, zainium]
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/build-zainium.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: user_utils-zainium-musl-${{ github.sha }}
+          path: dist/zainium/
+          retention-days: 7

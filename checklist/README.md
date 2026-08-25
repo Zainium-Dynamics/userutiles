@@ -27,6 +27,7 @@ implementing.
 | `hexdump` | P3 | **DONE** (2026-07-28) — real grammar gap found (via uucore source) + fixed | [hexdump.md](hexdump.md) |
 | `fsfreeze` | P3 | **DONE** (2026-07-28) — decided to keep current (more correct) behavior | [fsfreeze.md](fsfreeze.md) |
 | `blockdev`, `chcpu`, `ctrlaltdel`, `mcookie`, `mesg`, `mountpoint`, `nologin`, `renice`, `rev`, `setpgid`, `setsid` | — | at parity or better | [parity-confirmed.md](parity-confirmed.md) |
+| `chattr`, `lsattr` | — | **DONE** (2026-08-25) — ported from e2fsprogs 1.47.4 (not util-linux; tracked here anyway), byte-for-byte diffed vs the real binaries | [chattr-lsattr.md](chattr-lsattr.md) |
 
 Not reviewed in this pass (no util-linux-main counterpart): the other ~133
 zex-utils utilities (coreutils/findutils/checksum family/next-gen tools).

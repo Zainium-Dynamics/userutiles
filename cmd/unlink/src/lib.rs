@@ -42,7 +42,10 @@ pub fn run() -> i32 {
 /// going through `std::env::args()`.
 fn unlink_file(path: &Path) -> std::io::Result<()> {
     if let Some(reason) = protect::removal_denied(path) {
-        return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, reason.message()));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            reason.message(),
+        ));
     }
     fs::remove_file(path)
 }

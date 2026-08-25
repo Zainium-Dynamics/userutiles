@@ -412,7 +412,7 @@ mod tests {
         fs::write(src_dir.join("hello.txt"), b"hello world").unwrap();
         let archive = root.join("out.tar");
 
-        create_tar(&archive, &[src_dir.clone()], false).unwrap();
+        create_tar(&archive, std::slice::from_ref(&src_dir), false).unwrap();
         assert!(archive.exists());
 
         list_tar(&archive, false).unwrap();

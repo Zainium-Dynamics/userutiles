@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use user_trigger::{discovery::Discoverer, platform::Platform};
+use trigger::{discovery::Discoverer, platform::Platform};
 
 fn bench_platform_detection(c: &mut Criterion) {
     c.bench_function("Platform::detect", |b| b.iter(Platform::detect));

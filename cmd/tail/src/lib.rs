@@ -179,6 +179,9 @@ fn tail_lines(path: &str, n: u64, out: &mut impl Write) -> io::Result<()> {
 /// Ring-buffer the last `n` newline-delimited records from `reader` and
 /// write them to `out`.
 fn tail_lines_from(mut reader: impl BufRead, n: u64, out: &mut impl Write) -> io::Result<()> {
+    if n == 0 {
+        return Ok(());
+    }
     let mut ring: std::collections::VecDeque<Vec<u8>> =
         std::collections::VecDeque::with_capacity((n as usize).saturating_add(1).min(1 << 20));
     let mut buf = Vec::new();

@@ -116,23 +116,27 @@ mod tests {
         #[test]
         fn basics() {
             assert_tab_expansion("foo barr baz", 8, "foo barr baz");
-            assert_tab_expansion("foo\tbarr\tbaz", 8, "foo barr baz");
-            assert_tab_expansion("foo\tbarr\tbaz", 5, "foo barr baz");
-            assert_tab_expansion("foo\tbarr\tbaz", 2, "foo barr baz");
+            assert_tab_expansion("foo\tbarr\tbaz", 8, "foo     barr    baz");
+            assert_tab_expansion("foo\tbarr\tbaz", 5, "foo  barr baz");
+            assert_tab_expansion("foo\tbarr\tbaz", 2, "foo barr  baz");
         }
 
         #[test]
         fn multibyte_chars() {
-            assert_tab_expansion("foo\tépée\tbaz", 8, "foo épée baz");
-            assert_tab_expansion("foo\t\tbaz", 5, "foo baz");
+            assert_tab_expansion("foo\tépée\tbaz", 8, "foo     épée    baz");
+            assert_tab_expansion("foo\t\tbaz", 5, "foo       baz");
 
-            // Note: The Woman Scientist emoji (‍) is a ZWJ sequence combining
-            // the Woman emoji () and the Microscope emoji (). On supported platforms
-            // it is displayed as a single emoji and has a print size of 2 columns.
+            // Note: U+1F469 U+200D U+1F52C is a ZWJ sequence combining the
+            // "woman" and "microscope" emoji into one "woman scientist"
+            // glyph on supported platforms, with a print size of 2 columns.
             // Terminal emulators tend to not support this, and display the two emojis
             // side by side, thus accounting for a print size of 4 columns, but the
             // unicode_width crate reports a correct size of 2.
-            assert_tab_expansion("foo\t‍\tbaz", 6, "foo ‍ baz");
+            assert_tab_expansion(
+                "foo\t\u{1F469}\u{200d}\u{1F52C}\tbaz",
+                6,
+                "foo   \u{1F469}\u{200d}\u{1F52C}    baz",
+            );
         }
 
         #[test]

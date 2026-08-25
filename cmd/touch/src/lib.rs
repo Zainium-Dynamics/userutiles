@@ -224,7 +224,11 @@ fn touch_one(
             return Ok(());
         }
         // create empty file (and parents are NOT auto-created — GNU touch does not mkdir -p)
-        OpenOptions::new().create(true).truncate(false).write(true).open(path)?;
+        OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(path)?;
     }
 
     let mut at = times.atime;

@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - name: host-gnu
+            target: ""
+            bindir: target/release
+          - name: musl
+            target: x86_64-unknown-linux-musl
+            bindir: target/x86_64-unknown-linux-musl/release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools
+      - run: TARGET=${{ matrix.target }} ./scripts/build.sh
+
+      - name: Package discrete binaries
+        run: |
+          set -euo pipefail
+          out="user_utils-${{ github.ref_name }}-${{ matrix.name }}"
+          mkdir -p "$out"
+          # every executable, discrete binary in the release dir — skips
+          # .d/.rlib/etc build artifacts, matching scripts/build-zainium.sh's
+          # own "no dotted basename" filter.
+          for f in ${{ matrix.bindir }}/*; do
+            [ -f "$f" ] && [ -x "$f" ] || continue
+            case "$(basename "$f")" in *.*) continue ;; esac
+            cp "$f" "$out/"
+          done
+          tar -czf "$out.tar.gz" "$out"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: user_utils-${{ github.ref_name }}-${{ matrix.name }}
+          path: user_utils-${{ github.ref_name }}-${{ matrix.name }}.tar.gz
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.gz
+          generate_release_notes: true

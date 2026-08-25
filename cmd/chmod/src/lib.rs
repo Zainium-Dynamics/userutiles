@@ -76,7 +76,11 @@ pub fn run() -> i32 {
     let mut status = 0;
     for p in &paths {
         if let Some(reason) = protect::modification_denied(p) {
-            eprintln!("chmod: changing permissions of '{}': {}", p.display(), reason.message());
+            eprintln!(
+                "chmod: changing permissions of '{}': {}",
+                p.display(),
+                reason.message()
+            );
             status = 1;
             continue;
         }

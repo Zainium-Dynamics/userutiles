@@ -183,7 +183,7 @@ pub fn run() -> i32 {
     let mut status = 0;
     let mut out = io::stdout().lock();
     for p in &paths {
-        if let Err(e) = walk(p, p, 0, min_depth, max_depth, &preds, &mut out) {
+        if let Err(e) = walk(p, 0, min_depth, max_depth, &preds, &mut out) {
             eprintln!("find: {}: {e}", p.display());
             status = 1;
         }
@@ -257,43 +257,7 @@ fn parse_depth(s: &str) -> Result<usize, String> {
     s.parse().map_err(|_| format!("invalid depth `{s}'"))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parse_depth_accepts_valid_numbers() {
-        assert_eq!(parse_depth("0"), Ok(0));
-        assert_eq!(parse_depth("3"), Ok(3));
-    }
-
-    #[test]
-    fn parse_depth_rejects_garbage_instead_of_defaulting_to_zero() {
-        // Regression: this used to silently become 0 via unwrap_or(0).
-        assert!(parse_depth("abc").is_err());
-        assert!(parse_depth("-1").is_err());
-        assert!(parse_depth("").is_err());
-        assert!(parse_depth("3.5").is_err());
-    }
-
-    #[test]
-    fn parse_size_units() {
-        assert_eq!(parse_size("10c"), Ok(('=', 10)));
-        assert_eq!(parse_size("+2k"), Ok(('+', 2048)));
-        assert_eq!(parse_size("-1M"), Ok(('-', 1024 * 1024)));
-    }
-
-    #[test]
-    fn parse_n_signs() {
-        assert_eq!(parse_n("+7"), Ok(('+', 7)));
-        assert_eq!(parse_n("-3"), Ok(('-', 3)));
-        assert_eq!(parse_n("5"), Ok(('=', 5)));
-        assert!(parse_n("nope").is_err());
-    }
-}
-
 fn walk(
-    root: &Path,
     path: &Path,
     depth: usize,
     min_depth: usize,
@@ -321,15 +285,7 @@ fn walk(
         };
         for ent in rd {
             let ent = ent?;
-            walk(
-                root,
-                &ent.path(),
-                depth + 1,
-                min_depth,
-                max_depth,
-                preds,
-                out,
-            )?;
+            walk(&ent.path(), depth + 1, min_depth, max_depth, preds, out)?;
         }
     }
     Ok(())
@@ -449,4 +405,39 @@ fn glob_match(pat: &str, text: &str) -> bool {
         pi == p.len()
     }
     rec(pat.as_bytes(), text.as_bytes())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_depth_accepts_valid_numbers() {
+        assert_eq!(parse_depth("0"), Ok(0));
+        assert_eq!(parse_depth("3"), Ok(3));
+    }
+
+    #[test]
+    fn parse_depth_rejects_garbage_instead_of_defaulting_to_zero() {
+        // Regression: this used to silently become 0 via unwrap_or(0).
+        assert!(parse_depth("abc").is_err());
+        assert!(parse_depth("-1").is_err());
+        assert!(parse_depth("").is_err());
+        assert!(parse_depth("3.5").is_err());
+    }
+
+    #[test]
+    fn parse_size_units() {
+        assert_eq!(parse_size("10c"), Ok(('=', 10)));
+        assert_eq!(parse_size("+2k"), Ok(('+', 2048)));
+        assert_eq!(parse_size("-1M"), Ok(('-', 1024 * 1024)));
+    }
+
+    #[test]
+    fn parse_n_signs() {
+        assert_eq!(parse_n("+7"), Ok(('+', 7)));
+        assert_eq!(parse_n("-3"), Ok(('-', 3)));
+        assert_eq!(parse_n("5"), Ok(('=', 5)));
+        assert!(parse_n("nope").is_err());
+    }
 }

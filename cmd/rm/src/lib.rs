@@ -147,10 +147,8 @@ fn remove_path(
             }
             Ok(())
         } else {
-            Err(io::Error::new(
-                io::ErrorKind::IsADirectory,
-                "Is a directory",
-            ))
+            // IsADirectory needs Rust 1.83; MSRV here is 1.70.
+            Err(io::Error::new(io::ErrorKind::Other, "Is a directory"))
         }
     } else {
         if interactive && !prompt(&format!("rm: remove '{}'? ", path.display())) {
@@ -192,20 +190,30 @@ fn remove_dir_recursive(
                 continue;
             }
             protect_err(&p)?;
-            fs::remove_file(&p).or_else(|e| {
+            let result = fs::remove_file(&p).or_else(|e| {
                 if ft.is_dir() {
                     fs::remove_dir_all(&p)
                 } else {
                     Err(e)
                 }
-            })?;
-            if verbose {
-                println!("removed '{}'", p.display());
+            });
+            match result {
+                Ok(()) => {
+                    if verbose {
+                        println!("removed '{}'", p.display());
+                    }
+                }
+                Err(e) if force && e.kind() == io::ErrorKind::NotFound => {}
+                Err(e) => return Err(e),
             }
         }
     }
     protect_err(path)?;
-    fs::remove_dir(path)
+    match fs::remove_dir(path) {
+        Ok(()) => Ok(()),
+        Err(e) if force && e.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 fn prompt(msg: &str) -> bool {

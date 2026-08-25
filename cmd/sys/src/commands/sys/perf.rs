@@ -81,10 +81,9 @@ pub fn run(_ctx: &Ctx) {
     for proc in processes.iter().take(8) {
         let mem_mb = proc.memory() / 1_048_576;
         println!(
-            "  {} {} {}",
+            "  {} {} {mem_mb} MB",
             theme::paint_pad(Tone::Purple, proc.name(), 30),
             theme::paint_pad(Tone::Blue, &format!("{:.1}%", proc.cpu_usage()), 10),
-            format!("{} MB", mem_mb)
         );
     }
 

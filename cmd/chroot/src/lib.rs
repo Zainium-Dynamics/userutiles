@@ -1,4 +1,4 @@
-//! user chroot — run command or interactive shell with special root directory.
+// user chroot — run command or interactive shell with special root directory.
 use std::ffi::CString;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
@@ -72,15 +72,15 @@ fn parse_command(args: &[String]) -> (String, Vec<String>) {
     }
 }
 
-/// Pick a shell to run when no `COMMAND` was given: prefer `sh` found
-/// via Zainium's standard `PATH` directories, then `$SHELL`, then
-/// `/bin/sh` as a last-resort fallback.
+/// Pick a shell to run when no `COMMAND` was given: prefer `bash`, then
+/// `sh`, then `dash`, found via Zainium's standard `PATH` directories;
+/// then `$SHELL`; then `/bin/sh` as a last-resort fallback.
 fn resolve_shell() -> String {
     let shell_env = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into());
-    usercore::zainium::path_dirs()
+    let dirs = usercore::zainium::path_dirs();
+    ["bash", "sh", "dash"]
         .into_iter()
-        .map(|d| d.join("sh"))
-        .find(|p| p.is_file())
+        .find_map(|name| dirs.iter().map(|d| d.join(name)).find(|p| p.is_file()))
         .map(|p| p.display().to_string())
         .unwrap_or(shell_env)
 }
