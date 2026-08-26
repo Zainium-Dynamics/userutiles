@@ -11,12 +11,15 @@ fn run_with_stdin(args: &[&str], input: &str) -> (String, String, i32) {
         .stderr(Stdio::piped())
         .spawn()
         .expect("spawn pr");
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(input.as_bytes())
-        .unwrap();
+    // A child that errors out on its arguments (e.g. an invalid -l) can
+    // legitimately exit — closing its stdin — before this write
+    // completes; that's a normal race, not a real failure, so only a
+    // non-BrokenPipe error here is one.
+    if let Err(e) = child.stdin.take().unwrap().write_all(input.as_bytes()) {
+        if e.kind() != std::io::ErrorKind::BrokenPipe {
+            panic!("write to pr stdin: {e}");
+        }
+    }
     let out = child.wait_with_output().expect("wait pr");
     (
         String::from_utf8_lossy(&out.stdout).into_owned(),
