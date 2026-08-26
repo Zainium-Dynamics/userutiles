@@ -94,20 +94,3 @@ build:host:
     paths:
       - target/release/
     expire_in: 1 week
-
-# Generic musl target (rustup's x86_64-unknown-linux-musl, stable toolchain).
-build:musl:
-  extends: .cargo_job
-  stage: build
-  before_script:
-    - rustc --version && cargo --version
-    - rustup target add x86_64-unknown-linux-musl
-    - apt-get update -qq && apt-get install -y -qq musl-tools
-  script:
-    - TARGET=x86_64-unknown-linux-musl ./scripts/build.sh
-    - test -x target/x86_64-unknown-linux-musl/release/cat
-  artifacts:
-    name: "user_utils-musl-$CI_COMMIT_SHORT_SHA"
-    paths:
-      - target/x86_64-unknown-linux-musl/release/
-    expire_in: 1 week

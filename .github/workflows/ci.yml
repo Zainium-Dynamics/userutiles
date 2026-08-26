@@ -53,20 +53,3 @@ jobs:
           name: user_utils-host-${{ github.sha }}
           path: target/release/
           retention-days: 7
-
-  build-musl:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-unknown-linux-musl
-      - uses: Swatinem/rust-cache@v2
-      - run: sudo apt-get update -qq && sudo apt-get install -y -qq musl-tools
-      - run: TARGET=x86_64-unknown-linux-musl ./scripts/build.sh
-      - run: test -x target/x86_64-unknown-linux-musl/release/cat
-      - uses: actions/upload-artifact@v4
-        with:
-          name: user_utils-musl-${{ github.sha }}
-          path: target/x86_64-unknown-linux-musl/release/
-          retention-days: 7
