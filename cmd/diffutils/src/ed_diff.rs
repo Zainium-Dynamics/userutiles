@@ -181,7 +181,7 @@ mod tests {
     fn test_permutations() {
         let target = "target/ed-diff/";
         // test all possible six-line files.
-        let _ = std::fs::create_dir(target);
+        let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
                 for &c in &[0, 1, 2] {
@@ -261,7 +261,7 @@ mod tests {
     fn test_permutations_empty_lines() {
         let target = "target/ed-diff/";
         // test all possible six-line files with missing newlines.
-        let _ = std::fs::create_dir(target);
+        let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
                 for &c in &[0, 1, 2] {
@@ -335,7 +335,7 @@ mod tests {
     fn test_permutations_reverse() {
         let target = "target/ed-diff/";
         // test all possible six-line files.
-        let _ = std::fs::create_dir(target);
+        let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
                 for &c in &[0, 1, 2] {
