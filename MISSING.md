@@ -25,7 +25,7 @@
 |-------|-----------------|----------------------|-------------|----------|
 | **GNU coreutils** | 107 | 105 | **2** | ~98% |
 | **util-linux 2.42** | 123 (bash-completion) | 42 | **81** | ~34% |
-| **util-linux man extras** | +9 (login/init not in bash-completion) | 2 (`nologin`, `login`) | **~6 more** | — |
+| **util-linux man extras** | +9 (login/init not in bash-completion) | 3 (`nologin`, `login`, `agetty`) | **~5 more** | — |
 
 **Bottom line:** coreutils surface is almost done. The big gap is **util-linux** (disk, mount, login, schedule, IPC, text helpers).
 
@@ -138,11 +138,11 @@ Grouped by subsystem (same layout as util-linux sources).
 
 ### 2.6 Login / account / session
 
-`login` is **DONE** (2026-08-26) — see `checklist/`. `sulogin`, `chfn`,
-`chsh`, `passwd`, `useradd`/`userdel`/`usermod`, `vipw`/`vigr`, and the
-rest of the account-management surface are covered by `elevate-umbra`
-(a separate Zainium Dynamics component, not part of this repo) — not
-tracked as missing here. Remaining:
+`login`/`agetty` are **DONE** (2026-08-26) — see `checklist/`.
+`sulogin`, `chfn`, `chsh`, `passwd`, `useradd`/`userdel`/`usermod`,
+`vipw`/`vigr`, and the rest of the account-management surface are
+covered by `elevate-umbra` (a separate Zainium Dynamics component, not
+part of this repo) — not tracked as missing here. Remaining:
 
 | Command | Role |
 |---------|------|
@@ -154,7 +154,6 @@ tracked as missing here. Remaining:
 | `wall` | Write message to all users |
 | `write` | Write message to one user |
 | `logger` | Write to system log |
-| `agetty` | Alternative getty (man page; not always in bash-completion) |
 | `runuser` | Run command as user (no PAM password path like su) |
 
 ### 2.7 UUID / identity helpers
@@ -201,7 +200,9 @@ resizepart  rev  setpgid  setsid  sfdisk  swapoff  swapon
 switch_root  umount  uuidgen
 ```
 
-Also related (often grouped with util-linux / login): `nologin`.
+Also related (often grouped with util-linux / login, but from the
+"man extras" +9, not the 123 bash-completion count above): `nologin`,
+`agetty`.
 
 Parity notes for many of these live in `checklist/` and `DEVPLAN.md`.
 
@@ -241,11 +242,10 @@ If the goal is a bootable / usable Zainium userland, order roughly:
 ### P0 — Boot, rootfs, storage
 `mount`/`umount`/`pivot_root`/`switch_root`/`findmnt`/`losetup`/`swapon`/
 `swapoff`/`blkid`/`lsblk`/`findfs`/`fdisk`/`sfdisk`/`partx`/`addpart`/
-`delpart`/`resizepart`/`mkswap`/`fsck`/`login` are **DONE**
+`delpart`/`resizepart`/`mkswap`/`fsck`/`login`/`agetty` are **DONE**
 (2026-08-25/26) — see `checklist/`. `sulogin` is covered by
 `elevate-umbra` (separate component). Remaining:
 1. `mkfs` family (at least a front-end + one real FS helper path)
-2. `agetty`
 
 ### P1 — Everyday system admin
 10. `hwclock`
@@ -270,15 +270,16 @@ If the goal is a bootable / usable Zainium userland, order roughly:
 ## 7. Counts at a glance
 
 ```
-zex-utils cmd/ crates .............. 175
+zex-utils cmd/ crates .............. 176
   of which coreutils match ......... 105 / 107
   of which util-linux match ........  42 / 123
   of which extra / other ...........  ~26+
-  (+ chattr/lsattr, e2fsprogs — not in the util-linux count above)
+  (+ chattr/lsattr, e2fsprogs; + login/agetty, man extras —
+   neither counted in the util-linux 123 above)
 
 MISSING coreutils ..................   2  (chcon, runcon)
 MISSING util-linux ..................  81  (see §2)
-MISSING util-linux login/init extras ~  6  (agetty, su, newgrp, …;
+MISSING util-linux login/init extras ~  5  (su, newgrp, …;
   sulogin/chfn/chsh/passwd/etc. covered by elevate-umbra, not tracked here)
 ```
 

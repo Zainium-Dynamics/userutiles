@@ -7,6 +7,16 @@ detailed per-utility rationale and file list behind each item.
 
 ## [Unreleased]
 
+### Added (2026-08-26 — agetty)
+- `agetty`: opens/reuses a tty, makes it the controlling terminal
+  (`setsid` + `TIOCSCTTY`), prints `/etc/issue` with `\l`/`\n`/`\s`/`\r`/
+  `\m` escapes expanded, prompts for a username, execs `login` — closes
+  out the P0 boot/rootfs/storage list except `mkfs`. See
+  `checklist/agetty.md`.
+- README rewritten again, shorter still, per feedback that it still
+  read as padded — dropped the remaining marketing language and section
+  headers down to what's actually load-bearing.
+
 ### Added (2026-08-26 — addpart / delpart / resizepart / login)
 - `usercore::blkpg`: the `BLKPG` ioctl logic factored out of `partx`
   into a shared module, so `addpart`/`delpart`/`resizepart` (thin

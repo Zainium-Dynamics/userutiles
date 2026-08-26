@@ -1616,6 +1616,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "user_agetty"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "usercore",
+]
+
+[[package]]
 name = "user_arch"
 version = "0.1.0"
 dependencies = [

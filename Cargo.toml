@@ -4,6 +4,7 @@ members = [
  "core",
  "cmd/arch",
  "cmd/addpart",
+ "cmd/agetty",
  "cmd/b2sum",
  "cmd/base32",
  "cmd/base64",
