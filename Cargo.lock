@@ -1657,6 +1657,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "user_blkid"
+version = "0.1.0"
+dependencies = [
+ "usercore",
+]
+
+[[package]]
 name = "user_blockdev"
 version = "0.1.0"
 dependencies = [
@@ -1941,11 +1948,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "user_fdisk"
+version = "0.1.0"
+dependencies = [
+ "usercore",
+]
+
+[[package]]
 name = "user_find"
 version = "0.1.0"
 dependencies = [
  "colored",
  "libc",
+ "usercore",
+]
+
+[[package]]
+name = "user_findfs"
+version = "0.1.0"
+dependencies = [
+ "user_blkid",
  "usercore",
 ]
 
@@ -1977,6 +1999,13 @@ name = "user_free"
 version = "0.1.0"
 dependencies = [
  "libc",
+ "usercore",
+]
+
+[[package]]
+name = "user_fsck"
+version = "0.1.0"
+dependencies = [
  "usercore",
 ]
 
@@ -2134,6 +2163,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "user_lsblk"
+version = "0.1.0"
+dependencies = [
+ "usercore",
+]
+
+[[package]]
 name = "user_lscpu"
 version = "0.1.0"
 dependencies = [
@@ -2208,6 +2244,14 @@ dependencies = [
 
 [[package]]
 name = "user_mknod"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "usercore",
+]
+
+[[package]]
+name = "user_mkswap"
 version = "0.1.0"
 dependencies = [
  "libc",
@@ -2318,6 +2362,14 @@ dependencies = [
 
 [[package]]
 name = "user_od"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "usercore",
+]
+
+[[package]]
+name = "user_partx"
 version = "0.1.0"
 dependencies = [
  "libc",
@@ -2497,6 +2549,13 @@ name = "user_setsid"
 version = "0.1.0"
 dependencies = [
  "libc",
+ "usercore",
+]
+
+[[package]]
+name = "user_sfdisk"
+version = "0.1.0"
+dependencies = [
  "usercore",
 ]
 
@@ -2913,6 +2972,7 @@ name = "usercore"
 version = "0.1.0"
 dependencies = [
  "colored",
+ "crc32fast",
  "libc",
  "thiserror 1.0.69",
 ]

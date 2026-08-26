@@ -1,22 +1,23 @@
 [package]
-name = "usercore"
+name = "user_fdisk"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.70"
 authors = ["Zainium Dynamics"]
-description = "Shared core for user_utils — UI, errors, exit codes (no uucore)"
+description = "ZEX fdisk — list partition tables"
 license = "GPL-3.0"
 publish = false
 
 [lib]
-name = "usercore"
+name = "user_fdisk"
 path = "src/lib.rs"
 
+[[bin]]
+name = "fdisk"
+path = "src/main.rs"
+
 [dependencies]
-colored = "2"
-crc32fast = "1"
-libc = "0.2"
-thiserror = "1"
+usercore = { path = "../../core" }
 
 [lints]
 workspace = true

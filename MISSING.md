@@ -24,7 +24,7 @@
 | Suite | Reference count | Present in zex-utils | **Missing** | Coverage |
 |-------|-----------------|----------------------|-------------|----------|
 | **GNU coreutils** | 107 | 105 | **2** | ~98% |
-| **util-linux 2.42** | 123 (bash-completion) | 30 | **93** | ~24% |
+| **util-linux 2.42** | 123 (bash-completion) | 38 | **85** | ~31% |
 | **util-linux man extras** | +9 (login/init not in bash-completion) | 1 (`nologin`) | **~8 more** | — |
 
 **Bottom line:** coreutils surface is almost done. The big gap is **util-linux** (disk, mount, login, schedule, IPC, text helpers).
@@ -52,15 +52,12 @@ Grouped by subsystem (same layout as util-linux sources).
 
 ### 2.1 Disk / partition / block (high priority for a real OS)
 
+`blkid`/`lsblk`/`findfs`/`fdisk`/`sfdisk`/`partx`/`mkswap`/`fsck` are
+**DONE** (2026-08-26) — see `checklist/`. Remaining:
+
 | Command | Role |
 |---------|------|
-| `blkid` | Probe block devices for FS type / UUID / LABEL |
-| `lsblk` | List block devices as a tree |
-| `findfs` | Find FS by LABEL/UUID |
-| `fdisk` | Partition table editor |
-| `sfdisk` | Scriptable partition table tool |
 | `cfdisk` | Curses partition editor |
-| `partx` | Tell kernel about partition table |
 | `addpart` | Tell kernel a partition was added |
 | `delpart` | Tell kernel a partition was removed |
 | `resizepart` | Tell kernel a partition was resized |
@@ -77,10 +74,8 @@ Grouped by subsystem (same layout as util-linux sources).
 | `mkfs.bfs` | Create BFS filesystem |
 | `mkfs.cramfs` | Create cramfs |
 | `mkfs.minix` | Create Minix FS |
-| `fsck` | Filesystem check front-end |
 | `fsck.cramfs` | Check cramfs |
 | `fsck.minix` | Check Minix FS |
-| `mkswap` | Set up a swap area |
 | `swaplabel` | Read/write swap UUID/LABEL |
 | `fstrim` | Discard unused blocks on mounted FS |
 | `zramctl` | Control zram devices |
@@ -194,15 +189,16 @@ Grouped by subsystem (same layout as util-linux sources).
 
 ---
 
-## 3. Already present — util-linux subset (30)
+## 3. Already present — util-linux subset (38)
 
 These exist under `cmd/` and are the current util-linux footprint:
 
 ```
-blockdev  cal  chcpu  ctrlaltdel  dmesg  findmnt  fsfreeze  hexdump
-last  losetup  lscpu  lsipc  lslocks  lsmem  lsns  mcookie  mesg
-more  mount  mountpoint  pivot_root  renice  rev  setpgid  setsid
-swapoff  swapon  switch_root  umount  uuidgen
+blkid  blockdev  cal  chcpu  ctrlaltdel  dmesg  fdisk  findfs
+findmnt  fsck  fsfreeze  hexdump  last  losetup  lsblk  lscpu
+lsipc  lslocks  lsmem  lsns  mcookie  mesg  mkswap  more  mount
+mountpoint  partx  pivot_root  renice  rev  setpgid  setsid
+sfdisk  swapoff  swapon  switch_root  umount  uuidgen
 ```
 
 Also related (often grouped with util-linux / login): `nologin`.
@@ -243,14 +239,13 @@ These are **present** and outside the two C reference trees — not missing work
 If the goal is a bootable / usable Zainium userland, order roughly:
 
 ### P0 — Boot, rootfs, storage
-`mount`/`umount`/`pivot_root`/`switch_root`/`findmnt`/`losetup`/`swapon`/`swapoff`
-are **DONE** (2026-08-25) — see `checklist/`. Remaining:
-1. `blkid` / `lsblk` / `findfs`
-2. `fdisk` / `sfdisk` / `partx` (+ `addpart`/`delpart`/`resizepart`)
-3. `mkfs` family (at least a front-end + one real FS helper path)
-4. `mkswap`
-5. `fsck` front-end
-6. `agetty` / `login` / `sulogin`
+`mount`/`umount`/`pivot_root`/`switch_root`/`findmnt`/`losetup`/`swapon`/
+`swapoff`/`blkid`/`lsblk`/`findfs`/`fdisk`/`sfdisk`/`partx`/`mkswap`/
+`fsck` are **DONE** (2026-08-25/26) — see `checklist/`. Remaining:
+1. `mkfs` family (at least a front-end + one real FS helper path)
+2. `addpart`/`delpart`/`resizepart` (thin BLKPG wrappers, same mechanism
+   `partx` already uses)
+3. `agetty` / `login` / `sulogin`
 
 ### P1 — Everyday system admin
 10. `hwclock`
@@ -275,14 +270,14 @@ are **DONE** (2026-08-25) — see `checklist/`. Remaining:
 ## 7. Counts at a glance
 
 ```
-zex-utils cmd/ crates .............. 163
+zex-utils cmd/ crates .............. 171
   of which coreutils match ......... 105 / 107
-  of which util-linux match ........  30 / 123
+  of which util-linux match ........  38 / 123
   of which extra / other ...........  ~26+
   (+ chattr/lsattr, e2fsprogs — not in the util-linux count above)
 
 MISSING coreutils ..................   2  (chcon, runcon)
-MISSING util-linux ..................  93  (see §2)
+MISSING util-linux ..................  85  (see §2)
 MISSING util-linux login/init extras ~  8  (agetty, login, …)
 ```
 

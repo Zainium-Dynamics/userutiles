@@ -7,6 +7,24 @@ detailed per-utility rationale and file list behind each item.
 
 ## [Unreleased]
 
+### Added (2026-08-26 — blkid / lsblk / findfs / fdisk / sfdisk / partx / mkswap / fsck)
+- Two new `usercore` modules: `blkprobe` (ext2/3/4, swap, xfs, vfat,
+  iso9660 superblock probing — a from-scratch libblkid stand-in) and
+  `ptable` (MBR + GPT partition table read/write — a from-scratch
+  libfdisk stand-in, including correct GPT CRC-32 header/entry-array
+  checksums and mixed-endian GUID handling).
+- `blkid`, `lsblk`, `findfs`, `mkswap` built directly on `blkprobe`.
+- `fdisk` (`-l` listing only — no interactive edit mode), `sfdisk`
+  (dump/list/write, with `L`/`S`/`U` short type aliases), `partx`
+  (`-s`/`-a`/`-d` via a hand-defined `BLKPG` ioctl) built on `ptable`.
+- `fsck`: front-end only, dispatches to `fsck.<type>` on `PATH` by
+  detected or forced type; no per-filesystem checker vendored.
+- Cross-verified against the real, unmodified `blkid`/`fdisk`/`sfdisk`
+  binaries on real ext4/vfat/xfs/swap images built by the actual `mkfs.*`
+  tools — every field/checksum matched, including a full write-path
+  round trip (our `sfdisk` writes a table, real `fdisk -l`/`sfdisk -d`
+  read it back with zero warnings). See `checklist/blkid-partition-tools.md`.
+
 ### Added (2026-08-25 — mount / umount / pivot_root / switch_root / findmnt / losetup / swapon / swapoff)
 - Own implementation against `mount(2)`/`umount2(2)`/`pivot_root(2)` and
   the loop/swap ioctl ABIs (no `libblkid`/`libmount` equivalent exists in

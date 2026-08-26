@@ -1,0 +1,24 @@
+[package]
+name = "user_findfs"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX findfs — find a filesystem by LABEL or UUID"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_findfs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "findfs"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+user_blkid = { path = "../blkid" }
+
+[lints]
+workspace = true

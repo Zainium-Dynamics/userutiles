@@ -29,6 +29,7 @@ implementing.
 | `blockdev`, `chcpu`, `ctrlaltdel`, `mcookie`, `mesg`, `mountpoint`, `nologin`, `renice`, `rev`, `setpgid`, `setsid` | — | at parity or better | [parity-confirmed.md](parity-confirmed.md) |
 | `chattr`, `lsattr` | — | **DONE** (2026-08-25) — ported from e2fsprogs 1.47.4 (not util-linux; tracked here anyway), byte-for-byte diffed vs the real binaries | [chattr-lsattr.md](chattr-lsattr.md) |
 | `mount`, `umount`, `pivot_root`, `switch_root`, `findmnt`, `losetup`, `swapon`, `swapoff` | P0 | **DONE** (2026-08-25) — see [MISSING.md](../MISSING.md) §2.1/2.2 | [mount-storage-p0.md](mount-storage-p0.md) |
+| `blkid`, `lsblk`, `findfs`, `fdisk`, `sfdisk`, `partx`, `mkswap`, `fsck` | P0 | **DONE** (2026-08-26) — cross-verified against real `blkid`/`fdisk`/`sfdisk` | [blkid-partition-tools.md](blkid-partition-tools.md) |
 
 Not reviewed in this pass (no util-linux-main counterpart): the other ~133
 zex-utils utilities (coreutils/findutils/checksum family/next-gen tools).

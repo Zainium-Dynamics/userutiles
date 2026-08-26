@@ -21,7 +21,7 @@ Each `cmd/*` crate builds its own standalone executable directly.
 ## Highlights
 
 - **Discrete binaries** — every utility is its own standalone executable, built directly from its `cmd/*` crate
-- **160+ utilities**, each a `cmd/<name>` crate exporting `pub fn run() -> i32`
+- **170+ utilities**, each a `cmd/<name>` crate exporting `pub fn run() -> i32`
 - **Zainium-first layout** — installs under `/overlayer/syshub`, never assumes `/usr/bin`
 - **Coreutils, modernized** — the classic GNU coreutils surface (`cat`, `ls`, `cp`, `sort`, …), reimplemented from scratch in Rust with real syscalls and complete common flag sets, not a thin wrapper
 - **util-linux suite** — system/diagnostic tools (`lsns`, `lslocks`, `lsipc`, `last`, `lscpu`, `lsmem`, `dmesg`, `uuidgen`, `cal`, `hexdump`, `blockdev`, …) each verified flag-by-flag against the [uutils/util-linux](https://github.com/uutils/util-linux) reference **and** byte-for-byte diffed against the real system binaries — see [`DEVPLAN.md`](DEVPLAN.md) / [`checklist/`](checklist/) for the full parity log, and [`MISSING.md`](MISSING.md) for what's still missing
@@ -83,6 +83,8 @@ table to keep in sync.
 | `ui` | Zainium terminal palette (cyan / green / magenta / status marks) |
 | `error` / `exit` | Unified errors and exit codes |
 | `digest` | Pure-Rust MD5, SHA-1/2, BLAKE2b (no external crypto crates) |
+| `blkprobe` | Filesystem superblock probing (ext2/3/4, swap, xfs, vfat, iso9660) — a libblkid stand-in |
+| `ptable` | MBR/GPT partition table read/write — a libfdisk stand-in |
 | `zainium` | Default `PATH`, install prefix, locate DB resolution |
 
 Data tools keep **stdout clean** for pipelines; diagnostics go to **stderr**
@@ -308,6 +310,14 @@ gap against upstream util-linux is tracked in [`MISSING.md`](MISSING.md).
 | `switch_root` | Switch to another filesystem as root (initramfs) |
 | `swapon` | Enable a swap area |
 | `swapoff` | Disable a swap area |
+| `blkid` | Locate/print block device attributes (TYPE/UUID/LABEL) |
+| `lsblk` | List block devices as a tree |
+| `findfs` | Find a filesystem by LABEL or UUID |
+| `fdisk` | List partition tables (`-l`) |
+| `sfdisk` | Scriptable partition table tool (dump/list/write) |
+| `partx` | Tell the kernel about a device's partitions |
+| `mkswap` | Set up a swap area |
+| `fsck` | Filesystem check front-end (dispatches to `fsck.<type>`) |
 | `chattr` | Change ext2/3/4 file attributes (immutable, append-only, …) |
 | `lsattr` | List ext2/3/4 file attributes |
 
@@ -341,7 +351,7 @@ lscpu -J
 
 **Findutils:** `find` `xargs` `locate` `updatedb`
 
-**util-linux (system/diagnostic):** `lscpu` `lsmem` `lsns` `lslocks` `lsipc` `last` `dmesg` `hexdump` `blockdev` `cal` `chcpu` `ctrlaltdel` `fsfreeze` `mcookie` `mesg` `mountpoint` `nologin` `renice` `rev` `setpgid` `setsid` `uuidgen` `mount` `umount` `findmnt` `losetup` `pivot_root` `switch_root` `swapon` `swapoff` — see [util-linux suite](#util-linux-suite) above for descriptions
+**util-linux (system/diagnostic):** `lscpu` `lsmem` `lsns` `lslocks` `lsipc` `last` `dmesg` `hexdump` `blockdev` `cal` `chcpu` `ctrlaltdel` `fsfreeze` `mcookie` `mesg` `mountpoint` `nologin` `renice` `rev` `setpgid` `setsid` `uuidgen` `mount` `umount` `findmnt` `losetup` `pivot_root` `switch_root` `swapon` `swapoff` `blkid` `lsblk` `findfs` `fdisk` `sfdisk` `partx` `mkswap` `fsck` — see [util-linux suite](#util-linux-suite) above for descriptions
 
 Full list: `ls cmd/` (one crate per utility name).
 
