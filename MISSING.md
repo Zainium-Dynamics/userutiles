@@ -1,60 +1,44 @@
-# user_utils (formerly zex-utils) — Missing Commands Gap List
+# Missing commands
 
-> Renamed from `zex-utils` on 2026-08-05; the directory path below is
-> unchanged (still `zex-native/zex-utils` on disk), and crate names in the
-> rest of this file predate the `zex_*` → `user_*` rename. Counts/coverage
-> are unaffected by the rename.
-
-**Date:** 2026-07-29  
-**Purpose:** Compare `zex-utils` against GNU **coreutils** and **util-linux 2.42** and list what is still missing.  
-**References:**
-
-| Tree | Path |
-|------|------|
-| zex-utils | `/run/media/alizain/ZAINIUM_DRIVE/zex-native/zex-utils` |
-| GNU coreutils | `/home/alizain/coreutils-master` |
-| util-linux | `/home/alizain/util-linux-2.42` |
-
-**Method:** Directory / man / bash-completion command names vs `cmd/` crates in zex-utils (name match only — not full flag parity).
-
----
+What's still missing compared to GNU coreutils and util-linux 2.42.
+Name match only, not full flag parity.
 
 ## Summary
 
-| Suite | Reference count | Present in zex-utils | **Missing** | Coverage |
-|-------|-----------------|----------------------|-------------|----------|
-| **GNU coreutils** | 107 | 105 | **2** | ~98% |
-| **util-linux 2.42** | 123 (bash-completion) | 42 | **81** | ~34% |
-| **util-linux man extras** | +9 (login/init not in bash-completion) | 3 (`nologin`, `login`, `agetty`) | **~5 more** | — |
+| Suite | Reference count | Present | Missing | Coverage |
+|-------|-----------------|---------|---------|----------|
+| GNU coreutils | 107 | 105 | 2 | ~98% |
+| util-linux 2.42 | 123 (bash-completion) | 42 | 81 | ~34% |
+| util-linux man extras | +9 (login/init, not in bash-completion) | 3 (`nologin`, `login`, `agetty`) | ~5 | — |
 
-**Bottom line:** coreutils surface is almost done. The big gap is **util-linux** (disk, mount, login, schedule, IPC, text helpers).
+coreutils is basically done. The gap is util-linux: disk/mount tooling,
+login/session, scheduling, IPC, text helpers.
 
-zex-utils also ships **extra** tools not in either tree (findutils, procps-like, text tools, next-gen) — see § Extra below. Those are not “missing”; they are Zainium additions.
+user_utils also ships extra tools not in either tree (findutils,
+procps-like, text tools, next-gen Zainium tools) — see §5. Those aren't
+missing, they're additions.
 
----
+## 1. Missing from coreutils (2)
 
-## 1. Missing from GNU coreutils (2)
+SELinux-related, only relevant if Zainium targets SELinux:
 
-SELinux-related. Only meaningful if Zainium targets SELinux.
+| Command | Role |
+|---------|------|
+| `chcon` | Change SELinux security context of files |
+| `runcon` | Run command in a specified SELinux context |
 
-| Command | Role | Notes |
-|---------|------|-------|
-| `chcon` | Change SELinux security context of files | Needs SELinux policy/API |
-| `runcon` | Run command in a specified SELinux context | Needs SELinux policy/API |
+Everything else from coreutils is present, including `dir`, `vdir`,
+`arch`, and `[` (→ `test`).
 
-**Everything else from coreutils is present** (including multicall aliases `dir`, `vdir`, `arch`, and `[` → `test`).
+## 2. Missing from util-linux 2.42
 
----
+Grouped by subsystem.
 
-## 2. Missing from util-linux 2.42 (101+)
+### 2.1 Disk / partition / block
 
-Grouped by subsystem (same layout as util-linux sources).
-
-### 2.1 Disk / partition / block (high priority for a real OS)
-
-`blkid`/`lsblk`/`findfs`/`fdisk`/`sfdisk`/`partx`/`mkswap`/`fsck`/
-`addpart`/`delpart`/`resizepart` are **DONE** (2026-08-26) — see
-`checklist/`. Remaining:
+`blkid`, `lsblk`, `findfs`, `fdisk`, `sfdisk`, `partx`, `mkswap`, `fsck`,
+`addpart`, `delpart`, `resizepart` are done — see `checklist/`.
+Remaining:
 
 | Command | Role |
 |---------|------|
@@ -78,14 +62,14 @@ Grouped by subsystem (same layout as util-linux sources).
 | `fstrim` | Discard unused blocks on mounted FS |
 | `zramctl` | Control zram devices |
 
-### 2.2 Mount / namespaces (high priority)
+### 2.2 Mount / namespaces
 
 | Command | Role |
 |---------|------|
 | `nsenter` | Enter namespaces of another process |
 | `unshare` | Run program in new namespaces |
 | `namei` | Follow a pathname until a terminal point |
-| `exch` | Atomic exchange of two paths (newer) |
+| `exch` | Atomic exchange of two paths |
 
 ### 2.3 Hardware / system control
 
@@ -103,9 +87,9 @@ Grouped by subsystem (same layout as util-linux sources).
 | `setterm` | Set terminal attributes |
 | `setarch` | Set architecture personality / `linux32` etc. |
 | `setpriv` | Run with adjusted privilege bits |
-| `enosys` | Utility for testing ENOSYS (dev) |
-| `bits` | Bit-field helper (newer) |
-| `getino` | Inode helper (newer) |
+| `enosys` | Utility for testing ENOSYS |
+| `bits` | Bit-field helper |
+| `getino` | Inode helper |
 | `copyfilerange` | copy_file_range demo/helper |
 | `fadvise` | File advice (posix_fadvise) |
 | `pipesz` | Pipe size control |
@@ -131,18 +115,17 @@ Grouped by subsystem (same layout as util-linux sources).
 | `ipcmk` | Create SysV IPC objects |
 | `ipcrm` | Remove SysV IPC objects |
 | `ipcs` | Show SysV IPC status |
-| `lsfd` | List file descriptors (modern `lsof`-like) |
+| `lsfd` | List file descriptors |
 | `lsirq` | List interrupts |
 | `lsclocks` | List clocks |
 | `irqtop` | Live IRQ monitor |
 
 ### 2.6 Login / account / session
 
-`login`/`agetty` are **DONE** (2026-08-26) — see `checklist/`.
-`sulogin`, `chfn`, `chsh`, `passwd`, `useradd`/`userdel`/`usermod`,
-`vipw`/`vigr`, and the rest of the account-management surface are
-covered by `elevate-umbra` (a separate Zainium Dynamics component, not
-part of this repo) — not tracked as missing here. Remaining:
+`login` and `agetty` are done — see `checklist/`. `sulogin`, `chfn`,
+`chsh`, `passwd`, `useradd`/`userdel`/`usermod`, `vipw`/`vigr`, and the
+rest of account management are covered by `elevate-umbra` (separate
+Zainium Dynamics component, not part of this repo). Remaining:
 
 | Command | Role |
 |---------|------|
@@ -154,7 +137,7 @@ part of this repo) — not tracked as missing here. Remaining:
 | `wall` | Write message to all users |
 | `write` | Write message to one user |
 | `logger` | Write to system log |
-| `runuser` | Run command as user (no PAM password path like su) |
+| `runuser` | Run command as user |
 
 ### 2.7 UUID / identity helpers
 
@@ -163,9 +146,9 @@ part of this repo) — not tracked as missing here. Remaining:
 | `uuidd` | UUID generation daemon |
 | `uuidparse` | Parse UUIDs |
 
-*(zex already has `uuidgen`, `mcookie`.)*
+(`uuidgen` and `mcookie` are already present.)
 
-### 2.8 Text / column utilities (util-linux text-utils)
+### 2.8 Text / column utilities
 
 | Command | Role |
 |---------|------|
@@ -175,7 +158,7 @@ part of this repo) — not tracked as missing here. Remaining:
 | `colrm` | Remove columns from lines |
 | `look` | Display lines beginning with a string |
 | `ul` | Do underlining |
-| `pg` | Page through files (pager) |
+| `pg` | Page through files |
 | `line` | Read one line (legacy) |
 | `hardlink` | Consolidate duplicate files via hardlinks |
 | `rename` | Rename files by string replacement |
@@ -185,11 +168,7 @@ part of this repo) — not tracked as missing here. Remaining:
 | `scriptreplay` | Replay typescript |
 | `scriptlive` | Re-run session with timing |
 
----
-
 ## 3. Already present — util-linux subset (42)
-
-These exist under `cmd/` and are the current util-linux footprint:
 
 ```
 addpart  blkid  blockdev  cal  chcpu  ctrlaltdel  delpart  dmesg
@@ -200,29 +179,22 @@ resizepart  rev  setpgid  setsid  sfdisk  swapoff  swapon
 switch_root  umount  uuidgen
 ```
 
-Also related (often grouped with util-linux / login, but from the
-"man extras" +9, not the 123 bash-completion count above): `nologin`,
-`agetty`.
+Plus, from the "man extras" set rather than the 123 bash-completion
+count above: `nologin`, `agetty`.
 
-Parity notes for many of these live in `checklist/` and `DEVPLAN.md`.
+Per-tool verification notes: `checklist/`.
 
----
+## 4. Already present — coreutils (105 / 107)
 
-## 4. Already present — GNU coreutils (105 / 107)
-
-All standard coreutils names except `chcon` / `runcon`. Includes:
+Everything except `chcon`/`runcon`:
 
 - File ops: `cp` `mv` `rm` `ln` `mkdir` `rmdir` `touch` `chmod` `chown` `chgrp` `install` `dd` `shred` `truncate` `sync` …
-- Text: `cat` `head` `tail` `sort` `uniq` `cut` `tr` `wc` ` comm` `join` `split` `csplit` `paste` `fmt` `fold` `pr` `ptx` `nl` `expand` `unexpand` `tac` `od` `tee` …
+- Text: `cat` `head` `tail` `sort` `uniq` `cut` `tr` `wc` `comm` `join` `split` `csplit` `paste` `fmt` `fold` `pr` `ptx` `nl` `expand` `unexpand` `tac` `od` `tee` …
 - Checksums: `md5sum` `sha*sum` `b2sum` `cksum` `sum` `basenc` `base64` `base32`
 - System: `uname` `hostname` `hostid` `id` `groups` `who` `whoami` `pinky` `users` `uptime` `nproc` `arch` `date` `env` `printenv` `pwd` `tty` `stty` `stat` `df` `du` `timeout` `nice` `kill` `chroot` `stdbuf` …
 - Misc: `echo` `printf` `true` `false` `test`/`[` `expr` `seq` `yes` `sleep` `factor` `numfmt` `pathchk` `realpath` `readlink` `mktemp` `mkfifo` `mknod` `link` `unlink` `dircolors` `dir` `vdir` `ls`
 
----
-
-## 5. Extra in zex-utils (not coreutils / not util-linux)
-
-These are **present** and outside the two C reference trees — not missing work, but useful inventory:
+## 5. Extra tools (not coreutils, not util-linux)
 
 | Area | Commands |
 |------|----------|
@@ -230,80 +202,51 @@ These are **present** and outside the two C reference trees — not missing work
 | procps-like | `ps` `pgrep` `pkill` `free` |
 | text / filters | `grep` `sed` `diff` `cmp` `clear` `which` `tree` |
 | archives | `tar` |
-| next-gen / Zainium | `blueprint` `struct` `drive` `prio` `trigger` `trace` `sys` `zex-seccomp` |
-| packaging crate | `diffutils` (suite packaging, not a classic single binary name) |
+| next-gen / Zainium | `blueprint` `struct` `drive` `prio` `trigger` `trace` `sys` |
+| e2fsprogs | `chattr` `lsattr` |
 
----
+## 6. Suggested priority for OS bring-up
 
-## 6. Suggested implementation priority (OS bring-up view)
+### P0 — boot, rootfs, storage
+`mount`, `umount`, `pivot_root`, `switch_root`, `findmnt`, `losetup`,
+`swapon`, `swapoff`, `blkid`, `lsblk`, `findfs`, `fdisk`, `sfdisk`,
+`partx`, `addpart`, `delpart`, `resizepart`, `mkswap`, `fsck`, `login`,
+`agetty` are done. `sulogin` is covered by `elevate-umbra`. Remaining:
+- `mkfs` family (at least a front-end + one real FS helper path)
 
-If the goal is a bootable / usable Zainium userland, order roughly:
+### P1 — everyday system admin
+- `hwclock`
+- `fallocate` / `fstrim` / `wipefs`
+- `nsenter` / `unshare`
+- `flock` / `prlimit` / `taskset` / `chrt` / `ionice`
+- `logger` / `wall`
+- `column` / `getopt` / `whereis` / `rename`
+- `su` / `runuser` / `chsh` / `chfn`
 
-### P0 — Boot, rootfs, storage
-`mount`/`umount`/`pivot_root`/`switch_root`/`findmnt`/`losetup`/`swapon`/
-`swapoff`/`blkid`/`lsblk`/`findfs`/`fdisk`/`sfdisk`/`partx`/`addpart`/
-`delpart`/`resizepart`/`mkswap`/`fsck`/`login`/`agetty` are **DONE**
-(2026-08-25/26) — see `checklist/`. `sulogin` is covered by
-`elevate-umbra` (separate component). Remaining:
-1. `mkfs` family (at least a front-end + one real FS helper path)
-
-### P1 — Everyday system admin
-10. `hwclock`
-11. `fallocate` / `fstrim` / `wipefs`
-12. `nsenter` / `unshare`
-13. `flock` / `prlimit` / `taskset` / `chrt` / `ionice`
-14. `logger` / `wall`
-15. `column` / `getopt` / `whereis` / `rename`
-16. `su` / `runuser` / `chsh` / `chfn`
-
-### P2 — Nice-to-have / specialized
+### P2 — nice-to-have / specialized
 - IPC suite (`ipcs`/`ipcrm`/`ipcmk`), `lsfd`, `zramctl`, `rfkill`, `eject`
 - `script` / `scriptreplay`, text filters (`col*`, `look`, `ul`)
 - UUID daemon (`uuidd`/`uuidparse`), `lastlog2`, `lslogins`
-- SELinux: `chcon` / `runcon` only if policy is in scope
+- SELinux: `chcon` / `runcon`, only if policy is in scope
 
-### P3 — Legacy / rare
+### P3 — legacy / rare
 - `fdformat`, `raw`, `tunelp`, `line`, `pg`, `mkfs.bfs`, etc.
 
----
-
-## 7. Counts at a glance
+## 7. Counts
 
 ```
-zex-utils cmd/ crates .............. 176
-  of which coreutils match ......... 105 / 107
-  of which util-linux match ........  42 / 123
-  of which extra / other ...........  ~26+
-  (+ chattr/lsattr, e2fsprogs; + login/agetty, man extras —
-   neither counted in the util-linux 123 above)
+cmd/ crates .......................... 176
+  coreutils match .................... 105 / 107
+  util-linux match ...................  42 / 123
+  extra / other .......................~26
+  (+ chattr/lsattr; + login/agetty from the man-extras set, neither
+   counted in the util-linux 123 above)
 
-MISSING coreutils ..................   2  (chcon, runcon)
-MISSING util-linux ..................  81  (see §2)
-MISSING util-linux login/init extras ~  5  (su, newgrp, …;
-  sulogin/chfn/chsh/passwd/etc. covered by elevate-umbra, not tracked here)
+missing coreutils ....................   2  (chcon, runcon)
+missing util-linux ...................  81  (see §2)
+missing login/init extras ............  ~5  (su, newgrp, …;
+  sulogin/chfn/chsh/passwd/etc. covered by elevate-umbra)
 ```
 
----
-
-## 8. How this file was produced
-
-```bash
-# zex
-ls cmd/ | sort
-
-# coreutils
-ls man/*.x | sed 's|.*/||;s|\.x||' | grep -v coreutils
-
-# util-linux
-ls bash-completion/ | grep -v Makemodule
-
-# gaps
-comm -23 coreutils_list zex_list
-comm -23 util_linux_list zex_list
-```
-
-**Out of scope for this file:** flag-level parity, exit codes, and libc differences. For the 22 util-linux ports already in tree, see `checklist/` and `DEVPLAN.md`.
-
----
-
-*Generated for Zainium Dynamics / zex-utils — gap inventory only; no code changes required by this document.*
+Out of scope for this file: flag-level parity, exit codes, libc
+differences. Per-tool detail: `checklist/`.

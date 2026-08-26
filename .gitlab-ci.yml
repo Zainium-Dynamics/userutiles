@@ -3,12 +3,6 @@
 # =============================================================================
 # Fix for empty/instant-failed pipelines:
 #   Settings -> CI/CD -> Runners -> enable "Turn on instance runners for this project"
-#
-# The `build:zainium-musl` job cross-builds for Zainium OS's own musl target
-# (x86_64-zainium-linux-musl, see targets/README.md) using a toolchain that
-# lives on a physical drive, not on GitLab.com's shared runners. It's tagged
-# for a self-hosted runner and `allow_failure: true` until that runner is
-# registered — it does not block the rest of the pipeline going green.
 # =============================================================================
 
 workflow:
@@ -117,19 +111,3 @@ build:musl:
     paths:
       - target/x86_64-unknown-linux-musl/release/
     expire_in: 1 week
-
-# Zainium's native musl target (see targets/README.md) — needs the
-# crosstool-NG toolchain + pinned nightly from zairoot, only present on a
-# self-hosted runner.
-build:zainium-musl:
-  stage: build
-  tags:
-    - zainium
-  script:
-    - ./scripts/build-zainium.sh
-  artifacts:
-    name: "user_utils-zainium-musl-$CI_COMMIT_SHORT_SHA"
-    paths:
-      - dist/zainium/
-    expire_in: 1 week
-  allow_failure: true

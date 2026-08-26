@@ -126,13 +126,19 @@ impl Platform {
 
     /// Get Linux-specific paths (FHS + XDG compliance)
     fn linux_paths() -> (Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>, Vec<PathBuf>) {
-        // Application search paths - Linux FHS + package managers
+        // Application search paths - Zainium locations first, then real
+        // FHS + package manager paths as a fallback for any non-Zainium
+        // Linux box (a plain dev machine, or a CI runner with no
+        // /overlayer tree at all) so discovery still finds *something*.
         let app_paths = vec![
             PathBuf::from("/overlayer/syshub/bin"),
             PathBuf::from("/overlayer/syshub/sbin"),
             PathBuf::from("/opt/overlayer/syshub/bin"),
             PathBuf::from("/snap/overlayer/syshub/bin"), // Snap packages
             PathBuf::from("/usr/lib/flatpak/exports/overlayer/syshub/bin"), // Flatpak
+            PathBuf::from("/usr/bin"),
+            PathBuf::from("/usr/local/bin"),
+            PathBuf::from("/bin"),
         ];
 
         // Configuration directories - respect XDG Base Directory spec
@@ -176,11 +182,15 @@ impl Platform {
             }
         }
 
-        // Handler search paths - where interpreters are located
+        // Handler search paths - where interpreters are located; same
+        // Zainium-first-then-FHS-fallback reasoning as app_paths above.
         let handler_paths = vec![
             PathBuf::from("/overlayer/syshub/bin"),
             PathBuf::from("/overlayer/syshub/sbin"),
             PathBuf::from("/opt/overlayer/syshub/bin"),
+            PathBuf::from("/usr/bin"),
+            PathBuf::from("/usr/local/bin"),
+            PathBuf::from("/bin"),
         ];
 
         (app_paths, config_dirs, desktop_dirs, handler_paths)
