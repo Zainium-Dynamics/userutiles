@@ -1,0 +1,23 @@
+[package]
+name = "user_resizepart"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX resizepart — tell the kernel a partition was resized"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_resizepart"
+path = "src/lib.rs"
+
+[[bin]]
+name = "resizepart"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+
+[lints]
+workspace = true

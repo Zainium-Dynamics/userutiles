@@ -1,0 +1,23 @@
+[package]
+name = "user_delpart"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.70"
+authors = ["Zainium Dynamics"]
+description = "ZEX delpart — tell the kernel a partition was removed"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+name = "user_delpart"
+path = "src/lib.rs"
+
+[[bin]]
+name = "delpart"
+path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
+
+[lints]
+workspace = true

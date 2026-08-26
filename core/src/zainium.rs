@@ -27,6 +27,10 @@ pub const SYSHUB_DRIVERS: &str = "/overlayer/syshub/drivers";
 /// Engine / services.
 pub const SYSHUB_ENGINE: &str = "/overlayer/syshub/engine";
 
+/// Config tree — Zainium has no top-level `/etc`; `elevate-umbra` (the
+/// `/etc/passwd`+`/etc/shadow` replacement) reads and writes here.
+pub const SYSHUB_ETC: &str = "/overlayer/syshub/etc";
+
 /// Default `PATH` when the environment variable is unset or empty.
 /// Matches ZainiumOS profile — never falls back to `/usr/bin`.
 pub const DEFAULT_PATH: &str = "/overlayer/syshub/bin:/overlayer/syshub/sbin";
@@ -91,4 +95,87 @@ pub fn util_name_from_argv0(argv0: &std::ffi::OsStr) -> String {
         .unwrap_or(argv0)
         .to_string_lossy()
         .into_owned()
+}
+
+/// Resolve a config file: `$ZEX_PREFIX/etc/<name>` (real Zainium, and
+/// this is the same directory `elevate-umbra` reads/writes) if it
+/// exists, else `/etc/<name>` — so tools built and tested on an
+/// ordinary Linux host (no `/overlayer` tree) still find a real
+/// `/etc/passwd`. Existence-checked rather than unconditional, since
+/// unlike `PATH`/install-prefix this has no environment-variable
+/// override of its own.
+pub fn etc_path(name: &str) -> std::path::PathBuf {
+    let syshub = effective_prefix().join("etc").join(name);
+    if syshub.exists() {
+        syshub
+    } else {
+        std::path::PathBuf::from("/etc").join(name)
+    }
+}
+
+/// `passwd`-format user database — `etc_path("passwd")`.
+pub fn passwd_path() -> std::path::PathBuf {
+    etc_path("passwd")
+}
+
+/// `shadow`-format password database — `etc_path("shadow")` (on
+/// Zainium, this is what `elevate-umbra` reads and writes instead of a
+/// real `/etc/shadow`, but the on-disk format is unchanged).
+pub fn shadow_path() -> std::path::PathBuf {
+    etc_path("shadow")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ZEX_PREFIX is a process-wide env var; serialize the two tests
+    // that mutate it so they can't race each other.
+    static PREFIX_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn etc_path_prefers_the_syshub_tree_when_present() {
+        let _guard = PREFIX_LOCK.lock().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "usercore_zainium_test_present_{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(dir.join("etc")).unwrap();
+        std::fs::write(dir.join("etc/passwd"), b"root:x:0:0::/root:/bin/sh\n").unwrap();
+        // SAFETY: test-only; this test process does not spawn threads
+        // that read the environment concurrently with this mutation.
+        unsafe {
+            std::env::set_var("ZEX_PREFIX", &dir);
+        }
+
+        assert_eq!(passwd_path(), dir.join("etc/passwd"));
+
+        // SAFETY: test-only; undoing the mutation above.
+        unsafe {
+            std::env::remove_var("ZEX_PREFIX");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn etc_path_falls_back_to_etc_when_syshub_tree_is_absent() {
+        let _guard = PREFIX_LOCK.lock().unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "usercore_zainium_test_absent_{}",
+            std::process::id()
+        ));
+        // SAFETY: test-only; this test process does not spawn threads
+        // that read the environment concurrently with this mutation.
+        unsafe {
+            std::env::set_var("ZEX_PREFIX", &dir);
+        }
+
+        assert_eq!(passwd_path(), std::path::PathBuf::from("/etc/passwd"));
+        assert_eq!(shadow_path(), std::path::PathBuf::from("/etc/shadow"));
+
+        // SAFETY: test-only; undoing the mutation above.
+        unsafe {
+            std::env::remove_var("ZEX_PREFIX");
+        }
+    }
 }

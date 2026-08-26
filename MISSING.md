@@ -24,8 +24,8 @@
 | Suite | Reference count | Present in zex-utils | **Missing** | Coverage |
 |-------|-----------------|----------------------|-------------|----------|
 | **GNU coreutils** | 107 | 105 | **2** | ~98% |
-| **util-linux 2.42** | 123 (bash-completion) | 38 | **85** | ~31% |
-| **util-linux man extras** | +9 (login/init not in bash-completion) | 1 (`nologin`) | **~8 more** | — |
+| **util-linux 2.42** | 123 (bash-completion) | 42 | **81** | ~34% |
+| **util-linux man extras** | +9 (login/init not in bash-completion) | 2 (`nologin`, `login`) | **~6 more** | — |
 
 **Bottom line:** coreutils surface is almost done. The big gap is **util-linux** (disk, mount, login, schedule, IPC, text helpers).
 
@@ -52,15 +52,13 @@ Grouped by subsystem (same layout as util-linux sources).
 
 ### 2.1 Disk / partition / block (high priority for a real OS)
 
-`blkid`/`lsblk`/`findfs`/`fdisk`/`sfdisk`/`partx`/`mkswap`/`fsck` are
-**DONE** (2026-08-26) — see `checklist/`. Remaining:
+`blkid`/`lsblk`/`findfs`/`fdisk`/`sfdisk`/`partx`/`mkswap`/`fsck`/
+`addpart`/`delpart`/`resizepart` are **DONE** (2026-08-26) — see
+`checklist/`. Remaining:
 
 | Command | Role |
 |---------|------|
 | `cfdisk` | Curses partition editor |
-| `addpart` | Tell kernel a partition was added |
-| `delpart` | Tell kernel a partition was removed |
-| `resizepart` | Tell kernel a partition was resized |
 | `blkdiscard` | Discard / TRIM on block device |
 | `blkzone` | Zoned block device ops |
 | `blkpr` | Persistent reservations |
@@ -140,11 +138,15 @@ Grouped by subsystem (same layout as util-linux sources).
 
 ### 2.6 Login / account / session
 
+`login` is **DONE** (2026-08-26) — see `checklist/`. `sulogin`, `chfn`,
+`chsh`, `passwd`, `useradd`/`userdel`/`usermod`, `vipw`/`vigr`, and the
+rest of the account-management surface are covered by `elevate-umbra`
+(a separate Zainium Dynamics component, not part of this repo) — not
+tracked as missing here. Remaining:
+
 | Command | Role |
 |---------|------|
 | `su` | Switch user |
-| `chfn` | Change finger info |
-| `chsh` | Change login shell |
 | `newgrp` | Log in to a new group |
 | `lslogins` | List users / logins detail |
 | `lastlog2` | Last login via liblastlog2 |
@@ -153,10 +155,7 @@ Grouped by subsystem (same layout as util-linux sources).
 | `write` | Write message to one user |
 | `logger` | Write to system log |
 | `agetty` | Alternative getty (man page; not always in bash-completion) |
-| `login` | Begin session on terminal |
 | `runuser` | Run command as user (no PAM password path like su) |
-| `sulogin` | Single-user login |
-| `vipw` / `vigr` | Edit password/group files safely |
 
 ### 2.7 UUID / identity helpers
 
@@ -189,16 +188,17 @@ Grouped by subsystem (same layout as util-linux sources).
 
 ---
 
-## 3. Already present — util-linux subset (38)
+## 3. Already present — util-linux subset (42)
 
 These exist under `cmd/` and are the current util-linux footprint:
 
 ```
-blkid  blockdev  cal  chcpu  ctrlaltdel  dmesg  fdisk  findfs
-findmnt  fsck  fsfreeze  hexdump  last  losetup  lsblk  lscpu
-lsipc  lslocks  lsmem  lsns  mcookie  mesg  mkswap  more  mount
-mountpoint  partx  pivot_root  renice  rev  setpgid  setsid
-sfdisk  swapoff  swapon  switch_root  umount  uuidgen
+addpart  blkid  blockdev  cal  chcpu  ctrlaltdel  delpart  dmesg
+fdisk  findfs  findmnt  fsck  fsfreeze  hexdump  last  login
+losetup  lsblk  lscpu  lsipc  lslocks  lsmem  lsns  mcookie
+mesg  mkswap  more  mount  mountpoint  partx  pivot_root  renice
+resizepart  rev  setpgid  setsid  sfdisk  swapoff  swapon
+switch_root  umount  uuidgen
 ```
 
 Also related (often grouped with util-linux / login): `nologin`.
@@ -240,12 +240,12 @@ If the goal is a bootable / usable Zainium userland, order roughly:
 
 ### P0 — Boot, rootfs, storage
 `mount`/`umount`/`pivot_root`/`switch_root`/`findmnt`/`losetup`/`swapon`/
-`swapoff`/`blkid`/`lsblk`/`findfs`/`fdisk`/`sfdisk`/`partx`/`mkswap`/
-`fsck` are **DONE** (2026-08-25/26) — see `checklist/`. Remaining:
+`swapoff`/`blkid`/`lsblk`/`findfs`/`fdisk`/`sfdisk`/`partx`/`addpart`/
+`delpart`/`resizepart`/`mkswap`/`fsck`/`login` are **DONE**
+(2026-08-25/26) — see `checklist/`. `sulogin` is covered by
+`elevate-umbra` (separate component). Remaining:
 1. `mkfs` family (at least a front-end + one real FS helper path)
-2. `addpart`/`delpart`/`resizepart` (thin BLKPG wrappers, same mechanism
-   `partx` already uses)
-3. `agetty` / `login` / `sulogin`
+2. `agetty`
 
 ### P1 — Everyday system admin
 10. `hwclock`
@@ -270,15 +270,16 @@ If the goal is a bootable / usable Zainium userland, order roughly:
 ## 7. Counts at a glance
 
 ```
-zex-utils cmd/ crates .............. 171
+zex-utils cmd/ crates .............. 175
   of which coreutils match ......... 105 / 107
-  of which util-linux match ........  38 / 123
+  of which util-linux match ........  42 / 123
   of which extra / other ...........  ~26+
   (+ chattr/lsattr, e2fsprogs — not in the util-linux count above)
 
 MISSING coreutils ..................   2  (chcon, runcon)
-MISSING util-linux ..................  85  (see §2)
-MISSING util-linux login/init extras ~  8  (agetty, login, …)
+MISSING util-linux ..................  81  (see §2)
+MISSING util-linux login/init extras ~  6  (agetty, su, newgrp, …;
+  sulogin/chfn/chsh/passwd/etc. covered by elevate-umbra, not tracked here)
 ```
 
 ---

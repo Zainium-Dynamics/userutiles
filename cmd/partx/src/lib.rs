@@ -4,79 +4,28 @@
 //! `fdisk -l`/`sfdisk` use) and informs the running kernel about
 //! individual partitions through the `BLKPG` ioctl — the same mechanism
 //! real `partx`/`partprobe` use, not a re-scan-the-whole-disk shortcut.
-use std::fs::File;
 use std::io;
-use std::os::unix::io::AsRawFd;
 use std::path::Path;
 
+use usercore::blkpg::{self, BLKPG_ADD_PARTITION, BLKPG_DEL_PARTITION};
 use usercore::ptable::{self, Partition};
 use usercore::Ui;
-
-// linux/blkpg.h — stable kernel ABI, not exposed by the `libc` crate.
-const BLKPG: libc::c_ulong = 0x1269;
-const BLKPG_ADD_PARTITION: libc::c_int = 1;
-const BLKPG_DEL_PARTITION: libc::c_int = 2;
-
-/// Mirrors the kernel's `struct blkpg_partition` (linux/blkpg.h).
-#[repr(C)]
-struct BlkpgPartition {
-    start: i64,
-    length: i64,
-    pno: i32,
-    devname: [u8; 64],
-    volname: [u8; 64],
-}
-
-/// Mirrors the kernel's `struct blkpg_ioctl_arg` (linux/blkpg.h).
-#[repr(C)]
-struct BlkpgIoctlArg {
-    op: libc::c_int,
-    flags: libc::c_int,
-    datalen: libc::c_int,
-    data: *mut BlkpgPartition,
-}
-
-fn blkpg(fd: i32, op: libc::c_int, partition: &mut BlkpgPartition) -> io::Result<()> {
-    let mut arg = BlkpgIoctlArg {
-        op,
-        flags: 0,
-        datalen: std::mem::size_of::<BlkpgPartition>() as libc::c_int,
-        data: partition,
-    };
-    // SAFETY: `arg.data` points at `partition`, a live `BlkpgPartition`
-    // of exactly `arg.datalen` bytes, for the duration of this call;
-    // `arg` itself is a correctly-sized `blkpg_ioctl_arg` kept alive
-    // here. `fd` is the caller's open block-device descriptor.
-    let r = unsafe { libc::ioctl(fd, BLKPG as _, &mut arg) };
-    if r == -1 {
-        Err(io::Error::last_os_error())
-    } else {
-        Ok(())
-    }
-}
 
 /// Tell the kernel about one partition on `disk` (the whole-disk device
 /// node) — add it if `add`, else remove it.
 fn notify_kernel(disk: &Path, p: &Partition, add: bool) -> io::Result<()> {
-    let f = File::open(disk)?;
-    let mut bp = BlkpgPartition {
-        start: (p.start_lba * ptable::SECTOR_SIZE) as i64,
-        length: (p.size_lba * ptable::SECTOR_SIZE) as i64,
-        pno: p.number as i32,
-        devname: [0u8; 64],
-        volname: [0u8; 64],
-    };
-    let name = format!("{}{}", disk.display(), p.number);
-    let name_bytes = name.as_bytes();
-    let n = name_bytes.len().min(63);
-    bp.devname[..n].copy_from_slice(&name_bytes[..n]);
-
     let op = if add {
         BLKPG_ADD_PARTITION
     } else {
         BLKPG_DEL_PARTITION
     };
-    blkpg(f.as_raw_fd(), op, &mut bp)
+    blkpg::notify(
+        disk,
+        op,
+        p.number,
+        p.start_lba * ptable::SECTOR_SIZE,
+        p.size_lba * ptable::SECTOR_SIZE,
+    )
 }
 
 fn print_show(disk: &Path) -> io::Result<()> {
@@ -239,30 +188,9 @@ pub fn run() -> i32 {
 mod tests {
     use super::*;
 
-    #[test]
-    fn blkpg_struct_sizes_match_kernel_abi() {
-        // linux/blkpg.h: struct blkpg_partition is 152 bytes on a
-        // 64-bit target (natural C alignment); struct blkpg_ioctl_arg
-        // is 24 bytes. A mismatch here means the ioctl will silently
-        // read/write past the buffer the kernel expects.
-        assert_eq!(std::mem::size_of::<BlkpgPartition>(), 152);
-        assert_eq!(std::mem::size_of::<BlkpgIoctlArg>(), 24);
-    }
-
-    #[test]
-    fn notify_kernel_on_a_non_block_device_fails_cleanly() {
-        let partition = Partition {
-            number: 1,
-            start_lba: 2048,
-            size_lba: 1000,
-            part_type: "83".to_string(),
-            bootable: false,
-            name: None,
-        };
-        // /dev/null opens fine but isn't a block device — BLKPG must
-        // fail (ENOTTY), not panic or silently succeed.
-        assert!(notify_kernel(Path::new("/dev/null"), &partition, true).is_err());
-    }
+    // The BLKPG struct-ABI and no-such-device failure cases are covered
+    // once, in usercore::blkpg's own tests, since notify_kernel here is
+    // a thin wrapper over it.
 
     #[test]
     fn print_show_on_a_file_with_no_table_errors() {

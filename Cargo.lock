@@ -1609,6 +1609,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "user_addpart"
+version = "0.1.0"
+dependencies = [
+ "usercore",
+]
+
+[[package]]
 name = "user_arch"
 version = "0.1.0"
 dependencies = [
@@ -1823,6 +1830,13 @@ name = "user_dd"
 version = "0.1.0"
 dependencies = [
  "libc",
+ "usercore",
+]
+
+[[package]]
+name = "user_delpart"
+version = "0.1.0"
+dependencies = [
  "usercore",
 ]
 
@@ -2123,6 +2137,14 @@ dependencies = [
 
 [[package]]
 name = "user_locate"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "usercore",
+]
+
+[[package]]
+name = "user_login"
 version = "0.1.0"
 dependencies = [
  "libc",
@@ -2494,6 +2516,13 @@ name = "user_renice"
 version = "0.1.0"
 dependencies = [
  "libc",
+ "usercore",
+]
+
+[[package]]
+name = "user_resizepart"
+version = "0.1.0"
+dependencies = [
  "usercore",
 ]
 

@@ -7,6 +7,29 @@ detailed per-utility rationale and file list behind each item.
 
 ## [Unreleased]
 
+### Added (2026-08-26 — addpart / delpart / resizepart / login)
+- `usercore::blkpg`: the `BLKPG` ioctl logic factored out of `partx`
+  into a shared module, so `addpart`/`delpart`/`resizepart` (thin
+  wrappers around `BLKPG_ADD_PARTITION`/`BLKPG_DEL_PARTITION`/
+  `BLKPG_RESIZE_PARTITION`) don't duplicate the hand-defined struct
+  layouts. `partx` itself now calls the shared module too.
+- `usercore::zainium`: new `passwd_path()`/`shadow_path()` helpers —
+  Zainium has no top-level `/etc`; these resolve to
+  `/overlayer/syshub/etc/{passwd,shadow}` (what `elevate-umbra` manages
+  in place of a real `/etc/shadow`) when present, falling back to plain
+  `/etc/{passwd,shadow}` so the workspace still builds/tests on an
+  ordinary host.
+- `login`: reads those paths, verifies via the system's own `crypt(3)`
+  (no PAM — real PAM needs config this workspace doesn't ship, and
+  `elevate-pam` is a private, unpublished component of a separate
+  project, not depend-able from here), execs the user's shell as a
+  login shell. `sulogin` deliberately not duplicated — it already
+  exists in `elevate-umbra`. Verified against a hash produced by
+  Python's independent `crypt` module, not just our own round-trip; see
+  `checklist/addpart-delpart-resizepart-login.md`.
+- README rewritten for length/signal — dropped most of the tables in
+  favor of prose, per feedback that it had grown bloated.
+
 ### Added (2026-08-26 — blkid / lsblk / findfs / fdisk / sfdisk / partx / mkswap / fsck)
 - Two new `usercore` modules: `blkprobe` (ext2/3/4, swap, xfs, vfat,
   iso9660 superblock probing — a from-scratch libblkid stand-in) and

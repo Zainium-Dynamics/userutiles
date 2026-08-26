@@ -16,6 +16,7 @@
 #[cfg(not(target_os = "linux"))]
 compile_error!("usercore targets Zainium OS only.");
 
+pub mod blkpg;
 pub mod blkprobe;
 pub mod digest;
 pub mod error;
