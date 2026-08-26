@@ -84,32 +84,52 @@ extern "C" {
     fn crypt(key: *const libc::c_char, salt: *const libc::c_char) -> *mut libc::c_char;
 }
 
+/// `crypt(3)` (as opposed to the reentrant `crypt_r`) writes its result
+/// into a single buffer shared process-wide and isn't documented as
+/// thread-safe — two concurrent calls can clobber each other's output.
+/// `login` itself only ever calls this once per process, so this never
+/// mattered there; it does matter for this crate's own test suite,
+/// which runs test functions concurrently by default. Serialize every
+/// call through this lock instead of switching to `crypt_r` (whose
+/// `struct crypt_data` layout isn't guaranteed identical across
+/// glibc/musl, unlike this Mutex, which needs no ABI assumptions).
+static CRYPT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Call `crypt(3)` under [`CRYPT_LOCK`] and copy its result out of
+/// libc's shared buffer before releasing the lock. `None` on a bad
+/// (NUL-containing) input or a `crypt(3)` failure.
+fn crypt_locked(key: &str, salt: &str) -> Option<String> {
+    let c_key = CString::new(key).ok()?;
+    let c_salt = CString::new(salt).ok()?;
+    let _guard = CRYPT_LOCK.lock().unwrap();
+    // SAFETY: both C strings are valid, NUL-terminated, and kept alive
+    // for the call. `crypt` returns a pointer into a buffer owned by
+    // libc (never freed by the caller) or NULL on error; we only read
+    // through it before the next call, never write — and `CRYPT_LOCK`
+    // ensures no other thread in this process calls `crypt` between
+    // this call and that read.
+    let result = unsafe { crypt(c_key.as_ptr(), c_salt.as_ptr()) };
+    if result.is_null() {
+        return None;
+    }
+    // SAFETY: `result` was just checked non-NULL and points at libc's
+    // crypt buffer, still valid because `CRYPT_LOCK` is still held.
+    Some(
+        unsafe { CStr::from_ptr(result) }
+            .to_string_lossy()
+            .into_owned(),
+    )
+}
+
 /// Verify `password` against `stored_hash` via the system's own
 /// `crypt(3)` — `stored_hash` itself is used as the salt argument, since
 /// every `$id$salt$...` hash format encodes its own salt in that prefix.
 fn verify_password(password: &str, stored_hash: &str) -> bool {
-    let Ok(c_password) = CString::new(password) else {
-        return false;
-    };
-    let Ok(c_salt) = CString::new(stored_hash) else {
-        return false;
-    };
-    // SAFETY: both C strings are valid, NUL-terminated, and kept alive
-    // for the call. `crypt` returns a pointer into a static buffer
-    // owned by libc (never freed by the caller) or NULL on error; we
-    // only read through it before the next call, never write.
-    let result = unsafe { crypt(c_password.as_ptr(), c_salt.as_ptr()) };
-    if result.is_null() {
-        return false;
-    }
-    // SAFETY: `result` was just checked non-NULL and points at libc's
-    // static, NUL-terminated crypt buffer.
-    let result_str = unsafe { CStr::from_ptr(result) }.to_string_lossy();
     // Constant-ish comparison isn't attempted here (crypt(3)'s own
-    // static buffer already isn't a secret-independent-time API); this
-    // matches what real login(1) does too — the timing signal is
-    // dominated by crypt()'s own KDF cost either way.
-    result_str == stored_hash
+    // buffer already isn't a secret-independent-time API); this matches
+    // what real login(1) does too — the timing signal is dominated by
+    // crypt()'s own KDF cost either way.
+    crypt_locked(password, stored_hash).as_deref() == Some(stored_hash)
 }
 
 fn prompt(label: &str) -> io::Result<String> {
@@ -306,23 +326,18 @@ mod tests {
 
     #[test]
     fn verify_password_round_trips_via_the_real_system_crypt() {
-        // Hash our own password with the same crypt() we verify with,
-        // so this test is meaningful on whatever libc/libcrypt the
-        // build machine actually has, rather than hardcoding a vector
-        // tied to one specific algorithm.
-        let salt = CString::new("$6$usertestsalt$").unwrap();
-        let pass = CString::new("correct horse battery staple").unwrap();
-        // SAFETY: both C strings are valid and NUL-terminated, kept
-        // alive for the call.
-        let hashed = unsafe { crypt(pass.as_ptr(), salt.as_ptr()) };
-        assert!(!hashed.is_null());
-        // SAFETY: just checked non-NULL; points at libc's static,
-        // NUL-terminated crypt buffer.
-        let hashed = unsafe { CStr::from_ptr(hashed) }
-            .to_string_lossy()
-            .into_owned();
+        // Hash our own password with the same crypt() we verify with
+        // (through the same locked helper — see CRYPT_LOCK's docs for
+        // why a direct, unlocked crypt() call here would race against
+        // other tests in this file), so this test is meaningful on
+        // whatever libc/libcrypt the build machine actually has, rather
+        // than hardcoding a vector tied to one specific algorithm.
+        let hashed = crypt_locked("correct horse battery staple", "$6$usertestsalt$").unwrap();
 
-        assert!(verify_password("correct horse battery staple", &hashed));
+        assert!(
+            verify_password("correct horse battery staple", &hashed),
+            "verify_password failed against a hash crypt() itself just produced: {hashed:?}"
+        );
         assert!(!verify_password("wrong password", &hashed));
     }
 }
