@@ -1,13 +1,2 @@
 [alias]
 user-all = "build --release --workspace"
-
-[target.x86_64-unknown-linux-musl]
-linker = "musl-gcc"
-
-# x86_64-zainium-linux-musl: only resolved via the custom target spec at
-# targets/x86_64-zainium-linux-musl.json (see targets/README.md and
-# scripts/build-zainium.sh) — needs nightly + `-Z build-std`, since no
-# prebuilt std ships for a custom target. Never used by a plain
-# `cargo build` (no --target), so this doesn't affect the default path.
-[target.x86_64-zainium-linux-musl]
-linker = "x86_64-zainium-linux-musl-gcc"

@@ -76,7 +76,7 @@ fn attach(device: &str, file: &str, offset: u64, read_only: bool) -> io::Result<
     // SAFETY: `loop_dev` and `backing` are both valid, open file
     // descriptors kept alive for the call; `LOOP_SET_FD` takes the
     // backing fd directly as its third argument (not a pointer).
-    let r = unsafe { libc::ioctl(loop_dev.as_raw_fd(), LOOP_SET_FD, backing.as_raw_fd()) };
+    let r = unsafe { libc::ioctl(loop_dev.as_raw_fd(), LOOP_SET_FD as _, backing.as_raw_fd()) };
     if r == -1 {
         return Err(io::Error::last_os_error());
     }
@@ -90,12 +90,12 @@ fn attach(device: &str, file: &str, offset: u64, read_only: bool) -> io::Result<
 
     // SAFETY: `info` is a correctly-sized, fully-initialized
     // `loop_info64`; `loop_dev` stays open for the call.
-    let r = unsafe { libc::ioctl(loop_dev.as_raw_fd(), LOOP_SET_STATUS64, &info) };
+    let r = unsafe { libc::ioctl(loop_dev.as_raw_fd(), LOOP_SET_STATUS64 as _, &info) };
     if r == -1 {
         let save = io::Error::last_os_error();
         // SAFETY: undoing the SET_FD above on the same fd; takes no
         // pointer argument.
-        unsafe { libc::ioctl(loop_dev.as_raw_fd(), LOOP_CLR_FD, 0) };
+        unsafe { libc::ioctl(loop_dev.as_raw_fd(), LOOP_CLR_FD as _, 0) };
         return Err(save);
     }
     Ok(())
@@ -105,7 +105,7 @@ fn detach(device: &str) -> io::Result<()> {
     let loop_dev = OpenOptions::new().read(true).open(device)?;
     // SAFETY: `loop_dev` is open for the call; `LOOP_CLR_FD` takes no
     // pointer argument.
-    let r = unsafe { libc::ioctl(loop_dev.as_raw_fd(), LOOP_CLR_FD, 0) };
+    let r = unsafe { libc::ioctl(loop_dev.as_raw_fd(), LOOP_CLR_FD as _, 0) };
     if r == -1 {
         Err(io::Error::last_os_error())
     } else {
@@ -120,7 +120,7 @@ fn status(device: &str) -> io::Result<LoopInfo64> {
     let mut info = LoopInfo64::default();
     // SAFETY: `info` is a correctly-sized `loop_info64` out-param;
     // `loop_dev` stays open for the call.
-    let r = unsafe { libc::ioctl(loop_dev.as_raw_fd(), LOOP_GET_STATUS64, &mut info) };
+    let r = unsafe { libc::ioctl(loop_dev.as_raw_fd(), LOOP_GET_STATUS64 as _, &mut info) };
     if r == -1 {
         Err(io::Error::last_os_error())
     } else {
