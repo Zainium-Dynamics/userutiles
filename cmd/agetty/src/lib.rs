@@ -328,6 +328,7 @@ pub fn run() -> i32 {
 
     let host = fakehost.unwrap_or_else(hostname);
 
+    let is_autologin = autologin.is_some();
     let username = if let Some(user) = autologin {
         user
     } else if skip_login {
@@ -356,6 +357,14 @@ pub fn run() -> i32 {
     let mut cmd = Command::new(&login_bin);
     if !login_options.is_empty() {
         cmd.args(expand_login_options(&login_options, &username));
+    }
+    // Autologin means the username was never actually verified by
+    // anyone -- agetty is asserting it on the trusted (real-root) boot
+    // path, same trust boundary real agetty -f/login -f rely on. Pass
+    // that assertion through explicitly rather than just handing login
+    // a username, which our login(1) always re-prompts a password for.
+    if is_autologin {
+        cmd.arg("-f");
     }
     if !username.is_empty() {
         cmd.arg(&username);
