@@ -192,10 +192,14 @@ fn switch_identity(entry: &PasswdEntry) -> io::Result<()> {
 
 fn print_help() {
     print!(
-        "Usage: login [USERNAME]\n\
+        "Usage: login [-f] [USERNAME]\n\
  Begin a session on this terminal: prompt for a username (if not given)\n\
  and password, verify against the system's passwd/shadow database, then\n\
  exec the user's shell as a login shell.\n\
+ -f skip password verification -- USERNAME is already authenticated\n\
+    by the (trusted, real-root) caller, e.g. agetty --autologin.\n\
+    Refused unless this process is already running as real uid 0,\n\
+    matching real login(1)'s -f trust boundary.\n\
  --help display this help and exit\n\
  --version output version information and exit\n"
     );
@@ -220,6 +224,32 @@ pub fn run() -> i32 {
         return 0;
     }
 
+    // `-f USERNAME`: caller (agetty --autologin, or another trusted,
+    // already-root program) asserts USERNAME is already authenticated —
+    // matches real login(1)'s -f. Only honored when this process's real
+    // uid is already 0: -f is a trust-boundary bypass, not a general
+    // "skip the password" switch, so an unprivileged invocation just
+    // falls through to the normal prompt-and-verify path below instead
+    // of silently granting a free login.
+    let preauth_user = if let Some(pos) = args.iter().position(|a| a == "-f") {
+        let user = args.get(pos + 1).cloned();
+        // SAFETY: getuid(2) takes no arguments and cannot fail.
+        let real_root = unsafe { libc::getuid() } == 0;
+        match (user, real_root) {
+            (Some(u), true) => Some(u),
+            (Some(_), false) => {
+                ui.err("-f requires real uid 0 -- ignoring, falling back to password login");
+                None
+            }
+            (None, _) => {
+                ui.err("option requires an argument -- 'f'");
+                return 1;
+            }
+        }
+    } else {
+        None
+    };
+
     let passwd_path = usercore::zainium::passwd_path();
     let passwd_text = match fs::read_to_string(&passwd_path) {
         Ok(t) => t,
@@ -230,8 +260,27 @@ pub fn run() -> i32 {
     };
     let shadow_text = fs::read_to_string(usercore::zainium::shadow_path()).unwrap_or_default();
 
+    // Positional args with a recognized `-f USERNAME` pair stripped out,
+    // so the normal prompt-and-verify path below never sees `-f` itself
+    // as a literal username (matters both when `-f` was honored above,
+    // and when it was refused for lacking real root and we fall through
+    // to a real password prompt for that same invocation).
+    let mut positional = args.clone();
+    if let Some(pos) = positional.iter().position(|a| a == "-f") {
+        positional.drain(pos..(pos + 2).min(positional.len()));
+    }
+
+    if let Some(username) = preauth_user {
+        let entry = find_passwd_entry(&passwd_text, &username);
+        let Some(entry) = entry else {
+            ui.err(&format!("-f: no such user: {username}"));
+            return 1;
+        };
+        return exec_login_shell(&ui, &username, &entry);
+    }
+
     for _ in 0..MAX_ATTEMPTS {
-        let username = match args.first() {
+        let username = match positional.first() {
             Some(u) => u.clone(),
             None => match prompt("login: ") {
                 Ok(u) => u,
@@ -252,32 +301,72 @@ pub fn run() -> i32 {
         };
 
         if authenticated {
-            let entry = entry.unwrap();
-            if let Err(e) = std::env::set_current_dir(&entry.home) {
-                ui.err(&format!("cannot chdir to {}: {e}", entry.home));
-                return 1;
-            }
-            if let Err(e) = switch_identity(&entry) {
-                ui.err(&format!("cannot switch to user {username}: {e}"));
-                return 1;
-            }
-            std::env::set_var("HOME", &entry.home);
-            std::env::set_var("SHELL", &entry.shell);
-            std::env::set_var("USER", &username);
-            std::env::set_var("LOGNAME", &username);
-            std::env::set_var("PATH", usercore::zainium::effective_path());
-
-            // Login shell convention: argv[0] starts with '-'.
-            let shell_name = entry.shell.rsplit('/').next().unwrap_or(&entry.shell);
-            let err = Command::new(&entry.shell)
-                .arg0(format!("-{shell_name}"))
-                .exec();
-            ui.err(&format!("failed to execute {}: {err}", entry.shell));
-            return 1;
+            return exec_login_shell(&ui, &username, &entry.unwrap());
         }
 
         println!("Login incorrect");
     }
+    1
+}
+
+/// Finish a successful login: chdir home, drop to the user's identity,
+/// populate the standard session env vars, then exec the login shell.
+/// Only returns (with a nonzero code) if a step failed — a real success
+/// replaces this process entirely.
+fn exec_login_shell(ui: &Ui, username: &str, entry: &PasswdEntry) -> i32 {
+    if let Err(e) = std::env::set_current_dir(&entry.home) {
+        ui.err(&format!("cannot chdir to {}: {e}", entry.home));
+        return 1;
+    }
+    if let Err(e) = switch_identity(entry) {
+        ui.err(&format!("cannot switch to user {username}: {e}"));
+        return 1;
+    }
+    std::env::set_var("HOME", &entry.home);
+    std::env::set_var("SHELL", &entry.shell);
+    std::env::set_var("USER", username);
+    std::env::set_var("LOGNAME", username);
+    // A new session's PATH is established fresh, never inherited — the
+    // same rule real login(1) follows (ENV_PATH/ENV_SUPATH in
+    // login.defs). This matters concretely on Zainium: agetty/login are
+    // spawned by a systemd unit with no `Environment=PATH=...` override,
+    // so the process inherits systemd's own compiled-in default
+    // (`/usr/bin:/bin`-style FHS paths that don't exist here) — and
+    // effective_path() (which prefers an already-non-empty env PATH)
+    // would silently keep that broken value instead of falling back.
+    // Bypass it and always start the session with Zainium's real path.
+    std::env::set_var("PATH", usercore::zainium::DEFAULT_PATH);
+    std::env::set_var("LD_LIBRARY_PATH", usercore::zainium::DEFAULT_LD_LIBRARY_PATH);
+    // sys_resolver's LD_PRELOAD is what makes any bare FHS-shaped path
+    // (/etc/greetd/config.toml, /etc/profile, ...) resolve at all on
+    // Zainium. system.conf.d's DefaultEnvironment= only reaches units
+    // systemd itself spawns -- a manually-typed command from this very
+    // shell never sees it, no matter how fresh the ISO is. Set it here
+    // directly, same guaranteed-not-inherited reasoning as PATH above,
+    // so testing anything by hand from an interactive login session
+    // actually has the same env real systemd units are supposed to.
+    std::env::set_var("LD_PRELOAD", "/overlayer/syshub/lib/libsys_resolver.so");
+
+    // Real login(1)'s login.defs (ENV_PATH/ENV_SUPATH) is exactly this
+    // pattern: a fresh login session gets its own known-good env, not
+    // whatever it happened to inherit. PS1 belongs in that same set --
+    // shipping it through /overlayer/syshub/etc/profile instead (relying
+    // on bash's own login-shell startup, remapped via sys_resolver's
+    // LD_PRELOAD) was tried first and left unverified whether it's
+    // actually reached by the time bash starts (a getty->login->bash
+    // exec chain, LD_PRELOAD propagation through systemd's
+    // DefaultEnvironment -- too many links to trust without a live
+    // test). Setting it directly here has none of that: an inherited
+    // PS1 env var is just a plain shell variable to bash, no file lookup
+    // involved, guaranteed to show correctly the first time.
+    std::env::set_var("PS1", "\\u@\\h:\\w\\$ ");
+
+    // Login shell convention: argv[0] starts with '-'.
+    let shell_name = entry.shell.rsplit('/').next().unwrap_or(&entry.shell);
+    let err = Command::new(&entry.shell)
+        .arg0(format!("-{shell_name}"))
+        .exec();
+    ui.err(&format!("failed to execute {}: {err}", entry.shell));
     1
 }
 

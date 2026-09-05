@@ -15,6 +15,18 @@ pub const PROTECTED_TREE_PREFIXES: &[&str] = &["/overlayer/syshub"];
 /// Absolute trees that may never be modified (no exceptions).
 pub const MODIFICATION_PREFIXES: &[&str] = &["/overlayer/syshub", "/overlayer/zaisys"];
 
+/// Real, mutable system state living *inside* the otherwise-immutable
+/// syshub tree -- /etc/passwd, /etc/shadow, /etc/group and friends
+/// (useradd/passwd/usermod/login itself all need to write here), plus
+/// /var (runtime state: dbus's socket dir, logind sessions, ...).
+/// Without this exception NO account tool -- useradd, passwd, usermod,
+/// even login's own password-change path -- could ever write anything,
+/// since they all resolve to a path under /overlayer/syshub. This does
+/// NOT loosen `removal_denied` -- deleting /overlayer/syshub/etc
+/// wholesale is still blocked; only in-place modification of files
+/// already inside it is allowed.
+pub const MUTABLE_STATE_PREFIXES: &[&str] = &["/overlayer/syshub/etc", "/overlayer/syshub/var"];
+
 /// Directory basenames that are fully protected (self + descendants).
 pub const PROTECTED_TREE_NAMES: &[&str] = &["zaisys"];
 
@@ -123,6 +135,13 @@ pub fn modification_denied(path: &Path) -> Option<ProtectReason> {
 
 /// Same as [`modification_denied`] but for an already-resolved absolute path.
 pub fn modification_denied_resolved(resolved: &Path) -> Option<ProtectReason> {
+    for prefix in MUTABLE_STATE_PREFIXES {
+        let p = Path::new(prefix);
+        if resolved == p || resolved.starts_with(p) {
+            return None;
+        }
+    }
+
     for prefix in MODIFICATION_PREFIXES {
         let p = Path::new(prefix);
         if resolved == p || resolved.starts_with(p) {
