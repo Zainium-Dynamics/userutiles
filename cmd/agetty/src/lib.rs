@@ -175,8 +175,21 @@ fn find_login_program(login_program: Option<&str>) -> Option<PathBuf> {
         }
         return None;
     }
+    // `login` is a core Zainium system binary, not a user command --
+    // don't trust an ambient $PATH here. `path_dirs()` (via
+    // `effective_path()`) only falls back to Zainium's own
+    // `DEFAULT_PATH` when $PATH is completely unset, but a
+    // systemd-launched getty always gets *some* non-empty default
+    // $PATH from systemd itself (FHS-style, e.g. /usr/bin:/bin:...),
+    // which doesn't exist on Zainium at all -- that search silently
+    // finds nothing, even though /overlayer/syshub/bin/login is right
+    // there (the exact "login program not found" bug hit on every
+    // getty instance besides the one with an explicit
+    // --login-program override). Always also check Zainium's real
+    // DEFAULT_PATH, regardless of what $PATH held.
     usercore::zainium::path_dirs()
         .into_iter()
+        .chain(std::env::split_paths(usercore::zainium::DEFAULT_PATH))
         .map(|d| d.join("login"))
         .find(|p| p.is_file())
 }
