@@ -1,6 +1,6 @@
 //! user chown — change file owner and group.
 
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use usercore::protect;
@@ -117,42 +117,24 @@ fn resolve_user(name: &str) -> Result<u32, String> {
     if let Ok(n) = name.parse::<u32>() {
         return Ok(n);
     }
-    let c = CString::new(name).map_err(|_| "invalid user name".to_string())?;
-    // SAFETY: `c` is a valid, NUL-terminated `CString` that outlives this
-    // block, so `c.as_ptr()` is a sound `getpwnam` argument. `getpwnam`
-    // returns either NULL (handled below) or a pointer to an internal
-    // static `passwd` buffer valid until the next `getpwnam`/`getpwuid`/
-    // `getpwent`-family call on this thread; we dereference it exactly
-    // once, immediately, before any such call, so the read is sound.
-    unsafe {
-        let pw = libc::getpwnam(c.as_ptr());
-        if pw.is_null() {
-            Err(format!("invalid user: '{name}'"))
-        } else {
-            Ok((*pw).pw_uid)
-        }
-    }
+    // Direct passwd-file lookup (usercore::nss), not `getpwnam`: that goes
+    // through libc's own internal, non-interposable `/etc/passwd` access,
+    // which only resolves to Zainium's real path if the deployed `libc.so`
+    // happens to be built from an already-patched musl source.
+    usercore::nss::user_by_name(name)
+        .map(|pw| pw.uid)
+        .ok_or_else(|| format!("invalid user: '{name}'"))
 }
 
 fn resolve_group(name: &str) -> Result<u32, String> {
     if let Ok(n) = name.parse::<u32>() {
         return Ok(n);
     }
-    let c = CString::new(name).map_err(|_| "invalid group name".to_string())?;
-    // SAFETY: `c` is a valid, NUL-terminated `CString` that outlives this
-    // block, so `c.as_ptr()` is a sound `getgrnam` argument. `getgrnam`
-    // returns either NULL (handled below) or a pointer to an internal
-    // static `group` buffer valid until the next `getgrnam`/`getgrgid`/
-    // `getgrent`-family call on this thread; we dereference it exactly
-    // once, immediately, before any such call, so the read is sound.
-    unsafe {
-        let gr = libc::getgrnam(c.as_ptr());
-        if gr.is_null() {
-            Err(format!("invalid group: '{name}'"))
-        } else {
-            Ok((*gr).gr_gid)
-        }
-    }
+    // Direct group-file lookup (usercore::nss), not `getgrnam` -- same
+    // reasoning as `resolve_user` above.
+    usercore::nss::group_by_name(name)
+        .map(|gr| gr.gid)
+        .ok_or_else(|| format!("invalid group: '{name}'"))
 }
 
 fn chown_path(
@@ -214,39 +196,15 @@ fn do_chown(path: &Path, uid: Option<u32>, gid: Option<u32>, verbose: bool) -> s
 }
 
 fn uid_name(uid: u32) -> String {
-    // SAFETY: `getpwuid` takes a plain integer and returns either NULL
-    // (handled below) or a pointer to an internal static `passwd` buffer
-    // whose `pw_name` field is a NUL-terminated string valid until the
-    // next `getpwnam`/`getpwuid`/`getpwent`-family call on this thread.
-    // We build the `CStr` and copy it into an owned `String` immediately,
-    // before any such call, so both the dereference and `CStr::from_ptr`
-    // are sound.
-    unsafe {
-        let pw = libc::getpwuid(uid);
-        if pw.is_null() {
-            uid.to_string()
-        } else {
-            CStr::from_ptr((*pw).pw_name).to_string_lossy().into_owned()
-        }
-    }
+    usercore::nss::user_by_uid(uid)
+        .map(|pw| pw.name)
+        .unwrap_or_else(|| uid.to_string())
 }
 
 fn gid_name(gid: u32) -> String {
-    // SAFETY: `getgrgid` takes a plain integer and returns either NULL
-    // (handled below) or a pointer to an internal static `group` buffer
-    // whose `gr_name` field is a NUL-terminated string valid until the
-    // next `getgrnam`/`getgrgid`/`getgrent`-family call on this thread.
-    // We build the `CStr` and copy it into an owned `String` immediately,
-    // before any such call, so both the dereference and `CStr::from_ptr`
-    // are sound.
-    unsafe {
-        let gr = libc::getgrgid(gid);
-        if gr.is_null() {
-            gid.to_string()
-        } else {
-            CStr::from_ptr((*gr).gr_name).to_string_lossy().into_owned()
-        }
-    }
+    usercore::nss::group_by_gid(gid)
+        .map(|gr| gr.name)
+        .unwrap_or_else(|| gid.to_string())
 }
 
 #[cfg(test)]

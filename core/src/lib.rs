@@ -21,6 +21,7 @@ pub mod blkprobe;
 pub mod digest;
 pub mod error;
 pub mod exit;
+pub mod nss;
 pub mod pathx;
 pub mod protect;
 pub mod ptable;
