@@ -517,50 +517,16 @@ const MONTH: [&str; 12] = [
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
-/// Resolve `uid` to a user name via `getpwuid(3)`, falling back to the
-/// numeric id (stringified) if no matching passwd entry exists.
+/// Resolve `uid` to a user name from Zainium's passwd file, falling back to
+/// the numeric id (stringified) if no matching entry exists.
 fn uid_name(uid: u32) -> String {
-    // SAFETY: `libc::getpwuid` takes a plain `uid_t` by value and cannot itself cause
-    // UB. It returns either NULL or a pointer to a `passwd` struct backed by libc's
-    // internal static/thread-local buffer, which stays valid until the next call to
-    // `getpwuid`/`getpwnam` etc. on this thread. We check for NULL before
-    // dereferencing, and `pw_name` is documented to be a valid NUL-terminated C
-    // string for the lifetime of that buffer, so `CStr::from_ptr` is sound; the
-    // string is copied into an owned `String` before any further libc call could
-    // invalidate the buffer.
-    unsafe {
-        let pw = libc::getpwuid(uid);
-        if pw.is_null() {
-            uid.to_string()
-        } else {
-            std::ffi::CStr::from_ptr((*pw).pw_name)
-                .to_string_lossy()
-                .into_owned()
-        }
-    }
+    usercore::nss::user_by_uid(uid).map_or_else(|| uid.to_string(), |pw| pw.name)
 }
 
-/// Resolve `gid` to a group name via `getgrgid(3)`, falling back to the
-/// numeric id (stringified) if no matching group entry exists.
+/// Resolve `gid` to a group name from Zainium's group file, falling back to
+/// the numeric id (stringified) if no matching entry exists.
 fn gid_name(gid: u32) -> String {
-    // SAFETY: `libc::getgrgid` takes a plain `gid_t` by value and cannot itself cause
-    // UB. It returns either NULL or a pointer to a `group` struct backed by libc's
-    // internal static/thread-local buffer, which stays valid until the next call to
-    // `getgrgid`/`getgrnam` etc. on this thread. We check for NULL before
-    // dereferencing, and `gr_name` is documented to be a valid NUL-terminated C
-    // string for the lifetime of that buffer, so `CStr::from_ptr` is sound; the
-    // string is copied into an owned `String` before any further libc call could
-    // invalidate the buffer.
-    unsafe {
-        let gr = libc::getgrgid(gid);
-        if gr.is_null() {
-            gid.to_string()
-        } else {
-            std::ffi::CStr::from_ptr((*gr).gr_name)
-                .to_string_lossy()
-                .into_owned()
-        }
-    }
+    usercore::nss::group_by_gid(gid).map_or_else(|| gid.to_string(), |gr| gr.name)
 }
 
 #[cfg(test)]

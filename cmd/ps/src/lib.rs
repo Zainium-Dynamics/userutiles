@@ -235,28 +235,10 @@ fn tty_name(nr: i32) -> String {
     }
 }
 
-/// Resolve `uid` to a username via `getpwuid(3)`, falling back to the
-/// decimal uid itself if there is no matching passwd entry.
+/// Resolve `uid` to a user name from Zainium's passwd file, falling back to
+/// the numeric id (stringified) if no matching entry exists.
 fn uid_name(uid: u32) -> String {
-    // SAFETY: `getpwuid` takes a plain integer and returns either a null
-    // pointer (checked below before use) or a pointer into an internal
-    // static buffer owned by libc that stays valid until the next call
-    // to `getpwuid`/`getpwnam`/etc. on this thread. We only read from it
-    // once, synchronously, before any other libc passwd-database call can
-    // invalidate it. `(*pw).pw_name` is a non-null, NUL-terminated C
-    // string owned by that same static buffer, so `CStr::from_ptr` on it
-    // is valid, and `to_string_lossy().into_owned()` copies the data out
-    // before the buffer could be reused.
-    unsafe {
-        let pw = libc::getpwuid(uid);
-        if pw.is_null() {
-            uid.to_string()
-        } else {
-            std::ffi::CStr::from_ptr((*pw).pw_name)
-                .to_string_lossy()
-                .into_owned()
-        }
-    }
+    usercore::nss::user_by_uid(uid).map_or_else(|| uid.to_string(), |pw| pw.name)
 }
 
 /// Return the display name of the calling process's controlling terminal

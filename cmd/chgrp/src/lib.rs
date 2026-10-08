@@ -87,27 +87,15 @@ pub fn run() -> i32 {
 }
 
 /// Resolve `name` to a gid: a plain number is used as-is, otherwise it's
-/// looked up via `getgrnam(3)`.
+/// looked up in Zainium's group file.
 fn resolve_group(name: &str) -> Result<u32, String> {
     if let Ok(n) = name.parse::<u32>() {
         return Ok(n);
     }
-    let c = CString::new(name).map_err(|_| "invalid group".to_string())?;
-    // SAFETY: `c` is a valid, NUL-terminated `CString` that outlives this
-    // block, so `c.as_ptr()` is a sound argument for `getgrnam`.
-    // `getgrnam` either returns NULL (handled below) or a pointer to an
-    // internal static `group` buffer that remains valid until the next
-    // call to a `getgrnam`/`getgrgid`/`getgrent`-family function on this
-    // thread; we dereference it exactly once, immediately, before any
-    // such call could invalidate it, so the `(*gr).gr_gid` read is sound.
-    unsafe {
-        let gr = libc::getgrnam(c.as_ptr());
-        if gr.is_null() {
-            Err(format!("invalid group: '{name}'"))
-        } else {
-            Ok((*gr).gr_gid)
-        }
-    }
+    CString::new(name).map_err(|_| "invalid group".to_string())?;
+    usercore::nss::group_by_name(name)
+        .map(|gr| gr.gid)
+        .ok_or_else(|| format!("invalid group: '{name}'"))
 }
 
 /// Change the group of `path` to `gid`, recursing into its children if

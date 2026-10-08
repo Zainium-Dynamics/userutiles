@@ -200,22 +200,7 @@ fn resolve_user(name: &str) -> Option<u32> {
     if let Ok(n) = name.parse() {
         return Some(n);
     }
-    let c = std::ffi::CString::new(name).ok()?;
-    // SAFETY: `c` is a valid, NUL-terminated `CString` that outlives this
-    // block, so `c.as_ptr()` is a sound `getpwnam` argument. `getpwnam`
-    // returns either NULL (handled below) or a pointer to an internal
-    // static `passwd` buffer valid until the next `getpwnam`/`getpwuid`/
-    // `getpwent`-family call on this thread; we read `pw_uid` (a plain
-    // integer field) immediately, before any such call, so the
-    // dereference is sound.
-    unsafe {
-        let pw = libc::getpwnam(c.as_ptr());
-        if pw.is_null() {
-            None
-        } else {
-            Some((*pw).pw_uid)
-        }
-    }
+    usercore::nss::user_by_name(name).map(|pw| pw.uid)
 }
 
 /// Resolve `name` to a gid: a bare number is used as-is, otherwise it is
@@ -228,22 +213,7 @@ fn resolve_group(name: &str) -> Option<u32> {
     if let Ok(n) = name.parse() {
         return Some(n);
     }
-    let c = std::ffi::CString::new(name).ok()?;
-    // SAFETY: `c` is a valid, NUL-terminated `CString` that outlives this
-    // block, so `c.as_ptr()` is a sound `getgrnam` argument. `getgrnam`
-    // returns either NULL (handled below) or a pointer to an internal
-    // static `group` buffer valid until the next `getgrnam`/`getgrgid`/
-    // `getgrent`-family call on this thread; we read `gr_gid` (a plain
-    // integer field) immediately, before any such call, so the
-    // dereference is sound.
-    unsafe {
-        let gr = libc::getgrnam(c.as_ptr());
-        if gr.is_null() {
-            None
-        } else {
-            Some((*gr).gr_gid)
-        }
-    }
+    usercore::nss::group_by_name(name).map(|gr| gr.gid)
 }
 
 /// Apply `chown(2)` to `path` with `uid`/`gid`, leaving either field

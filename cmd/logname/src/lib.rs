@@ -5,8 +5,8 @@ use usercore::Ui;
 
 /// Entry point for the `logname` utility. Takes no operands (only
 /// `-h`/`--help`/`--version`); prints the invoking user's login name,
-/// resolved in order from `$LOGNAME`, `getlogin(3)`, then a `getpwuid(3)`
-/// lookup of the real uid.
+/// resolved in order from `$LOGNAME`, `getlogin(3)`, then the real uid's
+/// entry in Zainium's passwd file.
 ///
 /// Returns 0 on success, 1 if no login name could be determined or on a
 /// usage error.
@@ -42,24 +42,19 @@ pub fn run() -> i32 {
     // `getlogin`-family call on this thread; we build a `CStr` from it
     // and print it immediately, then return, so no later call can
     // invalidate it while it's in use. `getuid` takes no arguments and
-    // cannot fail. `getpwuid` returns either NULL (handled below) or a
-    // pointer to an internal static `passwd` buffer whose `pw_name` field
-    // is a NUL-terminated string valid until the next `getpwnam`/
-    // `getpwuid`/`getpwent`-family call on this thread; we read and print
-    // it immediately, before any such call, so the dereference and
-    // `CStr::from_ptr` are sound.
-    unsafe {
+    // cannot fail.
+    let uid = unsafe {
         let p = libc::getlogin();
         if !p.is_null() {
             println!("{}", CStr::from_ptr(p).to_string_lossy());
             return 0;
         }
-        let uid = libc::getuid();
-        let pw = libc::getpwuid(uid);
-        if !pw.is_null() {
-            println!("{}", CStr::from_ptr((*pw).pw_name).to_string_lossy());
-            return 0;
-        }
+        libc::getuid()
+    };
+    // Zainium's passwd file directly; libc's getpwuid only knows /etc/passwd
+    if let Some(pw) = usercore::nss::user_by_uid(uid) {
+        println!("{}", pw.name);
+        return 0;
     }
     ui.err("no login name");
     1

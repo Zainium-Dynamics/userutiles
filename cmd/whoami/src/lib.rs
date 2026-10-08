@@ -1,5 +1,4 @@
 //! user whoami
-use std::ffi::CStr;
 use std::io::{self, Write};
 
 pub fn run() -> i32 {
@@ -28,22 +27,8 @@ pub fn run() -> i32 {
     // SAFETY: `libc::geteuid` takes no arguments, reads no caller-supplied
     // pointers, and cannot fail — always safe to call.
     let euid = unsafe { libc::geteuid() };
-    // SAFETY: `libc::getpwuid` takes a plain uid integer and returns either
-    // NULL (checked before use) or a pointer to a libc-owned static `passwd`
-    // record. `pw_name` is documented to be a valid NUL-terminated C string
-    // owned by that same static record, so `CStr::from_ptr` on it is sound
-    // as long as we're done with it before another passwd-database call
-    // could reuse the static buffer — which we are, since we immediately
-    // copy it into an owned `String` via `to_string_lossy().into_owned()`
-    // and don't call getpwuid/getpwnam again afterward.
-    let name = unsafe {
-        let pw = libc::getpwuid(euid);
-        if pw.is_null() {
-            None
-        } else {
-            Some(CStr::from_ptr((*pw).pw_name).to_string_lossy().into_owned())
-        }
-    };
+    // Zainium's passwd file directly; libc's getpwuid only knows /etc/passwd
+    let name = usercore::nss::user_by_uid(euid).map(|pw| pw.name);
     match name {
         Some(n) => {
             let mut out = io::stdout().lock();

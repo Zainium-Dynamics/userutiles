@@ -102,37 +102,11 @@ impl NameCache {
 }
 
 fn user_name(uid: u32) -> Option<String> {
-    // SAFETY: `getpwuid` returns either null (handled below) or a pointer
-    // into a libc-owned static buffer valid until the next passwd-database
-    // call on this thread; we read `pw_name` out of it once, synchronously.
-    unsafe {
-        let pw = libc::getpwuid(uid);
-        if pw.is_null() {
-            None
-        } else {
-            Some(
-                std::ffi::CStr::from_ptr((*pw).pw_name)
-                    .to_string_lossy()
-                    .into_owned(),
-            )
-        }
-    }
+    usercore::nss::user_by_uid(uid).map(|pw| pw.name)
 }
 
 fn group_name(gid: u32) -> Option<String> {
-    // SAFETY: same reasoning as `user_name`, for the group database.
-    unsafe {
-        let gr = libc::getgrgid(gid);
-        if gr.is_null() {
-            None
-        } else {
-            Some(
-                std::ffi::CStr::from_ptr((*gr).gr_name)
-                    .to_string_lossy()
-                    .into_owned(),
-            )
-        }
-    }
+    usercore::nss::group_by_gid(gid).map(|gr| gr.name)
 }
 
 pub(crate) fn cell_value(

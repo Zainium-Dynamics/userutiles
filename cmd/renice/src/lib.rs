@@ -1,7 +1,5 @@
 //! user renice — alter the scheduling priority of one or more running
 //! processes, process groups, or all processes owned by a user.
-use std::ffi::CString;
-
 use usercore::Ui;
 
 const HELP: &str = "Usage: renice [-n] <priority> [-g | -p | -u] <identifier>...\n\
@@ -146,19 +144,7 @@ fn resolve_id(mode: Mode, ident: &str) -> Result<u32, String> {
 }
 
 fn lookup_uid(name: &str) -> Option<u32> {
-    let c_name = CString::new(name).ok()?;
-    // SAFETY: `getpwnam` is called with a valid NUL-terminated C string; the
-    // returned pointer (if non-null) refers to a static/thread-local buffer
-    // owned by libc that remains valid until the next passwd-database call,
-    // which is sufficient for reading `pw_uid` immediately.
-    unsafe {
-        let pw = libc::getpwnam(c_name.as_ptr());
-        if pw.is_null() {
-            None
-        } else {
-            Some((*pw).pw_uid)
-        }
-    }
+    usercore::nss::user_by_name(name).map(|pw| pw.uid)
 }
 
 /// Reads the current priority of a target, or `None` if it can't be

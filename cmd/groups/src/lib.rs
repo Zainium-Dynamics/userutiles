@@ -1,6 +1,6 @@
 //! user groups — print group memberships.
 
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 
 use usercore::Ui;
 
@@ -78,57 +78,30 @@ fn print_current() {
     println!("{}", names.join(" "));
 }
 
-/// Look up `name` via `getpwnam(3)` and print `name : PRIMARY_GROUP`.
-/// Returns `Err` (with a user-facing message, no `name:` prefix — the
-/// caller adds that via [`Ui::err`]) if `name` contains a NUL byte or
-/// isn't a known user.
+/// Print `name : GROUP...` from Zainium's passwd/group files: the primary
+/// group plus every group listing `name` as a member. Returns `Err` (with
+/// a user-facing message, no `name:` prefix — the caller adds that via
+/// [`Ui::err`]) if `name` contains a NUL byte or isn't a known user.
 fn print_user(name: &str) -> Result<(), String> {
-    let c = to_cstring(name)?;
-    // SAFETY: `c` is a valid, NUL-terminated `CString` that outlives this
-    // block, so `c.as_ptr()` is a sound `getpwnam` argument. `getpwnam`
-    // returns either NULL (handled above) or a pointer to an internal
-    // static `passwd` buffer valid until the next `getpwnam`/`getpwuid`/
-    // `getpwent`-family call on this thread; we read `pw_gid` (a plain
-    // integer field) immediately, before any such call, so the
-    // dereference is sound. The nested call to `gid_name` performs its
-    // own independent `getgrgid` lookup and does not reuse `pw`, so it
-    // cannot invalidate the already-copied `gid`.
-    unsafe {
-        let pw = libc::getpwnam(c.as_ptr());
-        if pw.is_null() {
-            return Err(format!("'{name}': no such user"));
-        }
-        let gid = (*pw).pw_gid;
-        print!("{name} : {}", gid_name(gid));
-        // primary only (full getgrouplist needs more setup)
-        println!();
-    }
+    to_cstring(name)?;
+    let pw = usercore::nss::user_by_name(name).ok_or_else(|| format!("'{name}': no such user"))?;
+    let names: Vec<String> = usercore::nss::groups_for_user(name, pw.gid)
+        .into_iter()
+        .map(gid_name)
+        .collect();
+    println!("{name} : {}", names.join(" "));
     Ok(())
 }
 
-/// Convert `name` to a `CString` suitable for passing to `getpwnam(3)`.
+/// Reject names a passwd file can't hold (embedded NUL).
 fn to_cstring(name: &str) -> Result<CString, String> {
     CString::new(name).map_err(|_| format!("invalid user: '{name}'"))
 }
 
-/// Resolve `gid` to its group name via `getgrgid(3)`, falling back to the
-/// numeric GID (as a string) if there is no such group.
+/// Resolve `gid` to its group name from Zainium's group file, falling back
+/// to the numeric GID (as a string) if there is no such group.
 fn gid_name(gid: libc::gid_t) -> String {
-    // SAFETY: `getgrgid` takes a plain integer and returns either NULL
-    // (handled below) or a pointer to an internal static `group` buffer
-    // whose `gr_name` field is a NUL-terminated string valid until the
-    // next `getgrnam`/`getgrgid`/`getgrent`-family call on this thread.
-    // We build the `CStr` and copy it into an owned `String` immediately,
-    // before any such call, so both the dereference and `CStr::from_ptr`
-    // are sound.
-    unsafe {
-        let gr = libc::getgrgid(gid);
-        if gr.is_null() {
-            gid.to_string()
-        } else {
-            CStr::from_ptr((*gr).gr_name).to_string_lossy().into_owned()
-        }
-    }
+    usercore::nss::group_by_gid(gid).map_or_else(|| gid.to_string(), |gr| gr.name)
 }
 
 #[cfg(test)]
