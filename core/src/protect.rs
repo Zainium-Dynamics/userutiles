@@ -6,6 +6,7 @@
 //! - `zaisys/kernel` and everything under it: **cannot be modified or deleted**
 //! - everything else under `zaisys`: writable (carve's install-only files live here)
 //! - `zexlib` (both root and contents): **fully modifiable and deletable**
+//! - `.syshub-pending` / `.syshub-rollback` (staged base upgrades): **only zex and quantra-ramfs touch them**
 
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -19,6 +20,9 @@ pub const ZAISYS_KERNEL_PREFIXES: &[&str] =
 
 pub const MUTABLE_STATE_PREFIXES: &[&str] = &["/overlayer/syshub/etc", "/overlayer/syshub/var"];
 
+pub const SYSHUB_UPGRADE_PREFIXES: &[&str] =
+    &["/overlayer/.syshub-pending", "/overlayer/.syshub-rollback"];
+
 pub const PROTECTED_TREE_NAMES: &[&str] = &[];
 
 pub const PROTECTED_ROOT_NAMES: &[&str] = &["zexlib", "zaisys"];
@@ -29,6 +33,7 @@ pub enum ProtectReason {
     ZaisysRoot,
     ZaisysKernel,
     OverlayerTree,
+    SyshubUpgrade,
 }
 
 impl ProtectReason {
@@ -43,6 +48,9 @@ impl ProtectReason {
             }
             Self::OverlayerTree => {
                 "protected path: core OS layers cannot be modified (even as root)"
+            }
+            Self::SyshubUpgrade => {
+                "protected path: staged system upgrades are managed by zex only (even as root)"
             }
         }
     }
@@ -88,6 +96,9 @@ pub fn removal_denied(path: &Path) -> Option<ProtectReason> {
 }
 
 pub fn removal_denied_resolved(resolved: &Path) -> Option<ProtectReason> {
+    if let Some(r) = syshub_upgrade_denied(resolved) {
+        return Some(r);
+    }
     if is_named_root(resolved, "zexlib") || is_inside_named_root(resolved, "zexlib") {
         return None;
     }
@@ -120,6 +131,9 @@ pub fn modification_denied(path: &Path) -> Option<ProtectReason> {
 }
 
 pub fn modification_denied_resolved(resolved: &Path) -> Option<ProtectReason> {
+    if let Some(r) = syshub_upgrade_denied(resolved) {
+        return Some(r);
+    }
     for prefix in MUTABLE_STATE_PREFIXES {
         let p = Path::new(prefix);
         if resolved == p || resolved.starts_with(p) {
@@ -152,6 +166,14 @@ pub fn modification_denied_resolved(resolved: &Path) -> Option<ProtectReason> {
     None
 }
 
+fn syshub_upgrade_denied(resolved: &Path) -> Option<ProtectReason> {
+    SYSHUB_UPGRADE_PREFIXES
+        .iter()
+        .map(Path::new)
+        .any(|p| resolved == p || resolved.starts_with(p))
+        .then_some(ProtectReason::SyshubUpgrade)
+}
+
 fn is_named_root(path: &Path, name: &str) -> bool {
     path.file_name().and_then(|n| n.to_str()) == Some(name)
 }
@@ -182,6 +204,19 @@ mod tests {
             removal_denied_resolved(Path::new("/overlayer/syshub/bin")),
             Some(ProtectReason::SyshubTree)
         );
+    }
+
+    #[test]
+    fn staged_upgrades_blocked() {
+        for p in [
+            "/overlayer/.syshub-pending",
+            "/overlayer/.syshub-pending/root/bin/zex",
+            "/overlayer/.syshub-rollback/x/journal",
+        ] {
+            assert_eq!(removal_denied_resolved(Path::new(p)), Some(ProtectReason::SyshubUpgrade));
+            assert_eq!(modification_denied_resolved(Path::new(p)), Some(ProtectReason::SyshubUpgrade));
+        }
+        assert_eq!(removal_denied_resolved(Path::new("/overlayer/.syshub-pendingx")), None);
     }
 
     #[test]
