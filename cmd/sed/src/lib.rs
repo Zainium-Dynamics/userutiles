@@ -9,6 +9,9 @@ use usercore::{protect, Ui};
 
 /// Entry point: parse options and scripts, then stream every input through them.
 pub fn run() -> i32 {
+    // a closed pipe (`| head`) ends the program quietly instead of panicking
+    // SAFETY: restoring the default SIGPIPE action has no preconditions.
+    unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
     let ui = Ui::new("sed");
     let mut scripts: Vec<String> = Vec::new();
     let mut in_place: Option<String> = None;

@@ -34,6 +34,9 @@ struct Opts {
 const HELP: &str = "Usage: grep [OPTION]... PATTERNS [FILE]...\n  -E, -F, -G           extended / fixed-string / basic patterns (default -G)\n  -e PAT, -f FILE      use PAT / patterns from FILE (repeatable)\n  -i, -v, -w, -x       ignore case / invert / whole words / whole lines\n  -c, -l, -L, -q, -s   count / files with / files without / quiet / no file errors\n  -n, -o, -h, -H       line numbers / only matching / no names / with names\n  -m NUM               stop after NUM matches\n  -A, -B, -C NUM       context after / before / around\n  -r, -R               recurse into directories (--include, --exclude, --exclude-dir)\n  -Z, --null           NUL after file names\n";
 
 pub fn run() -> i32 {
+    // a closed pipe (`| head`) ends the program quietly instead of panicking
+    // SAFETY: restoring the default SIGPIPE action has no preconditions.
+    unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
     let mut o = Opts::default();
     let mut patterns: Vec<String> = Vec::new();
     let mut have_pattern = false;
