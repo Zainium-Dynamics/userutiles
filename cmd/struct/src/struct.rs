@@ -242,15 +242,21 @@ fn existing_kind(path: &Path) -> io::Result<Option<ExistingKind>> {
 }
 
 fn classify_target(path: &Path, force_file: bool) -> TargetKind {
-    if force_file || path_contains_dot(path) {
+    if force_file || name_has_dot(path) {
         TargetKind::File
     } else {
         TargetKind::Directory
     }
 }
 
-fn path_contains_dot(path: &Path) -> bool {
-    path.as_os_str().as_bytes().contains(&b'.')
+// Only the last component decides; a leading dot (.config) or a trailing `/` stays a directory.
+fn name_has_dot(path: &Path) -> bool {
+    if path.as_os_str().as_bytes().ends_with(b"/") {
+        return false;
+    }
+    path.file_name()
+        .and_then(|name| name.as_bytes().get(1..))
+        .is_some_and(|rest| rest.contains(&b'.'))
 }
 
 fn validate_target_shape(target: &Target) -> Result<(), StructError> {
@@ -432,9 +438,10 @@ fn print_help() {
     println!();
     println!("RULES:");
     println!(" 1. If <PATH> already exists, abort immediately (no overwrite).");
-    println!(" 2. If <PATH> contains '.', create it as a file (touch-style create).");
-    println!(" 3. If <PATH> does not contain '.', create it as a directory tree (mkdir -p).");
-    println!(" 4. Use -t to force an extensionless file target.");
+    println!(" 2. If the last name in <PATH> has a '.' (engine.rs), create it as a file.");
+    println!(" 3. Otherwise create a directory tree (mkdir -p); dots in parent dirs,");
+    println!("    a leading dot (.config) or a trailing '/' (conf.d/) stay directories.");
+    println!(" 4. Use -t to force a file target (bin/trigger, .bashrc).");
     println!();
     println!("EXAMPLES:");
     println!(" struct src/core/engine.rs # parents + file (like touch after mkdir -p)");
@@ -530,11 +537,22 @@ mod tests {
     }
 
     #[test]
-    fn detects_dots_anywhere_in_the_path_as_file_targets() {
+    fn only_the_last_name_decides_file_targets() {
         assert_eq!(
             classify_target(Path::new("release.v1/config"), false),
+            TargetKind::Directory
+        );
+        assert_eq!(
+            classify_target(Path::new("/home/u/.config/systemd/user"), false),
+            TargetKind::Directory
+        );
+        assert_eq!(
+            classify_target(Path::new(".config/systemd/user/x.target"), false),
             TargetKind::File
         );
+        assert_eq!(classify_target(Path::new("a/.config"), false), TargetKind::Directory);
+        assert_eq!(classify_target(Path::new("etc/conf.d/"), false), TargetKind::Directory);
+        assert_eq!(classify_target(Path::new("etc/conf.d"), false), TargetKind::File);
     }
 
     #[test]

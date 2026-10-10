@@ -3,7 +3,7 @@ pub fn run() -> i32 {
     eprintln!();
     eprintln!(" struct replaces both mkdir -p and touch workflows:");
     eprintln!(" struct src/services/auth # create directory tree (like mkdir -p)");
-    eprintln!(" struct path/to/file.txt # create file (path contains '.')");
+    eprintln!(" struct path/to/file.txt # create file (last name contains '.')");
     eprintln!(" struct -t path/name # force file even without '.'");
     eprintln!();
     eprintln!(" Run `struct --help` for full usage.");

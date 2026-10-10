@@ -18,9 +18,11 @@ struct -t <PATH>
 
 | Input | Detection | Operation |
 | --- | --- | --- |
-| `src/core/engine.rs` | Path contains `.` | Create missing parents, then create an empty file |
-| `src/services/auth` | Path does not contain `.` | Create the full directory tree |
-| `bin/trigger` | Path does not contain `.` | Create a directory tree by default |
+| `src/core/engine.rs` | Last name contains `.` | Create missing parents, then create an empty file |
+| `src/services/auth` | Last name has no `.` | Create the full directory tree |
+| `~/.config/systemd/user` | Dots only in parents or a leading dot | Create the full directory tree |
+| `etc/conf.d/` | Trailing `/` | Create the full directory tree |
+| `bin/trigger` | Last name has no `.` | Create a directory tree by default |
 | `struct -t bin/trigger` | `-t` forces file mode | Create missing parents, then create extensionless file `trigger` |
 
 Before creating anything, `struct` checks whether the terminal target already exists. Existing files, directories, symlinks, and other filesystem objects abort the operation immediately.
@@ -79,9 +81,10 @@ USAGE:
 
 RULES:
  1. If <PATH> already exists, abort immediately.
- 2. If <PATH> contains '.', create it as a file.
- 3. If <PATH> does not contain '.', create it as a directory tree.
- 4. Use -t to force an extensionless file target.
+ 2. If the last name in <PATH> has a '.' (engine.rs), create it as a file.
+ 3. Otherwise create a directory tree (mkdir -p); dots in parent dirs,
+    a leading dot (.config) or a trailing '/' (conf.d/) stay directories.
+ 4. Use -t to force a file target (bin/trigger, .bashrc).
 
 EXAMPLES:
  struct src/core/engine.rs # creates parents, then engine.rs
