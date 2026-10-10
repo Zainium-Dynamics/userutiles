@@ -23,6 +23,7 @@ pub mod error;
 pub mod exit;
 pub mod nss;
 pub mod pathx;
+pub mod posix_regex;
 pub mod protect;
 pub mod ptable;
 pub mod ui;
