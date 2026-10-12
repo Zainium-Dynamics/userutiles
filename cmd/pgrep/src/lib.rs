@@ -1,6 +1,7 @@
 //! user pgrep — look up or signal processes by name.
 use std::fs;
 
+use usercore::posix_regex::Regex;
 use usercore::Ui;
 
 /// Entry point for the `pgrep` utility (also serves as `pkill` when
@@ -23,120 +24,177 @@ pub fn run_as_pkill() -> i32 {
 }
 
 fn run_inner(is_pkill: bool) -> i32 {
-    let ui = Ui::new(if is_pkill { "pkill" } else { "pgrep" });
-    let mut full = false;
-    let mut list_name = false;
-    let mut ignore_case = false;
+    // SAFETY: restoring the default SIGPIPE action has no preconditions.
+    unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
+    let name = if is_pkill { "pkill" } else { "pgrep" };
+    let ui = Ui::new(name);
+    let (mut full, mut list_name, mut list_full, mut ignore_case) = (false, false, false, false);
+    let (mut exact, mut count, mut newest, mut oldest, mut invert) = (false, false, false, false, false);
+    let mut delim = "\n".to_string();
+    let mut uids: Vec<u32> = Vec::new();
+    let mut ppids: Vec<i32> = Vec::new();
     let mut signal = libc::SIGTERM;
-    let mut pattern = None;
+    let mut pattern: Option<String> = None;
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut i = 0;
     while i < args.len() {
-        match args[i].as_str() {
+        let a = args[i].clone();
+        i += 1;
+        let mut take = |what: &str| -> Option<String> {
+            let v = args.get(i).cloned();
+            i += 1;
+            if v.is_none() {
+                ui.err(&format!("option requires an argument -- '{what}'"));
+            }
+            v
+        };
+        match a.as_str() {
             "-h" | "--help" => {
-                if is_pkill {
-                    print!("Usage: pkill [OPTION]... PATTERN\nSignal processes based on name.\n -f full command line\n -i ignore case\n -SIGNAL signal number/name\n");
-                } else {
-                    print!("Usage: pgrep [OPTION]... PATTERN\nLook up processes based on name.\n -f full command line\n -l list name\n -i ignore case\n");
-                }
+                print!("Usage: {name} [OPTION]... PATTERN\n -f full command line\n -x exact match\n -i ignore case\n -l list name, -a list full command line\n -c count, -n newest, -o oldest, -v invert\n -d DELIM, -u USER, -P PPID{}\n", if is_pkill { "\n -SIGNAL, --signal SIG" } else { "" });
                 return 0;
             }
-            "--version" => {
-                println!(
-                    "{} (user_utils) 0.1.0",
-                    if is_pkill { "pkill" } else { "pgrep" }
-                );
+            "--version" | "-V" => {
+                println!("{name} (user_utils) 0.2.0");
                 return 0;
             }
             "-f" | "--full" => full = true,
             "-l" | "--list-name" => list_name = true,
+            "-a" | "--list-full" => list_full = true,
             "-i" | "--ignore-case" => ignore_case = true,
-            s if s.starts_with('-')
-                && s.len() > 1
-                && s[1..].chars().all(|c| c.is_ascii_digit()) =>
-            {
-                match s[1..].parse::<i32>() {
-                    Ok(n) => signal = n,
-                    Err(_) => {
-                        ui.err(&format!("invalid signal number '{}'", &s[1..]));
-                        return 2;
+            "-x" | "--exact" => exact = true,
+            "-c" | "--count" => count = true,
+            "-n" | "--newest" => newest = true,
+            "-o" | "--oldest" => oldest = true,
+            "-v" | "--inverse" => invert = true,
+            "-d" | "--delimiter" => match take("d") { Some(v) => delim = v, None => return 2 },
+            "-u" | "-U" | "--euid" | "--uid" => match take("u") {
+                Some(v) => {
+                    for u in v.split(',') {
+                        match u.parse::<u32>().ok().or_else(|| usercore::nss::user_by_name(u).map(|p| p.uid)) {
+                            Some(id) => uids.push(id),
+                            None => {
+                                ui.err(&format!("invalid user name: {u}"));
+                                return 2;
+                            }
+                        }
+                    }
+                }
+                None => return 2,
+            },
+            "-P" | "--parent" => match take("P") {
+                Some(v) => ppids.extend(v.split(',').filter_map(|x| x.parse::<i32>().ok())),
+                None => return 2,
+            },
+            "--signal" if is_pkill => match take("signal").and_then(|v| v.parse().ok().or_else(|| parse_sig(&v))) {
+                Some(n) => signal = n,
+                None => {
+                    ui.err("invalid signal");
+                    return 2;
+                }
+            },
+            s if is_pkill && s.starts_with('-') && s.len() > 1 && s[1..].chars().all(|c| c.is_ascii_digit()) => {
+                signal = s[1..].parse().unwrap_or(libc::SIGTERM);
+            }
+            s if is_pkill && s.starts_with('-') && s.len() > 1 && parse_sig(&s[1..]).is_some() => {
+                signal = parse_sig(&s[1..]).unwrap_or(libc::SIGTERM);
+            }
+            // combined flags such as -fx or -la
+            s if s.starts_with('-') && s.len() > 2 && !s.starts_with("--") && s[1..].chars().all(|c| "flaixcnov".contains(c)) => {
+                for c in s[1..].chars() {
+                    match c {
+                        'f' => full = true,
+                        'l' => list_name = true,
+                        'a' => list_full = true,
+                        'i' => ignore_case = true,
+                        'x' => exact = true,
+                        'c' => count = true,
+                        'n' => newest = true,
+                        'o' => oldest = true,
+                        _ => invert = true,
                     }
                 }
             }
-            s if s.starts_with('-') && s.len() > 1 && s.as_bytes()[1].is_ascii_alphabetic() => {
-                match parse_sig(&s[1..]) {
-                    Some(n) => signal = n,
-                    None => {
-                        ui.err(&format!("unknown signal '{}'", &s[1..]));
-                        return 2;
-                    }
-                }
-            }
-            s if s.starts_with('-') => {
-                ui.err(&format!("invalid option -- '{s}'"));
+            s if s.starts_with('-') && s.len() > 1 => {
+                ui.err(&format!("invalid option -- '{}'", s.trim_start_matches('-')));
                 return 2;
             }
             other => pattern = Some(other.to_string()),
         }
-        i += 1;
     }
-    let pattern = match pattern {
-        Some(p) => p,
-        None => {
-            ui.err("missing pattern");
-            return 2;
+    if pattern.is_none() && uids.is_empty() && ppids.is_empty() {
+        ui.err("no matching criteria specified");
+        return 2;
+    }
+    let re = match &pattern {
+        Some(p) => {
+            let p = if exact { format!("^({p})$") } else { p.clone() };
+            match Regex::new(&p, true, ignore_case) {
+                Ok(r) => Some(r),
+                Err(e) => {
+                    ui.err(&e);
+                    return 2;
+                }
+            }
         }
+        None => None,
     };
     let me = std::process::id() as i32;
-    let mut found = 0;
-    for p in iter_procs() {
-        if p.pid == me {
-            continue;
+    let mut hits: Vec<P> = iter_procs()
+        .into_iter()
+        .filter(|p| p.pid != me)
+        .filter(|p| {
+            let m = re.as_ref().is_none_or(|r| r.is_match(if full { &p.cmd } else { &p.name }))
+                && (uids.is_empty() || uids.contains(&p.uid))
+                && (ppids.is_empty() || ppids.contains(&p.ppid));
+            m != invert
+        })
+        .collect();
+    if newest || oldest {
+        hits.sort_by_key(|p| p.start);
+        let pick = if newest { hits.pop() } else { hits.into_iter().next() };
+        hits = pick.into_iter().collect();
+    }
+    if hits.is_empty() {
+        if count {
+            println!("0");
         }
-        let hay = if full { &p.cmd } else { &p.name };
-        if !matches_pattern(hay, &pattern, ignore_case) {
-            continue;
+        return 1;
+    }
+    if is_pkill {
+        for p in &hits {
+            // SAFETY: kill takes plain integers; a vanished pid just fails with ESRCH.
+            unsafe { libc::kill(p.pid, signal) };
         }
-        found += 1;
-        if is_pkill {
-            // SAFETY: `libc::kill` takes only plain integer arguments — `p.pid`
-            // (parsed from a `/proc/<pid>` directory name, so it names a process
-            // that existed at scan time) and `signal` (either `SIGTERM` or a
-            // value parsed/validated from CLI input above) — with no pointer
-            // arguments, so it cannot cause UB. If the target process has since
-            // exited or the signal number is invalid, the call simply fails and
-            // sets `errno` (`ESRCH`/`EINVAL`), which matches standard `kill(1)`/
-            // `pkill(1)` behaviour of not treating that as fatal.
-            unsafe {
-                libc::kill(p.pid, signal);
+        if count {
+            println!("{}", hits.len());
+        }
+        return 0;
+    }
+    if count {
+        println!("{}", hits.len());
+        return 0;
+    }
+    let out: Vec<String> = hits
+        .iter()
+        .map(|p| {
+            if list_full {
+                format!("{} {}", p.pid, p.cmd)
+            } else if list_name {
+                format!("{} {}", p.pid, p.name)
+            } else {
+                p.pid.to_string()
             }
-        } else if list_name {
-            println!("{} {}", p.pid, p.name);
-        } else {
-            println!("{}", p.pid);
-        }
-    }
-    if found == 0 {
-        1
-    } else {
-        0
-    }
-}
-
-/// True if `pattern` occurs anywhere in `haystack`, comparing case-
-/// insensitively when `ignore_case` is set.
-fn matches_pattern(haystack: &str, pattern: &str, ignore_case: bool) -> bool {
-    if ignore_case {
-        haystack
-            .to_ascii_lowercase()
-            .contains(&pattern.to_ascii_lowercase())
-    } else {
-        haystack.contains(pattern)
-    }
+        })
+        .collect();
+    println!("{}", out.join(&delim));
+    0
 }
 
 struct P {
     pid: i32,
+    ppid: i32,
+    uid: u32,
+    start: u64,
     name: String,
     cmd: String,
 }
@@ -173,7 +231,15 @@ fn iter_procs() -> Vec<P> {
                 .trim()
                 .to_string()
         };
-        v.push(P { pid, name, cmd });
+        let field = |k: &str| status.lines().find(|l| l.starts_with(k)).and_then(|l| l[k.len()..].split_whitespace().next()).and_then(|x| x.parse().ok());
+        let ppid = field("PPid:").map(|x: i64| x as i32).unwrap_or(0);
+        let uid = field("Uid:").map(|x: i64| x as u32).unwrap_or(u32::MAX);
+        // starttime is field 22 of /proc/<pid>/stat, after the ")" that ends the name
+        let start = fs::read_to_string(path.join("stat"))
+            .ok()
+            .and_then(|st| st.rsplit_once(')').and_then(|(_, r)| r.split_whitespace().nth(19).and_then(|x| x.parse().ok())))
+            .unwrap_or(0);
+        v.push(P { pid, ppid, uid, start, name, cmd });
     }
     v
 }
@@ -204,19 +270,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn matches_pattern_case_sensitive_by_default() {
-        assert!(matches_pattern("firefox", "fire", false));
-        assert!(!matches_pattern("Firefox", "fire", false));
-    }
-
-    #[test]
-    fn matches_pattern_ignore_case() {
-        assert!(matches_pattern("Firefox", "FIRE", true));
-    }
-
-    #[test]
-    fn matches_pattern_empty_pattern_matches_everything() {
-        assert!(matches_pattern("anything", "", false));
+    fn patterns_are_extended_regex() {
+        assert!(Regex::new("fire", true, false).unwrap().is_match("firefox"));
+        assert!(!Regex::new("fire", true, false).unwrap().is_match("Firefox"));
+        assert!(Regex::new("FIRE", true, true).unwrap().is_match("Firefox"));
+        assert!(Regex::new("^(cosmic-comp)$", true, false).unwrap().is_match("cosmic-comp"));
+        assert!(!Regex::new("^(cosmic)$", true, false).unwrap().is_match("cosmic-comp"));
+        assert!(Regex::new("sshd|cron", true, false).unwrap().is_match("crond"));
     }
 
     #[test]
