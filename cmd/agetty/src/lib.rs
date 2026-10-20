@@ -104,6 +104,25 @@ fn acquire_controlling_tty(fd: i32) -> io::Result<()> {
     }
 }
 
+/// `(TTY, TERM)` from the positional arguments, in util-linux's two orders:
+/// `BAUD,... TTY [TERM]` when the first starts with a digit (systemd's
+/// serial-getty@.service passes `115200,57600,38400,9600 - $TERM`), else
+/// `TTY [BAUD,...] [TERM]`.
+fn split_positional(positional: &[String]) -> Option<(&str, Option<&str>)> {
+    let is_speed = |s: &str| s.starts_with(|c: char| c.is_ascii_digit());
+    let mut rest = positional.iter().map(String::as_str).peekable();
+    let first = rest.next()?;
+    let tty = if is_speed(first) {
+        rest.next()?
+    } else {
+        if rest.peek().is_some_and(|s| is_speed(s)) {
+            rest.next();
+        }
+        first
+    };
+    Some((tty, rest.next()))
+}
+
 /// Open `tty_arg` and make it stdin/stdout/stderr and the controlling
 /// terminal — unless `tty_arg` is `-`, meaning "use the already-open
 /// stdin as-is" (an extension real `agetty` also accepts).
@@ -305,16 +324,12 @@ pub fn run() -> i32 {
         i += 1;
     }
 
-    let Some(tty_arg) = positional.first() else {
+    let Some((tty_arg, term)) = split_positional(&positional) else {
         ui.err("usage: agetty [options] TTY [BAUD_RATE...] [TERM]");
         return 1;
     };
-    if let Some(term) = positional.last().filter(|_| positional.len() > 1) {
-        // Last positional after TTY [BAUD...] is TERM, if it's not
-        // purely numeric (a baud rate).
-        if term.parse::<u32>().is_err() {
-            std::env::set_var("TERM", term);
-        }
+    if let Some(term) = term {
+        std::env::set_var("TERM", term);
     }
 
     if let Err(e) = set_up_terminal(tty_arg) {
@@ -389,6 +404,18 @@ mod tests {
     fn expand_issue_leaves_unknown_escapes_alone() {
         let out = expand_issue("100\\% done", "tty1");
         assert_eq!(out, "100\\% done");
+    }
+
+    #[test]
+    fn positional_args_in_both_util_linux_orders() {
+        let v = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let serial = v(&["115200,57600,38400,9600", "-", "vt220"]);
+        assert_eq!(split_positional(&serial), Some(("-", Some("vt220"))));
+        assert_eq!(split_positional(&v(&["-", "linux"])), Some(("-", Some("linux"))));
+        assert_eq!(split_positional(&v(&["ttyS0", "115200", "vt100"])), Some(("ttyS0", Some("vt100"))));
+        assert_eq!(split_positional(&v(&["tty1"])), Some(("tty1", None)));
+        assert_eq!(split_positional(&v(&["38400"])), None);
+        assert_eq!(split_positional(&[]), None);
     }
 
     #[test]
