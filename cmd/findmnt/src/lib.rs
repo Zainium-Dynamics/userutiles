@@ -137,17 +137,8 @@ pub fn run() -> i32 {
     // SAFETY: restoring the default SIGPIPE action has no preconditions.
     unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
     let ui = Ui::new("findmnt");
-    // split combined flags such as -rn into -r -n
-    let args: Vec<String> = std::env::args()
-        .skip(1)
-        .flat_map(|a| {
-            if a.len() > 2 && a.starts_with('-') && !a.starts_with("--") && a[1..].chars().all(|c| "nrPfDlkmvAu".contains(c)) {
-                a[1..].chars().map(|c| format!("-{c}")).collect()
-            } else {
-                vec![a]
-            }
-        })
-        .collect();
+    // combined flags such as -rn or -no SOURCE
+    let args = usercore::args::expand_short(std::env::args().skip(1), "nrPfDlkmvAuhV", "tSTMOo");
 
     let mut fstype: Option<String> = None;
     let mut source: Option<String> = None;
