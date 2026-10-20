@@ -24,6 +24,10 @@ struct Opts {
     sort_time: bool,
     sort_size: bool,
     color: bool,
+    /// strftime formats for `-l` times: (older than six months or future, recent).
+    time_fmt: (String, String),
+    /// Current time in seconds, for choosing between the two `time_fmt`s.
+    now: i64,
 }
 
 /// Entry point for the `ls` utility. Parses `std::env::args()` and lists
@@ -56,10 +60,18 @@ pub fn run_args(args: &[String]) -> i32 {
         sort_time: false,
         sort_size: false,
         color: io::stdout().is_terminal() && std::env::var_os("NO_COLOR").is_none(),
+        time_fmt: std::env::var("TIME_STYLE")
+            .ok()
+            .and_then(|s| time_style(&s))
+            .unwrap_or_else(|| time_style("locale").unwrap()),
+        now: SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs() as i64),
     };
     let mut paths: Vec<PathBuf> = Vec::new();
 
-    for arg in args {
+    let mut it = args.iter();
+    while let Some(arg) = it.next() {
         match arg.as_str() {
             "-h" | "--help" if !o.human => {
                 // conflict: -h is human in GNU when listing; --help always help
@@ -92,6 +104,33 @@ pub fn run_args(args: &[String]) -> i32 {
             "--color" | "--color=always" => o.color = true,
             "--color=never" => o.color = false,
             "--color=auto" => o.color = io::stdout().is_terminal(),
+            "--full-time" => {
+                o.long = true;
+                o.time_fmt = time_style("full-iso").unwrap();
+            }
+            s if s == "--time-style" || s.starts_with("--time-style=") => {
+                let v = match s.strip_prefix("--time-style=") {
+                    Some(v) => v,
+                    None => match it.next() {
+                        Some(v) => v.as_str(),
+                        None => {
+                            ui.err("option '--time-style' requires an argument");
+                            return 1;
+                        }
+                    },
+                };
+                match time_style(v) {
+                    Some(f) => o.time_fmt = f,
+                    None => {
+                        ui.err(&format!(
+                            "invalid argument '{v}' for '--time-style'\n\
+                             Valid arguments are: [posix-]full-iso, [posix-]long-iso, \
+                             [posix-]iso, [posix-]locale, +FORMAT"
+                        ));
+                        return 1;
+                    }
+                }
+            }
             s if s.starts_with('-') && s.len() > 1 && !s.starts_with("--") => {
                 for c in s.chars().skip(1) {
                     match c {
@@ -153,6 +192,10 @@ fn print_help() {
  -S sort by file size, largest first\n\
  -t sort by time, newest first\n\
  -1 list one file per line\n\
+ --full-time like -l --time-style=full-iso\n\
+ --time-style=STYLE with -l, show times using STYLE: full-iso, long-iso, iso,\n\
+   locale or +FORMAT (strftime; %N is nanoseconds; FORMAT1<newline>FORMAT2\n\
+   gives old and recent files different formats); default $TIME_STYLE\n\
  --color[=WHEN] colorize the output; WHEN can be always/auto/never\n\
  --help display this help and exit\n\
  --version output version information and exit\n"
@@ -333,7 +376,7 @@ fn print_long(path: &Path, name: &str, meta: &fs::Metadata, o: &Opts) -> io::Res
     } else {
         format!("{:>8}", meta.len())
     };
-    let mtime = format_mtime(meta);
+    let mtime = format_mtime(meta, o);
     let display = colorize_name(name, meta, o);
     let class = if o.classify { classify_char(meta) } else { "" };
     // symlink target
@@ -471,18 +514,60 @@ fn human_size(n: u64) -> String {
     }
 }
 
-/// Format `meta`'s modification time as `-l`'s `"Mon DD HH:MM"` column,
-/// converted to local time via `localtime_r(3)`.
-fn format_mtime(meta: &fs::Metadata) -> String {
-    use std::time::Duration;
-    let modified = meta.modified().unwrap_or(SystemTime::UNIX_EPOCH);
-    let secs = modified
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or(Duration::ZERO)
-        .as_secs() as i64;
+/// Map a `--time-style` value to (old, recent) strftime formats, as GNU ls
+/// does. `posix-STYLE` means the locale style here, since ls runs in the C locale.
+fn time_style(style: &str) -> Option<(String, String)> {
+    if let Some(f) = style.strip_prefix('+') {
+        let (old, recent) = f.split_once('\n').unwrap_or((f, f));
+        return Some((old.to_string(), recent.to_string()));
+    }
+    let (old, recent) = match style {
+        "full-iso" => ("%Y-%m-%d %H:%M:%S.%N %z", "%Y-%m-%d %H:%M:%S.%N %z"),
+        "long-iso" => ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M"),
+        "iso" => ("%Y-%m-%d ", "%m-%d %H:%M"),
+        "locale" | "default" => ("%b %e  %Y", "%b %e %H:%M"),
+        s if s.starts_with("posix-") && time_style(&s[6..]).is_some() => {
+            ("%b %e  %Y", "%b %e %H:%M")
+        }
+        _ => return None,
+    };
+    Some((old.to_string(), recent.to_string()))
+}
+
+/// Format `meta`'s modification time for `-l` in local time: the recent
+/// format within the last six months, the old one otherwise (as GNU ls).
+fn format_mtime(meta: &fs::Metadata, o: &Opts) -> String {
+    const SIX_MONTHS: i64 = 31_556_952 / 2;
+    let secs = meta.mtime();
+    let recent = secs <= o.now && o.now - secs < SIX_MONTHS;
+    let fmt = if recent { &o.time_fmt.1 } else { &o.time_fmt.0 };
+    strftime_local(fmt, secs, meta.mtime_nsec())
+}
+
+/// `strftime(3)` of `secs` in local time, with `%N` expanded to `nsec`.
+fn strftime_local(fmt: &str, secs: i64, nsec: i64) -> String {
+    let mut f = String::with_capacity(fmt.len());
+    let mut chars = fmt.chars();
+    while let Some(c) = chars.next() {
+        if c != '%' {
+            f.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('N') => f.push_str(&format!("{:09}", nsec.clamp(0, 999_999_999))),
+            Some(n) => {
+                f.push('%');
+                f.push(n);
+            }
+            None => f.push('%'),
+        }
+    }
+    let Ok(cfmt) = std::ffi::CString::new(f) else {
+        return String::new();
+    };
     // `libc::tm` has no `Default` impl, but every field is a public primitive
     // (int/long/pointer), so we can build a zeroed value with a plain struct
-    // literal instead of `mem::zeroed`, avoiding an unsafe block here.
+    // literal instead of `mem::zeroed`.
     let mut tm = libc::tm {
         tm_sec: 0,
         tm_min: 0,
@@ -497,25 +582,23 @@ fn format_mtime(meta: &fs::Metadata) -> String {
         tm_zone: std::ptr::null(),
     };
     let t = secs as libc::time_t;
-    // SAFETY: `t` points to a valid, initialized `libc::time_t` on the stack and
-    // `tm` points to a valid, initialized `libc::tm` on the stack that outlives
-    // this call. `localtime_r` only reads through the first pointer and writes
-    // through the second, both for the duration of the call only.
-    unsafe {
+    let mut buf = vec![0u8; 512];
+    // SAFETY: `t` and `tm` are valid, initialized stack values that outlive
+    // both calls; `localtime_r` reads `t` and writes `tm`. `strftime` writes at
+    // most `buf.len()` bytes into `buf`, reads the NUL-terminated `cfmt` and
+    // `tm`, and returns the number of bytes written (0 if they did not fit).
+    let n = unsafe {
         libc::localtime_r(&t, &mut tm);
-    }
-    format!(
-        "{:3} {:2} {:02}:{:02}",
-        MONTH[tm.tm_mon.clamp(0, 11) as usize],
-        tm.tm_mday,
-        tm.tm_hour,
-        tm.tm_min
-    )
+        libc::strftime(
+            buf.as_mut_ptr().cast::<libc::c_char>(),
+            buf.len(),
+            cfmt.as_ptr(),
+            &tm,
+        )
+    };
+    buf.truncate(n);
+    String::from_utf8_lossy(&buf).into_owned()
 }
-
-const MONTH: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
 
 /// Resolve `uid` to a user name from Zainium's passwd file, falling back to
 /// the numeric id (stringified) if no matching entry exists.
@@ -557,6 +640,8 @@ mod tests {
             sort_time: false,
             sort_size: false,
             color: false,
+            time_fmt: time_style("locale").unwrap(),
+            now: 0,
         }
     }
 
@@ -667,6 +752,27 @@ mod tests {
         let o = base_opts();
         assert!(list_dir(&dir, &o, false, false).is_ok());
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn time_style_names_map_to_gnu_formats() {
+        assert_eq!(time_style("long-iso").unwrap().1, "%Y-%m-%d %H:%M");
+        assert_eq!(time_style("iso").unwrap().0, "%Y-%m-%d ");
+        assert_eq!(time_style("posix-iso"), time_style("locale"));
+        assert_eq!(time_style("+%s\n%H").unwrap(), ("%s".into(), "%H".into()));
+        assert!(time_style("bogus").is_none());
+        assert!(time_style("posix-bogus").is_none());
+    }
+
+    #[test]
+    fn strftime_local_expands_nanoseconds() {
+        assert_eq!(strftime_local("%s.%N %%N", 0, 5), "0.000000005 %N");
+    }
+
+    #[test]
+    fn run_args_rejects_bad_time_style() {
+        assert_eq!(run_args(&["--time-style=bogus".to_string()]), 1);
+        assert_eq!(run_args(&["--time-style".to_string()]), 1);
     }
 
     #[test]
