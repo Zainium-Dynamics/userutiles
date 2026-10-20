@@ -168,22 +168,33 @@ pub fn run() -> i32 {
     0
 }
 
-fn expand_set(s: &str) -> Vec<u8> {
+/// One element of a SET operand, escapes already decoded.
+enum Tok<'a> {
+    Byte(u8),
+    /// An unescaped `-`: a range when it sits between two bytes, else itself.
+    Dash,
+    Class(&'a str),
+}
+
+fn tokenize(s: &str) -> Vec<Tok<'_>> {
     let bytes = s.as_bytes();
     let mut out = Vec::new();
     let mut i = 0;
     while i < bytes.len() {
-        // ranges a-z
-        if i + 2 < bytes.len() && bytes[i + 1] == b'-' && bytes[i] < bytes[i + 2] {
-            for b in bytes[i]..=bytes[i + 2] {
-                out.push(b);
-            }
-            i += 3;
-            continue;
-        }
-        // \ escapes
+        // \ escapes, including POSIX octal \o, \oo, \ooo (so \0 is NUL)
         if bytes[i] == b'\\' && i + 1 < bytes.len() {
-            let e = match bytes[i + 1] {
+            let mut j = i + 1;
+            let mut octal: u32 = 0;
+            while j < bytes.len() && j < i + 4 && (b'0'..=b'7').contains(&bytes[j]) {
+                octal = octal * 8 + u32::from(bytes[j] - b'0');
+                j += 1;
+            }
+            if j > i + 1 {
+                out.push(Tok::Byte(octal as u8));
+                i = j;
+                continue;
+            }
+            out.push(Tok::Byte(match bytes[i + 1] {
                 b'n' => b'\n',
                 b't' => b'\t',
                 b'r' => b'\r',
@@ -193,21 +204,40 @@ fn expand_set(s: &str) -> Vec<u8> {
                 b'f' => 0x0c,
                 b'v' => 0x0b,
                 other => other,
-            };
-            out.push(e);
+            }));
             i += 2;
             continue;
         }
         // [:class:]
         if bytes[i] == b'[' && i + 1 < bytes.len() && bytes[i + 1] == b':' {
             if let Some(end) = find_class_end(bytes, i) {
-                let name = &s[i + 2..end];
-                push_class(&mut out, name);
+                out.push(Tok::Class(&s[i + 2..end]));
                 i = end + 2; // skip :]
                 continue;
             }
         }
-        out.push(bytes[i]);
+        out.push(if bytes[i] == b'-' { Tok::Dash } else { Tok::Byte(bytes[i]) });
+        i += 1;
+    }
+    out
+}
+
+fn expand_set(s: &str) -> Vec<u8> {
+    let toks = tokenize(s);
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < toks.len() {
+        match (&toks[i], toks.get(i + 1), toks.get(i + 2)) {
+            // ranges a-z, \0-\37
+            (Tok::Byte(a), Some(Tok::Dash), Some(Tok::Byte(b))) if a <= b => {
+                out.extend(*a..=*b);
+                i += 3;
+                continue;
+            }
+            (Tok::Byte(b), _, _) => out.push(*b),
+            (Tok::Dash, _, _) => out.push(b'-'),
+            (Tok::Class(name), _, _) => push_class(&mut out, name),
+        }
         i += 1;
     }
     out
@@ -286,5 +316,21 @@ fn push_class(out: &mut Vec<u8>, name: &str) {
             out.extend_from_slice(b"0123456789ABCDEFabcdef");
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn set_escapes_and_ranges() {
+        assert_eq!(expand_set("\\0"), vec![0]);
+        assert_eq!(expand_set("\\012"), vec![b'\n']);
+        assert_eq!(expand_set("\\0-\\3"), vec![0, 1, 2, 3]);
+        assert_eq!(expand_set("a-c"), b"abc".to_vec());
+        assert_eq!(expand_set("a-"), b"a-".to_vec());
+        assert_eq!(expand_set("\\n\\t\\\\"), b"\n\t\\".to_vec());
+        assert_eq!(expand_set("[:digit:]"), b"0123456789".to_vec());
     }
 }
