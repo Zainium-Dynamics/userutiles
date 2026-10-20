@@ -1997,6 +1997,7 @@ dependencies = [
 name = "user_findmnt"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "usercore",
 ]
 
@@ -2195,6 +2196,7 @@ dependencies = [
 name = "user_lsblk"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "usercore",
 ]
 

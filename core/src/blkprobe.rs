@@ -13,6 +13,7 @@ use std::path::Path;
 /// One probe result: filesystem type plus whatever UUID/label it carries
 /// (FAT has no true UUID — its 4-byte volume serial is formatted the same
 /// `XXXX-XXXX` way `blkid` reports it).
+#[derive(Clone)]
 pub struct Probe {
     pub fstype: String,
     pub uuid: Option<String>,

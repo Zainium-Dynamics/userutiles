@@ -135,127 +135,297 @@ fn mountpoints_for(devnode: &str, mounts: &[(String, String)]) -> String {
         .join(",")
 }
 
+/// (device node, mount point) for every mount; a source given as a symlink
+/// (`/dev/disk/by-uuid/...`, as Zainium mounts its root) is resolved to the node.
 fn read_mounts() -> Vec<(String, String)> {
     fs::read_to_string("/proc/self/mounts")
         .unwrap_or_default()
         .lines()
         .filter_map(|l| {
             let mut f = l.split_whitespace();
-            Some((f.next()?.to_string(), f.next()?.to_string()))
+            let src = f.next()?.to_string();
+            let mp = f.next()?.replace("\\040", " ");
+            let src = if src.starts_with("/dev/") {
+                fs::canonicalize(&src).map(|p| p.to_string_lossy().into_owned()).unwrap_or(src)
+            } else {
+                src
+            };
+            Some((src, mp))
         })
         .collect()
 }
 
-fn print_default(devices: &[Device], mounts: &[(String, String)]) {
-    println!("NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS");
+/// Every column `-o` understands: (name, right-aligned).
+const COLUMNS: &[(&str, bool)] = &[
+    ("NAME", false),
+    ("KNAME", false),
+    ("PATH", false),
+    ("MAJ:MIN", false),
+    ("RM", true),
+    ("SIZE", true),
+    ("RO", true),
+    ("TYPE", false),
+    ("FSTYPE", false),
+    ("LABEL", false),
+    ("UUID", false),
+    ("MODEL", false),
+    ("SERIAL", false),
+    ("TRAN", false),
+    ("MOUNTPOINT", false),
+    ("MOUNTPOINTS", false),
+];
+
+struct Opts {
+    bytes: bool,
+    paths: bool,
+    tree: bool,
+    raw: bool,
+}
+
+fn sys_attr(name: &str, attr: &str) -> String {
+    let base = disk_of(name);
+    read_trimmed(&Path::new("/sys/block").join(base).join("device").join(attr)).unwrap_or_default()
+}
+
+/// The whole disk a partition belongs to (nvme0n1p2 -> nvme0n1, sda1 -> sda).
+fn disk_of(name: &str) -> String {
+    let Ok(entries) = fs::read_dir("/sys/block") else {
+        return name.to_string();
+    };
+    entries
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|d| name.starts_with(d.as_str()))
+        .max_by_key(|d| d.len())
+        .unwrap_or_else(|| name.to_string())
+}
+
+/// How the disk is attached, from where it sits in /sys.
+fn transport(name: &str) -> String {
+    let disk = disk_of(name);
+    if disk.starts_with("nvme") {
+        return "nvme".into();
+    }
+    let path = fs::canonicalize(Path::new("/sys/block").join(&disk)).map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
+    if path.contains("/usb") {
+        "usb"
+    } else if path.contains("/ata") {
+        "sata"
+    } else if path.contains("/virtio") {
+        "virtio"
+    } else if disk.starts_with("mmcblk") {
+        "mmc"
+    } else {
+        ""
+    }
+    .into()
+}
+
+fn cell(d: &Device, col: &str, mounts: &[(String, String)], o: &Opts, probe: &mut Option<Option<usercore::blkprobe::Probe>>) -> String {
+    let mut fs_info = || probe.get_or_insert_with(|| usercore::blkprobe::probe_path(Path::new(&d.devnode)).ok().flatten()).clone();
+    match col {
+        "NAME" => if o.paths { d.devnode.clone() } else { d.name.clone() },
+        "KNAME" => d.name.clone(),
+        "PATH" => d.devnode.clone(),
+        "MAJ:MIN" => d.maj_min.clone(),
+        "RM" => (d.removable as u8).to_string(),
+        "SIZE" => if o.bytes { d.size.to_string() } else { human_size(d.size) },
+        "RO" => (d.readonly as u8).to_string(),
+        "TYPE" => d.kind.to_string(),
+        "FSTYPE" => fs_info().map(|p| p.fstype).unwrap_or_default(),
+        "LABEL" => fs_info().and_then(|p| p.label).unwrap_or_default(),
+        "UUID" => fs_info().and_then(|p| p.uuid).unwrap_or_default(),
+        "MODEL" => if d.kind == "part" { String::new() } else { sys_attr(&d.name, "model") },
+        "SERIAL" => if d.kind == "part" { String::new() } else { sys_attr(&d.name, "serial") },
+        "TRAN" => if d.kind == "part" { String::new() } else { transport(&d.name) },
+        "MOUNTPOINT" => mountpoints_for(&d.devnode, mounts).split(',').next().unwrap_or("").to_string(),
+        "MOUNTPOINTS" => mountpoints_for(&d.devnode, mounts),
+        _ => String::new(),
+    }
+}
+
+fn print_table(devices: &[Device], cols: &[&str], headings: bool, nodeps: bool, mounts: &[(String, String)], o: &Opts) {
+    // (tree prefix, device) in display order
+    let mut rows: Vec<(String, &Device)> = Vec::new();
     for d in devices {
-        print_row_default(&d.name, d, mounts);
-        for (i, child) in d.children.iter().enumerate() {
-            let branch = if i == d.children.len() - 1 {
-                "└─"
+        rows.push((String::new(), d));
+        if !nodeps {
+            for (i, c) in d.children.iter().enumerate() {
+                let branch = if !o.tree { "" } else if i == d.children.len() - 1 { "└─" } else { "├─" };
+                rows.push((branch.to_string(), c));
+            }
+        }
+    }
+    let table: Vec<Vec<String>> = rows
+        .iter()
+        .map(|(prefix, d)| {
+            let mut probe = None;
+            cols.iter()
+                .map(|c| {
+                    let v = cell(d, c, mounts, o, &mut probe);
+                    if *c == "NAME" { format!("{prefix}{v}") } else { v }
+                })
+                .collect()
+        })
+        .collect();
+    if o.raw {
+        if headings {
+            println!("{}", cols.join(" "));
+        }
+        for r in &table {
+            println!("{}", r.iter().map(|v| v.replace(' ', "\\x20")).collect::<Vec<_>>().join(" "));
+        }
+        return;
+    }
+    let mut widths: Vec<usize> = cols.iter().map(|c| if headings { c.len() } else { 0 }).collect();
+    for r in &table {
+        for (w, v) in widths.iter_mut().zip(r) {
+            *w = (*w).max(v.chars().count());
+        }
+    }
+    let right = |c: &str| COLUMNS.iter().any(|(n, r)| *n == c && *r);
+    let line = |vals: Vec<String>| -> String {
+        let mut s = String::new();
+        for (i, (v, c)) in vals.iter().zip(cols).enumerate() {
+            if i > 0 {
+                s.push(' ');
+            }
+            let pad = widths[i].saturating_sub(v.chars().count());
+            if right(c) {
+                s.push_str(&" ".repeat(pad));
+                s.push_str(v);
             } else {
-                "├─"
-            };
-            print_row_default(&format!("{branch}{}", child.name), child, mounts);
+                s.push_str(v);
+                s.push_str(&" ".repeat(pad));
+            }
         }
+        s.trim_end().to_string()
+    };
+    if headings {
+        println!("{}", line(cols.iter().map(|c| c.to_string()).collect()));
     }
-}
-
-fn print_row_default(name_col: &str, d: &Device, mounts: &[(String, String)]) {
-    println!(
-        "{:<11} {:<7} {:<2}  {:>5} {:<2} {:<4} {}",
-        name_col,
-        d.maj_min,
-        d.removable as u8,
-        human_size(d.size),
-        d.readonly as u8,
-        d.kind,
-        mountpoints_for(&d.devnode, mounts),
-    );
-}
-
-fn print_fs(devices: &[Device], mounts: &[(String, String)]) {
-    println!(
-        "NAME        FSTYPE      LABEL        UUID                                 MOUNTPOINTS"
-    );
-    for d in devices {
-        print_device_fs(d, mounts);
-        for c in &d.children {
-            print_device_fs(c, mounts);
-        }
+    for r in table {
+        println!("{}", line(r));
     }
-}
-
-fn print_device_fs(d: &Device, mounts: &[(String, String)]) {
-    let probe = usercore::blkprobe::probe_path(Path::new(&d.devnode))
-        .ok()
-        .flatten();
-    let fstype = probe.as_ref().map(|p| p.fstype.as_str()).unwrap_or("");
-    let label = probe
-        .as_ref()
-        .and_then(|p| p.label.as_deref())
-        .unwrap_or("");
-    let uuid = probe.as_ref().and_then(|p| p.uuid.as_deref()).unwrap_or("");
-    println!(
-        "{:<11} {:<11} {:<12} {:<36} {}",
-        d.name,
-        fstype,
-        label,
-        uuid,
-        mountpoints_for(&d.devnode, mounts),
-    );
 }
 
 fn print_help() {
     print!(
-        "Usage: lsblk [-f]\n\
+        "Usage: lsblk [options] [DEVICE...]\n\
  List block devices as a tree, from /sys/block.\n\
- -f, --fs show filesystem TYPE/LABEL/UUID instead of size/type\n\
- --help display this help and exit\n\
- --version output version information and exit\n"
+ -d, --nodeps        disks only, no partitions\n\
+ -f, --fs            filesystem columns: NAME FSTYPE LABEL UUID MOUNTPOINTS\n\
+ -o, --output LIST   columns, comma separated (see below)\n\
+ -n, --noheadings    no header line\n\
+ -p, --paths         full device paths in NAME\n\
+ -b, --bytes         SIZE in bytes\n\
+ -l, --list          list instead of tree\n\
+ -r, --raw           raw output: no alignment, no tree\n\
+ --help, --version\n\
+ Columns: NAME KNAME PATH MAJ:MIN RM SIZE RO TYPE FSTYPE LABEL UUID MODEL SERIAL TRAN MOUNTPOINT MOUNTPOINTS\n"
     );
 }
 
 /// Entry point for the `lsblk` utility. Lists every block device under
-/// `/sys/block` (disks, then their partitions as a tree) with
-/// major:minor, size, removable/read-only flags, type, and mountpoints;
-/// `-f` instead shows filesystem type/label/UUID.
+/// `/sys/block` (disks, then their partitions as a tree); `-o` picks the
+/// columns, `-d` drops partitions, `-n` the header, `-p` shows full paths,
+/// `-b` sizes in bytes, `-l`/`-r` print a list, `-f` the filesystem columns.
+/// Device arguments limit the output to those devices.
 ///
 /// Returns 0 on success, 1 on a usage error.
 pub fn run() -> i32 {
+    // `lsblk | head` ends quietly instead of panicking on the closed pipe
+    // SAFETY: restoring the default action of a signal has no other effect.
+    unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
     let ui = Ui::new("lsblk");
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let args = usercore::args::expand_short(std::env::args().skip(1), "dfnpblrahV", "o");
 
-    let mut fs_mode = false;
-    for arg in &args {
-        match arg.as_str() {
+    let mut cols: Vec<String> = ["NAME", "MAJ:MIN", "RM", "SIZE", "RO", "TYPE", "MOUNTPOINTS"].map(String::from).to_vec();
+    let mut headings = true;
+    let mut nodeps = false;
+    let mut opts = Opts { bytes: false, paths: false, tree: true, raw: false };
+    let mut wanted: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        let a = args[i].as_str();
+        match a {
             "--help" | "-h" => {
                 print_help();
                 return 0;
             }
-            "--version" => {
-                println!("lsblk (user_utils) 0.1.0");
+            "--version" | "-V" => {
+                println!("lsblk (user_utils) 0.2.0");
                 return 0;
             }
-            "-f" | "--fs" => fs_mode = true,
+            "-f" | "--fs" => cols = ["NAME", "FSTYPE", "LABEL", "UUID", "MOUNTPOINTS"].map(String::from).to_vec(),
+            "-d" | "--nodeps" => nodeps = true,
+            "-n" | "--noheadings" => headings = false,
+            "-p" | "--paths" => opts.paths = true,
+            "-b" | "--bytes" => opts.bytes = true,
+            "-l" | "--list" => opts.tree = false,
+            "-r" | "--raw" => {
+                opts.raw = true;
+                opts.tree = false;
+            }
+            "-a" | "--all" => {}
+            _ if a == "-o" || a == "--output" || a.starts_with("--output=") => {
+                let v = match a.split_once('=') {
+                    Some((_, v)) => Some(v.to_string()),
+                    None => {
+                        i += 1;
+                        args.get(i).cloned()
+                    }
+                };
+                let Some(v) = v else {
+                    ui.err("option requires an argument -- 'o'");
+                    return 1;
+                };
+                // -o +COL adds to the default columns
+                let (base, list) = match v.strip_prefix('+') {
+                    Some(rest) => (cols.clone(), rest.to_string()),
+                    None => (Vec::new(), v),
+                };
+                let mut picked = base;
+                for c in list.split(',').map(|c| c.trim().to_uppercase()).filter(|c| !c.is_empty()) {
+                    if !COLUMNS.iter().any(|(n, _)| *n == c) {
+                        ui.err(&format!("unknown column: {c}"));
+                        return 1;
+                    }
+                    picked.push(c);
+                }
+                cols = picked;
+            }
             s if s.starts_with('-') && s.len() > 1 => {
                 ui.err(&format!("unrecognized option '{s}'"));
                 return 1;
             }
-            _ => {
-                ui.err("device filtering by name is not supported");
-                return 1;
-            }
+            dev => wanted.push(dev.trim_start_matches("/dev/").to_string()),
         }
+        i += 1;
     }
 
-    let devices = list_devices();
-    let mounts = read_mounts();
-    if fs_mode {
-        print_fs(&devices, &mounts);
-    } else {
-        print_default(&devices, &mounts);
+    let mut devices = list_devices();
+    if !wanted.is_empty() {
+        let mut picked = Vec::new();
+        for mut d in devices {
+            if wanted.contains(&d.name) {
+                picked.push(d);
+            } else {
+                d.children.retain(|c| wanted.contains(&c.name));
+                for c in d.children {
+                    picked.push(c);
+                }
+            }
+        }
+        if picked.is_empty() {
+            ui.err(&format!("{}: not a block device", wanted.join(", ")));
+            return 1;
+        }
+        devices = picked;
     }
+    let mounts = read_mounts();
+    let col_refs: Vec<&str> = cols.iter().map(String::as_str).collect();
+    print_table(&devices, &col_refs, headings, nodeps, &mounts, &opts);
     0
 }
 
