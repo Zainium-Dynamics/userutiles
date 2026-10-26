@@ -15,13 +15,21 @@ pub struct Opts {
     #[arg(required = false, num_args = 0..)]
     pub paths: Vec<String>,
 
-    /// Move directories recursively (cross-device)
+    /// Accepted for compatibility: directories are always moved, as POSIX mv does
     #[arg(short = 'R', long = "recursive")]
     pub recursive: bool,
 
     /// Do not overwrite existing destination
     #[arg(short = 'n', long = "no-clobber")]
     pub no_clobber: bool,
+
+    /// Overwrite without asking (POSIX; cancels -i and -n)
+    #[arg(short = 'f', long = "force")]
+    pub force: bool,
+
+    /// Ask before overwriting an existing destination (POSIX)
+    #[arg(short = 'i', long = "interactive")]
+    pub interactive: bool,
 
     /// Atomically exchange two paths using renameat2(RENAME_EXCHANGE).
     /// Both paths must exist and be on the same filesystem.

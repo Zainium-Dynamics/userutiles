@@ -103,21 +103,16 @@ pub fn run(args: Vec<String>) {
     }
 
     // ── Process each source ───────────────────────────────────────────────────
-    ui::heading("mv — Move");
+    // silent unless asked: scripts and Makefiles call mv as POSIX mv
+    if opts.verbose {
+        ui::heading("mv — Move");
+    }
 
-    let total_sources = sources.len();
     for source_str in sources.iter() {
         let src = Path::new(source_str);
 
         if !src.exists() {
             ui::fatal(&format!("Source not found: '{}'", src.display()));
-        }
-
-        if src.is_dir() && !opts.recursive {
-            ui::fatal(&format!(
-                "'{}' is a directory — use -R / --recursive.",
-                src.display()
-            ));
         }
 
         // Determine effective destination path.
@@ -142,7 +137,7 @@ pub fn run(args: Vec<String>) {
             ));
         }
 
-        if opts.verbose || total_sources > 1 {
+        if opts.verbose {
             ui::kv("Source", &src.display().to_string());
             ui::kv("Dest", &effective_dest.display().to_string());
         }
@@ -159,7 +154,11 @@ pub fn run(args: Vec<String>) {
                 }
                 Err(e) => ui::fatal(&format!("--trash-safe failed: {e}")),
             }
-        } else if opts.no_clobber && effective_dest.exists() {
+        } else if opts.interactive && !opts.force && effective_dest.exists() {
+            if !confirm_overwrite(&effective_dest) {
+                continue;
+            }
+        } else if opts.no_clobber && !opts.force && effective_dest.exists() {
             ui::warn(&format!(
                 "Skipping '{}' — destination exists (--no-clobber).",
                 src.display()
@@ -168,7 +167,12 @@ pub fn run(args: Vec<String>) {
         }
 
         // ── Route: same-device or cross-device ───────────────────────────────
-        let same_dev = rename::same_device(src, effective_dest.parent().unwrap_or(dest));
+        // `mv a b` in the current directory: b's parent is "", which is "."
+        let dest_parent = effective_dest
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or(Path::new("."));
+        let same_dev = rename::same_device(src, dest_parent);
 
         if same_dev {
             move_same_device(src, &effective_dest, &opts, &mut journal);
@@ -176,6 +180,16 @@ pub fn run(args: Vec<String>) {
             move_cross_device(src, &effective_dest, &opts, &mut journal);
         }
     }
+}
+
+/// `mv -i`: asks on stderr, as POSIX mv does; anything but y/yes keeps the destination.
+fn confirm_overwrite(dest: &Path) -> bool {
+    use std::io::Write;
+    eprint!("mv: overwrite '{}'? ", dest.display());
+    std::io::stderr().flush().ok();
+    let mut answer = String::new();
+    std::io::stdin().read_line(&mut answer).ok();
+    matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
 }
 
 fn move_same_device(src: &Path, dest: &Path, opts: &Opts, journal: &mut Journal) {
@@ -249,7 +263,8 @@ fn move_cross_device(src: &Path, dest: &Path, opts: &Opts, journal: &mut Journal
 
     let (tx, rx) = unbounded();
 
-    let show = opts.progress;
+    // a progress bar only on a terminal; scripts get POSIX mv's silence
+    let show = opts.progress && std::io::IsTerminal::is_terminal(&std::io::stderr());
     let progress_handle = std::thread::spawn(move || {
         if show {
             progress::render_progress(rx)
@@ -263,13 +278,15 @@ fn move_cross_device(src: &Path, dest: &Path, opts: &Opts, journal: &mut Journal
         Ok(()) => {
             let (files, bytes) = progress_handle.join().unwrap_or((0, 0));
             commit_last(journal);
-            ui::ok(&format!(
-                "'{}' → '{}' ({} file(s), {})",
-                src.display(),
-                dest.display(),
-                files,
-                ByteSize(bytes),
-            ));
+            if opts.verbose {
+                ui::ok(&format!(
+                    "'{}' → '{}' ({} file(s), {})",
+                    src.display(),
+                    dest.display(),
+                    files,
+                    ByteSize(bytes),
+                ));
+            }
         }
         Err(e) => {
             let _ = progress_handle.join();

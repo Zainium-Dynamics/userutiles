@@ -3,7 +3,7 @@ name = "user_mkdir"
 version = "0.1.0"
 edition = "2021"
 authors = ["Zainium Dynamics"]
-description = "ZEX mkdir — redirects users to struct"
+description = "ZEX mkdir — create directories (POSIX)"
 license = "GPL-3.0"
 publish = false
 
@@ -14,6 +14,9 @@ path = "src/lib.rs"
 [[bin]]
 name = "mkdir"
 path = "src/main.rs"
+
+[dependencies]
+usercore = { path = "../../core" }
 
 [lints]
 workspace = true
