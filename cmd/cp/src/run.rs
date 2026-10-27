@@ -50,7 +50,7 @@ pub fn run(args: Vec<String>) -> i32 {
     // -a implies -R --preserve=all --no-dereference; -d implies
     // --no-dereference (copy symlinks as symlinks, no full metadata copy).
     let recursive = opts.recursive || opts.archive;
-    let preserve = opts.preserve || opts.archive;
+    let preserve = opts.preserve || opts.preserve_list.is_some() || opts.archive;
     let dereference = resolve_dereference(&opts, recursive);
 
     if sources.len() > 1 && !dest.is_dir() {
@@ -91,12 +91,10 @@ pub fn run(args: Vec<String>) -> i32 {
             continue;
         }
 
-        if opts.verbose || sources.len() > 1 {
-            ui::kv("Source", &src.display().to_string());
-            ui::kv("Dest", &effective_dest.display().to_string());
-        }
-
-        let result = dispatch_one(
+        let result = if opts.link || opts.symbolic_link {
+            make_link(src, &effective_dest, &opts)
+        } else {
+            dispatch_one(
             src,
             &src_meta,
             &effective_dest,
@@ -105,16 +103,13 @@ pub fn run(args: Vec<String>) -> i32 {
             preserve,
             dereference,
             file_opts,
-        );
+        )
+        };
 
         match result {
             Ok(()) => {
                 if opts.verbose {
-                    ui::ok(&format!(
-                        "'{}' -> '{}'",
-                        src.display(),
-                        effective_dest.display()
-                    ));
+                    println!("'{}' -> '{}'", src.display(), effective_dest.display());
                 }
             }
             Err(CpError::NoClobber(_)) => {
@@ -170,6 +165,24 @@ fn dispatch_one(
     copy_single_file(src, dest, opts, preserve, file_opts)
 }
 
+/// -l / -s: a hard or symbolic link to SOURCE instead of a copy.
+fn make_link(src: &Path, dest: &Path, opts: &Opts) -> Result<()> {
+    if fs::symlink_metadata(dest).is_ok() {
+        if opts.no_clobber {
+            return Err(CpError::NoClobber(dest.to_owned()));
+        }
+        if !opts.force {
+            return Err(io_err(dest, std::io::Error::from(std::io::ErrorKind::AlreadyExists)));
+        }
+        fs::remove_file(dest).map_err(|e| io_err(dest, e))?;
+    }
+    if opts.symbolic_link {
+        std::os::unix::fs::symlink(src, dest).map_err(|e| io_err(dest, e))
+    } else {
+        fs::hard_link(src, dest).map_err(|e| io_err(dest, e))
+    }
+}
+
 fn resolve_dereference(opts: &Opts, recursive: bool) -> bool {
     if opts.dereference {
         true
@@ -211,6 +224,17 @@ fn copy_single_file(
         return Ok(());
     }
 
+    if let (Ok(s), Ok(d)) = (fs::metadata(src), fs::metadata(dest)) {
+        use std::os::unix::fs::MetadataExt;
+        if s.dev() == d.dev() && s.ino() == d.ino() {
+            return Err(CpError::SameFile(src.to_owned(), dest.to_owned()));
+        }
+    }
+    let existing = {
+        use std::os::unix::fs::PermissionsExt;
+        fs::metadata(dest).ok().map(|m| m.permissions().mode())
+    };
+
     let (tx, rx) = unbounded();
     let drain = std::thread::spawn(move || for _ in rx {});
     let result = file::copy_file_atomic(src, dest, file_opts, &tx);
@@ -220,6 +244,8 @@ fn copy_single_file(
 
     if preserve {
         metadata::preserve(src, dest)?;
+    } else {
+        metadata::plain_mode(src, dest, existing)?;
     }
     if opts.verify {
         verify::verify(src, dest)?;

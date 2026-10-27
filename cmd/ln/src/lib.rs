@@ -5,16 +5,60 @@ use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use usercore::protect;
 
+/// `target` as a path relative to the directory `link` will be in (both resolved, so
+/// `..` steps are real ones); `None` when either directory can't be resolved.
+fn relative_target(target: &Path, link: &Path) -> Option<PathBuf> {
+    let resolve_dir = |p: &Path| -> Option<PathBuf> {
+        let parent = p.parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or(Path::new("."));
+        fs::canonicalize(parent).ok()
+    };
+    let to = resolve_dir(target)?.join(target.file_name()?);
+    let from = resolve_dir(link)?;
+    let (to_c, from_c): (Vec<_>, Vec<_>) = (to.components().collect(), from.components().collect());
+    let common = to_c.iter().zip(&from_c).take_while(|(a, b)| a == b).count();
+    let mut out = PathBuf::new();
+    for _ in common..from_c.len() {
+        out.push("..");
+    }
+    for c in &to_c[common..] {
+        out.push(c);
+    }
+    Some(out)
+}
+
 pub fn run() -> i32 {
     let mut symbolic = false;
     let mut force = false;
     let mut interactive = false;
     let mut verbose = false;
     let mut no_deref = false;
+    let mut relative = false;
+    let mut no_target = false;
+    let mut target_dir: Option<PathBuf> = None;
     let mut paths: Vec<PathBuf> = Vec::new();
 
-    for arg in std::env::args().skip(1) {
+    let mut args = std::env::args().skip(1);
+    let mut operands_only = false;
+    while let Some(arg) = args.next() {
+        if operands_only {
+            paths.push(PathBuf::from(arg));
+            continue;
+        }
         match arg.as_str() {
+            "--" => operands_only = true,
+            "-r" | "--relative" => relative = true,
+            "-T" | "--no-target-directory" => no_target = true,
+            "-L" | "--logical" | "-P" | "--physical" => {}
+            "-t" | "--target-directory" => match args.next() {
+                Some(t) => target_dir = Some(PathBuf::from(t)),
+                None => {
+                    eprintln!("ln: option requires an argument -- 't'");
+                    return 1;
+                }
+            },
+            s if s.starts_with("--target-directory=") => {
+                target_dir = Some(PathBuf::from(&s["--target-directory=".len()..]));
+            }
             "-h" | "--help" => {
                 print!(
                     "Usage: ln [OPTION]... [-T] TARGET LINK_NAME\n\
@@ -49,6 +93,16 @@ pub fn run() -> i32 {
                         'i' => interactive = true,
                         'v' => verbose = true,
                         'n' => no_deref = true,
+                        'r' => relative = true,
+                        'T' => no_target = true,
+                        'L' | 'P' => {}
+                        't' => match args.next() {
+                            Some(t) => target_dir = Some(PathBuf::from(t)),
+                            None => {
+                                eprintln!("ln: option requires an argument -- 't'");
+                                return 1;
+                            }
+                        },
                         _ => {
                             eprintln!("ln: invalid option -- '{c}'");
                             return 1;
@@ -69,7 +123,9 @@ pub fn run() -> i32 {
         return 1;
     }
 
-    let (targets, link_dir_or_name) = if paths.len() == 1 {
+    let (targets, link_dir_or_name) = if let Some(dir) = target_dir {
+        (paths, dir)
+    } else if paths.len() == 1 {
         // ln TARGET -> create link in cwd named after target
         let t = paths[0].clone();
         let name = t
@@ -90,7 +146,8 @@ pub fn run() -> i32 {
         (paths, dest)
     };
 
-    let dest_is_dir = link_dir_or_name.is_dir()
+    let dest_is_dir = !no_target
+        && link_dir_or_name.is_dir()
         && !(no_deref
             && link_dir_or_name
                 .symlink_metadata()
@@ -122,6 +179,20 @@ pub fn run() -> i32 {
             status = 1;
             continue;
         }
+
+        // -r: the symlink's target relative to the directory the link is in
+        let rel;
+        let target = if relative && symbolic {
+            match relative_target(target, &link_path) {
+                Some(r) => {
+                    rel = r;
+                    &rel
+                }
+                None => target,
+            }
+        } else {
+            target
+        };
 
         // Try the create directly first — symlink(2)/link(2) already fail
         // atomically with EEXIST if link_path exists, so the common

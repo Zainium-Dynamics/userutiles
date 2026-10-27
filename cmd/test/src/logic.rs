@@ -11,54 +11,86 @@ use std::path::Path;
 /// `bracket` selects the diagnostic prefix (`[:` vs `test:`) used for error
 /// messages; it does not otherwise change evaluation semantics.
 pub fn eval(args: &[String], bracket: bool) -> i32 {
-    if args.is_empty() {
-        return 1; // false
-    }
-    if args.len() == 1 {
-        return if args[0].is_empty() { 1 } else { 0 };
-    }
-    // unary
-    if args.len() == 2 {
-        return unary(&args[0], &args[1], bracket);
-    }
-    // binary — except `-a`/`-o`, which at this arity are logical AND/OR of
-    // the two single-string truth tests either side, not comparison ops.
-    if args.len() == 3 {
-        if args[1] == "-a" {
-            return if eval(&args[..1], bracket) == 0 && eval(&args[2..], bracket) == 0 {
-                0
-            } else {
-                1
-            };
+    // POSIX decides by the number of arguments first
+    match args.len() {
+        0 => 1,
+        1 => i32::from(args[0].is_empty()),
+        2 => unary(&args[0], &args[1], bracket),
+        3 => {
+            if is_binary_op(&args[1]) {
+                return match args[1].as_str() {
+                    "-a" => both(eval(&args[..1], bracket), eval(&args[2..], bracket)),
+                    "-o" => either(eval(&args[..1], bracket), eval(&args[2..], bracket)),
+                    _ => binary(&args[0], &args[1], &args[2], bracket),
+                };
+            }
+            if args[0] == "!" {
+                return negate(eval(&args[1..], bracket));
+            }
+            if args[0] == "(" && args[2] == ")" {
+                return eval(&args[1..2], bracket);
+            }
+            binary(&args[0], &args[1], &args[2], bracket)
         }
-        if args[1] == "-o" {
-            return if eval(&args[..1], bracket) == 0 || eval(&args[2..], bracket) == 0 {
-                0
-            } else {
-                1
-            };
-        }
-        return binary(&args[0], &args[1], &args[2], bracket);
+        4 if args[0] == "!" => negate(eval(&args[1..], bracket)),
+        4 if args[0] == "(" && args[3] == ")" => eval(&args[1..3], bracket),
+        _ => general(args, bracket),
     }
-    // ! EXPR
+}
+
+fn is_binary_op(op: &str) -> bool {
+    matches!(
+        op,
+        "=" | "==" | "!=" | "<" | ">" | "-eq" | "-ne" | "-lt" | "-le" | "-gt" | "-ge" | "-nt" | "-ot" | "-ef" | "-a" | "-o"
+    )
+}
+
+fn negate(code: i32) -> i32 {
+    match code {
+        0 => 1,
+        1 => 0,
+        e => e,
+    }
+}
+
+fn both(l: i32, r: i32) -> i32 {
+    if l > 1 || r > 1 { 2 } else { i32::from(!(l == 0 && r == 0)) }
+}
+
+fn either(l: i32, r: i32) -> i32 {
+    if l > 1 || r > 1 { 2 } else { i32::from(!(l == 0 || r == 0)) }
+}
+
+/// The position of the last `op` outside parentheses (left-associative split).
+fn split_at(args: &[String], op: &str) -> Option<usize> {
+    let mut depth = 0i32;
+    let mut found = None;
+    for (i, a) in args.iter().enumerate() {
+        match a.as_str() {
+            "(" => depth += 1,
+            ")" => depth -= 1,
+            x if x == op && depth == 0 && i > 0 && i + 1 < args.len() => found = Some(i),
+            _ => {}
+        }
+    }
+    found
+}
+
+/// More than four arguments: `-o` binds loosest, then `-a`, then `!`, then `( )`.
+fn general(args: &[String], bracket: bool) -> i32 {
+    if let Some(i) = split_at(args, "-o") {
+        return either(eval(&args[..i], bracket), eval(&args[i + 1..], bracket));
+    }
+    if let Some(i) = split_at(args, "-a") {
+        return both(eval(&args[..i], bracket), eval(&args[i + 1..], bracket));
+    }
     if args[0] == "!" {
-        return if eval(&args[1..], bracket) == 0 { 1 } else { 0 };
+        return negate(eval(&args[1..], bracket));
     }
-    // simple -a / -o
-    if let Some(pos) = args.iter().position(|a| a == "-a") {
-        let left = eval(&args[..pos], bracket);
-        let right = eval(&args[pos + 1..], bracket);
-        return if left == 0 && right == 0 { 0 } else { 1 };
+    if args[0] == "(" && args[args.len() - 1] == ")" {
+        return eval(&args[1..args.len() - 1], bracket);
     }
-    if let Some(pos) = args.iter().position(|a| a == "-o") {
-        let left = eval(&args[..pos], bracket);
-        let right = eval(&args[pos + 1..], bracket);
-        return if left == 0 || right == 0 { 0 } else { 1 };
-    }
-    // STRING1 = STRING2 with more? treat as binary first three
-    if args.len() >= 3 {
-        return binary(&args[0], &args[1], &args[2], bracket);
-    }
+    eprintln!("{}: too many arguments", prog(bracket));
     2
 }
 
@@ -243,6 +275,16 @@ mod tests {
     fn negation() {
         assert_eq!(eval(&args(&["!", ""]), false), 0);
         assert_eq!(eval(&args(&["!", "x"]), false), 1);
+    }
+
+    #[test]
+    fn negation_and_grouping() {
+        assert_eq!(eval(&args(&["!", "-n", "x"]), false), 1);
+        assert_eq!(eval(&args(&["!", "a", "=", "b"]), false), 0);
+        assert_eq!(eval(&args(&["(", "x", ")"]), false), 0);
+        assert_eq!(eval(&args(&["(", "1", "-eq", "1", ")"]), false), 0);
+        assert_eq!(eval(&args(&["a", "-o", "b", "-a", ""]), false), 0);
+        assert_eq!(eval(&args(&["(", "", "-o", "x", ")", "-a", "y"]), false), 0);
     }
 
     #[test]

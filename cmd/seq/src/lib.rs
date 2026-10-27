@@ -13,6 +13,7 @@ pub fn run() -> i32 {
     let ui = Ui::new("seq");
     let mut separator = "\n".to_string();
     let mut equal_width = false;
+    let mut format: Option<String> = None;
     let mut nums: Vec<String> = Vec::new();
 
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -43,6 +44,26 @@ pub fn run() -> i32 {
             i += 1;
             continue;
         }
+        if a == "-f" || a == "--format" {
+            i += 1;
+            let Some(f) = args.get(i) else {
+                ui.err("option requires an argument -- 'f'");
+                return 1;
+            };
+            format = Some(f.clone());
+            i += 1;
+            continue;
+        }
+        if let Some(f) = a.strip_prefix("--format=") {
+            format = Some(f.to_string());
+            i += 1;
+            continue;
+        }
+        if let Some(sep) = a.strip_prefix("--separator=") {
+            separator = sep.to_string();
+            i += 1;
+            continue;
+        }
         if a == "-w" || a == "--equal-width" {
             equal_width = true;
             i += 1;
@@ -64,6 +85,14 @@ pub fn run() -> i32 {
         return 1;
     }
 
+    if let Some(f) = &format {
+        let convs: Vec<&str> = f.split('%').skip(1).filter(|p| !p.is_empty() && !p.starts_with('%')).collect();
+        let double = |p: &&str| p.trim_start_matches(|c: char| "-+ #0'.".contains(c) || c.is_ascii_digit()).starts_with(['e', 'f', 'g', 'E', 'F', 'G', 'a', 'A']);
+        if convs.len() != 1 || !convs.iter().all(double) {
+            ui.err(&format!("format '{f}' has no % directive or too many"));
+            return 1;
+        }
+    }
     let (first, step, last) = match parse_operands(&nums) {
         Ok(triple) => triple,
         Err(msg) => {
@@ -72,7 +101,25 @@ pub fn run() -> i32 {
         }
     };
 
-    let values = generate_sequence(first, step, last);
+    // as many decimals as FIRST and INCREMENT have (seq 1.5 0.5 3: 1.5 2.0 2.5 3.0)
+    let decimals = |s: &str| -> usize {
+        if s.contains(['e', 'E']) {
+            return 0;
+        }
+        s.split_once('.').map_or(0, |(_, f)| f.len())
+    };
+    let prec = match nums.len() {
+        1 => 0,
+        2 => decimals(&nums[0]),
+        _ => decimals(&nums[0]).max(decimals(&nums[1])),
+    };
+    let values: Vec<String> = generate_sequence(first, step, last)
+        .into_iter()
+        .map(|v| match &format {
+            Some(f) => c_format(f, v),
+            None => format!("{v:.prec$}"),
+        })
+        .collect();
     let width = if equal_width {
         values.iter().map(|s| s.len()).max().unwrap_or(0)
     } else {
@@ -88,8 +135,20 @@ pub fn run() -> i32 {
             print!("{v}");
         }
     }
-    println!();
+    if !values.is_empty() {
+        println!();
+    }
     0
+}
+
+/// `-f FORMAT`: a printf floating-point conversion, applied by C's snprintf.
+fn c_format(fmt: &str, v: f64) -> String {
+    let Ok(f) = std::ffi::CString::new(fmt) else { return String::new() };
+    let mut buf = vec![0u8; 128];
+    // SAFETY: buf has buf.len() bytes and FORMAT is a double conversion (checked in run).
+    let n = unsafe { libc::snprintf(buf.as_mut_ptr() as *mut libc::c_char, buf.len(), f.as_ptr(), v) };
+    buf.truncate(n.clamp(0, 127) as usize);
+    String::from_utf8_lossy(&buf).into_owned()
 }
 
 /// Parse 1–3 numeric operands into `(first, increment, last)`, applying
@@ -127,6 +186,7 @@ fn parse_operands(nums: &[String]) -> Result<(f64, f64, f64), String> {
 /// Convert a sequence value to `seq`'s output form: integral-looking values
 /// (within `1e-12` of an integer and under `1e15` in magnitude) print as
 /// plain integers; everything else keeps its default float formatting.
+#[cfg(test)]
 fn format_number(n: f64) -> String {
     if n.fract().abs() < 1e-12 && n.abs() < 1e15 {
         format!("{}", n as i64)
@@ -139,22 +199,15 @@ fn format_number(n: f64) -> String {
 /// `step`. Bounded at 10,000,000 elements as a hard stop against runaway
 /// output; callers are expected to have already rejected zero/non-finite
 /// `step` via [`parse_operands`].
-fn generate_sequence(first: f64, step: f64, last: f64) -> Vec<String> {
-    let mut values: Vec<String> = Vec::new();
-    let mut cur = first;
-    for _ in 0..10_000_000 {
-        if step > 0.0 && cur > last + 1e-9 {
+/// FIRST + i * INCREMENT up to LAST (computed per step, so no rounding drift adds up).
+fn generate_sequence(first: f64, step: f64, last: f64) -> Vec<f64> {
+    let mut values = Vec::new();
+    for i in 0..10_000_000u64 {
+        let cur = first + i as f64 * step;
+        if (step > 0.0 && cur > last + 1e-9) || (step < 0.0 && cur < last - 1e-9) {
             break;
         }
-        if step < 0.0 && cur < last - 1e-9 {
-            break;
-        }
-        values.push(format_number(cur));
-        let next = cur + step;
-        if next == cur {
-            break;
-        }
-        cur = next;
+        values.push(cur);
     }
     values
 }
@@ -222,19 +275,19 @@ mod tests {
 
     #[test]
     fn generate_sequence_ascending() {
-        let v = generate_sequence(1.0, 1.0, 5.0);
+        let v: Vec<String> = generate_sequence(1.0, 1.0, 5.0).iter().map(|v| format_number(*v)).collect();
         assert_eq!(v, vec!["1", "2", "3", "4", "5"]);
     }
 
     #[test]
     fn generate_sequence_descending() {
-        let v = generate_sequence(5.0, -2.0, 1.0);
+        let v: Vec<String> = generate_sequence(5.0, -2.0, 1.0).iter().map(|v| format_number(*v)).collect();
         assert_eq!(v, vec!["5", "3", "1"]);
     }
 
     #[test]
     fn generate_sequence_empty_when_first_past_last() {
-        let v = generate_sequence(5.0, 1.0, 1.0);
+        let v: Vec<String> = generate_sequence(5.0, 1.0, 1.0).iter().map(|v| format_number(*v)).collect();
         assert!(v.is_empty());
     }
 

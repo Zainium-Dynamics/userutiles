@@ -227,10 +227,16 @@ fn copy_one_file(
         return Ok(());
     }
 
+    let existing = {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::metadata(dest).ok().map(|m| m.permissions().mode())
+    };
     file::copy_file_atomic(src, dest, opts.file, tx)?;
 
     if opts.preserve {
         metadata::preserve(src, dest)?;
+    } else {
+        metadata::plain_mode(src, dest, existing)?;
     }
     if opts.verify {
         verify::verify(src, dest)?;

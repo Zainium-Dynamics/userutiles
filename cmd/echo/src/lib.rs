@@ -110,6 +110,17 @@ fn append_escaped(out: &mut Vec<u8>, s: &[u8]) -> bool {
             b'r' => out.push(b'\r'),
             b't' => out.push(b'\t'),
             b'v' => out.push(0x0b),
+            // \NNN without the leading 0, as GNU echo also takes it
+            b'1'..=b'7' => {
+                let mut val = s[i] - b'0';
+                let mut count = 1;
+                while count < 3 && i + 1 < s.len() && (b'0'..=b'7').contains(&s[i + 1]) {
+                    i += 1;
+                    val = val.wrapping_mul(8).wrapping_add(s[i] - b'0');
+                    count += 1;
+                }
+                out.push(val);
+            }
             b'0' => {
                 // up to 3 octal digits including this 0? GNU: \0nnn octal
                 let mut val = 0u8;

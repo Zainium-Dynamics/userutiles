@@ -109,6 +109,7 @@ pub fn run() -> i32 {
         files.push("-".into());
     }
 
+    let width = number_width(&files, show);
     let mut total = Counts::default();
     let mut status = 0;
     let multi = files.len() > 1;
@@ -117,7 +118,7 @@ pub fn run() -> i32 {
     for f in &files {
         match count_file(f) {
             Ok(c) => {
-                print_counts(c, show, f, show_name);
+                print_counts(c, show, f, show_name, width);
                 total.lines += c.lines;
                 total.words += c.words;
                 total.bytes += c.bytes;
@@ -131,7 +132,7 @@ pub fn run() -> i32 {
         }
     }
     if multi {
-        print_counts(total, show, "total", true);
+        print_counts(total, show, "total", true, width);
     }
     status
 }
@@ -185,22 +186,47 @@ fn count_file(path: &str) -> io::Result<Counts> {
 /// Print one result row: the requested columns (in `-l -w -c -m -L`
 /// order), then `name` if `show_name` is set (and `name` isn't the stdin
 /// placeholder `"-"`).
-fn print_counts(c: Counts, show: Show, name: &str, show_name: bool) {
+/// GNU's column width: 1 for a single count of a single input; otherwise wide enough for
+/// the total size of the regular files, and at least 7 when an input is not a regular
+/// file (a pipe), whose size isn't known ahead.
+fn number_width(files: &[String], show: Show) -> usize {
+    let counts = [show.lines, show.words, show.chars, show.bytes, show.max_line]
+        .iter()
+        .filter(|b| **b)
+        .count();
+    if files.len() == 1 && counts == 1 {
+        return 1;
+    }
+    let mut minimum = 1;
+    let mut total: u64 = 0;
+    for (i, f) in files.iter().enumerate() {
+        let path = if f == "-" { "/proc/self/fd/0" } else { f.as_str() };
+        match std::fs::metadata(path) {
+            Ok(m) if m.is_file() => total = total.saturating_add(m.len()),
+            Ok(_) => minimum = 7,
+            Err(_) if i == 0 => return 1,
+            Err(_) => {}
+        }
+    }
+    total.to_string().len().max(minimum)
+}
+
+fn print_counts(c: Counts, show: Show, name: &str, show_name: bool, width: usize) {
     let mut parts = Vec::new();
     if show.lines {
-        parts.push(format!("{:8}", c.lines));
+        parts.push(format!("{:width$}", c.lines));
     }
     if show.words {
-        parts.push(format!("{:8}", c.words));
+        parts.push(format!("{:width$}", c.words));
     }
     if show.chars {
-        parts.push(format!("{:8}", c.chars));
+        parts.push(format!("{:width$}", c.chars));
     }
     if show.bytes {
-        parts.push(format!("{:8}", c.bytes));
+        parts.push(format!("{:width$}", c.bytes));
     }
     if show.max_line {
-        parts.push(format!("{:8}", c.max_line));
+        parts.push(format!("{:width$}", c.max_line));
     }
     if show_name && name != "-" {
         println!("{} {name}", parts.join(" "));

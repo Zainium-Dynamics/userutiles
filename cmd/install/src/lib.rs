@@ -23,9 +23,33 @@ pub fn run() -> i32 {
     let mut compare = false;
     let mut verbose = false;
     let mut preserve_ts = false;
+    let mut leading = false;
+    let mut strip = false;
+    let mut no_target = false;
+    let mut target_dir: Option<PathBuf> = None;
     let mut paths: Vec<PathBuf> = Vec::new();
 
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    // bundled short options (-Dm644, -dm755, -vD) become separate ones
+    let mut args: Vec<String> = Vec::new();
+    let mut operands_only = false;
+    for a in std::env::args().skip(1) {
+        if operands_only || a == "--" || !a.starts_with('-') || a.starts_with("--") || a.len() <= 2 {
+            operands_only |= a == "--";
+            args.push(a);
+            continue;
+        }
+        let rest: Vec<char> = a.chars().skip(1).collect();
+        for (k, c) in rest.iter().enumerate() {
+            args.push(format!("-{c}"));
+            if matches!(c, 'm' | 'o' | 'g' | 't' | 'S') {
+                let inline: String = rest[k + 1..].iter().collect();
+                if !inline.is_empty() {
+                    args.push(inline);
+                }
+                break;
+            }
+        }
+    }
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -54,6 +78,28 @@ pub fn run() -> i32 {
             "-v" | "--verbose" => verbose = true,
             "-C" | "--compare" => compare = true,
             "-p" | "--preserve-timestamps" => preserve_ts = true,
+            "-D" => leading = true,
+            "-s" | "--strip" => strip = true,
+            "-c" | "--" => {}
+            "-T" | "--no-target-directory" => no_target = true,
+            "-t" | "--target-directory" => {
+                i += 1;
+                let Some(t) = args.get(i) else {
+                    ui.err("option requires an argument -- 't'");
+                    return 1;
+                };
+                target_dir = Some(PathBuf::from(t));
+            }
+            s if s.starts_with("--target-directory=") => {
+                target_dir = Some(PathBuf::from(&s["--target-directory=".len()..]));
+            }
+            s if s.starts_with("--mode=") => {
+                let Some(m) = parse_mode(&s[7..]) else {
+                    ui.err(&format!("invalid mode '{}'", &s[7..]));
+                    return 1;
+                };
+                mode = Some(m);
+            }
             "-m" | "--mode" => {
                 i += 1;
                 let spec = args.get(i).map(|s| s.as_str()).unwrap_or("755");
@@ -130,14 +176,29 @@ pub fn run() -> i32 {
         return status;
     }
 
-    if paths.len() < 2 {
-        ui.err("missing destination");
-        return 1;
+    let (sources, dest, dest_is_dir) = match target_dir {
+        Some(t) => (paths, t, true),
+        None => {
+            if paths.len() < 2 {
+                ui.err("missing destination file operand");
+                return 1;
+            }
+            // `paths.len() >= 2` was just checked above, so `pop()` cannot be None.
+            let dest = paths.pop().unwrap();
+            let is_dir = !no_target && (dest.is_dir() || paths.len() > 1);
+            (paths, dest, is_dir)
+        }
+    };
+    // -D: create DEST's missing parents (or the -t directory itself)
+    if leading {
+        let dir = if dest_is_dir { Some(dest.as_path()) } else { dest.parent() };
+        if let Some(d) = dir.filter(|d| !d.as_os_str().is_empty()) {
+            if let Err(e) = fs::create_dir_all(d) {
+                ui.err(&format!("cannot create directory '{}': {e}", d.display()));
+                return 1;
+            }
+        }
     }
-    // `paths.len() >= 2` was just checked above, so `pop()` cannot be None.
-    let dest = paths.pop().unwrap();
-    let sources = paths;
-    let dest_is_dir = dest.is_dir() || sources.len() > 1;
 
     let mut status = 0;
     for src in &sources {
@@ -174,6 +235,13 @@ pub fn run() -> i32 {
             ));
             status = 1;
             continue;
+        }
+        if strip {
+            let stripped = std::process::Command::new("strip").arg(&target).status();
+            if !stripped.is_ok_and(|s| s.success()) {
+                ui.err(&format!("strip process terminated abnormally: '{}'", target.display()));
+                status = 1;
+            }
         }
         apply_owner(&target, owner, group);
         if verbose {

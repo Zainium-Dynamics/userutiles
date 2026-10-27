@@ -169,7 +169,8 @@ pub fn run_args(args: &[String]) -> i32 {
     for (idx, p) in paths.iter().enumerate() {
         if let Err(e) = list_path(p, &o, multi, idx > 0) {
             ui.err(&format!("cannot access '{}': {e}", p.display()));
-            status = 1;
+            // GNU: 2 for a command-line operand that can't be listed
+            status = 2;
         }
     }
     status
@@ -783,7 +784,7 @@ mod tests {
     #[test]
     fn run_args_missing_path_returns_failure() {
         let missing = format!("/nonexistent_user_ls_test_{}", std::process::id());
-        assert_eq!(run_args(&[missing]), 1);
+        assert_eq!(run_args(&[missing]), 2);
     }
 
     #[test]

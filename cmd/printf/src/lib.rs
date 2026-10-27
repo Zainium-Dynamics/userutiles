@@ -1,4 +1,5 @@
 //! user printf — format and print data.
+use std::ffi::{CStr, CString};
 use std::io::{self, Write};
 
 use usercore::Ui;
@@ -62,22 +63,14 @@ pub fn run() -> i32 {
 /// leaving any other `\X` sequence untouched. Used for the fast path where
 /// `FORMAT` contains no `%` directives at all.
 fn expand_literal(s: &[u8], out: &mut Vec<u8>) {
-    // interpret \\ escapes in format itself for non-% path
     let mut i = 0;
     while i < s.len() {
-        if s[i] == b'\\' && i + 1 < s.len() {
-            i += 1;
-            match s[i] {
-                b'n' => out.push(b'\n'),
-                b't' => out.push(b'\t'),
-                b'r' => out.push(b'\r'),
-                b'\\' => out.push(b'\\'),
-                other => {
-                    out.push(b'\\');
-                    out.push(other);
-                }
+        if s[i] == b'\\' {
+            let (next, stop) = escape(s, i, out, false);
+            if stop {
+                return;
             }
-            i += 1;
+            i = next;
         } else {
             out.push(s[i]);
             i += 1;
@@ -85,31 +78,180 @@ fn expand_literal(s: &[u8], out: &mut Vec<u8>) {
     }
 }
 
-/// Expand one pass of `fmt` (its `\`-escapes and `%`-directives) against
-/// `args`, appending the result to `out`. On a malformed numeric `ARGUMENT`,
-/// warns via `ui`, sets `*status = 1`, and substitutes `0` rather than
-/// aborting — matching GNU `printf`'s recovery behavior.
-///
-/// Returns the number of `args` consumed, so the caller can detect when
-/// `fmt` has no more directives left to cycle through (a return of `0`).
+/// The escape at `b[i]` (a backslash): its bytes go to `out`. Returns the index after it,
+/// and whether it was `\c` (in `%b`: produce no further output). In `%b` an octal escape
+/// is `\0NNN`; in the format it is `\NNN`.
+fn escape(b: &[u8], i: usize, out: &mut Vec<u8>, in_b: bool) -> (usize, bool) {
+    let mut j = i + 1;
+    let Some(&c) = b.get(j) else {
+        out.push(b'\\');
+        return (j, false);
+    };
+    j += 1;
+    let digits = |j: &mut usize, max: usize, radix: u32| -> Option<u32> {
+        let mut v = None;
+        for _ in 0..max {
+            match b.get(*j).and_then(|d| (*d as char).to_digit(radix)) {
+                Some(d) => {
+                    v = Some(v.unwrap_or(0) * radix + d);
+                    *j += 1;
+                }
+                None => break,
+            }
+        }
+        v
+    };
+    match c {
+        b'n' => out.push(b'\n'),
+        b't' => out.push(b'\t'),
+        b'r' => out.push(b'\r'),
+        b'\\' => out.push(b'\\'),
+        b'a' => out.push(7),
+        b'b' => out.push(8),
+        b'f' => out.push(12),
+        b'v' => out.push(11),
+        b'"' => out.push(b'"'),
+        b'\'' => out.push(b'\''),
+        b'c' if in_b => return (j, true),
+        b'x' => match digits(&mut j, 2, 16) {
+            Some(v) => out.push(v as u8),
+            None => out.extend_from_slice(b"\\x"),
+        },
+        b'u' | b'U' => {
+            let n = if c == b'u' { 4 } else { 8 };
+            match digits(&mut j, n, 16).and_then(char::from_u32) {
+                Some(ch) => out.extend_from_slice(ch.encode_utf8(&mut [0u8; 4]).as_bytes()),
+                None => out.extend_from_slice(&[b'\\', c]),
+            }
+        }
+        b'0'..=b'7' => {
+            j -= 1;
+            if in_b && c == b'0' {
+                j += 1;
+            }
+            out.push(digits(&mut j, 3, 8).unwrap_or(0) as u8);
+        }
+        other => {
+            out.push(b'\\');
+            out.push(other);
+        }
+    }
+    (j, false)
+}
+
+/// What a conversion gets from its argument, formatted by C's printf.
+enum CArg<'a> {
+    Int(i64),
+    Uint(u64),
+    Float(f64),
+    Str(&'a CStr),
+}
+
+/// `spec` (a C conversion like `%-08.3lld`) applied to `arg` by snprintf: exactly the
+/// printf(1) rules for flags, width and precision.
+fn c_format(spec: &str, arg: CArg) -> Vec<u8> {
+    let Ok(f) = CString::new(spec) else { return Vec::new() };
+    let mut buf = vec![0u8; 256];
+    loop {
+        let p = buf.as_mut_ptr() as *mut libc::c_char;
+        // SAFETY: buf has buf.len() bytes, f is NUL-terminated and the argument matches the
+        // conversion the caller built (lld / llu / a double conversion / s).
+        let n = unsafe {
+            match arg {
+                CArg::Int(v) => libc::snprintf(p, buf.len(), f.as_ptr(), v as libc::c_longlong),
+                CArg::Uint(v) => libc::snprintf(p, buf.len(), f.as_ptr(), v as libc::c_ulonglong),
+                CArg::Float(v) => libc::snprintf(p, buf.len(), f.as_ptr(), v as libc::c_double),
+                CArg::Str(v) => libc::snprintf(p, buf.len(), f.as_ptr(), v.as_ptr()),
+            }
+        };
+        if n < 0 {
+            return Vec::new();
+        }
+        if (n as usize) < buf.len() {
+            buf.truncate(n as usize);
+            return buf;
+        }
+        buf.resize(n as usize + 1, 0);
+    }
+}
+
+/// Shell-quoted `s` (`%q`): unchanged when it needs no quoting, else in single quotes.
+fn shell_quote(s: &str) -> String {
+    if !s.is_empty()
+        && s.bytes().all(|c| c.is_ascii_alphanumeric() || b"_./-=,:+@%^".contains(&c))
+    {
+        return s.to_string();
+    }
+    format!("'{}'", s.replace('\'', r"'\''"))
+}
+
+/// A numeric argument as printf(1) reads it: decimal, 0x hex, 0 octal, or 'c / "c for
+/// the character's value. A trailing part that isn't a number is an error, the number
+/// before it is still used.
+fn int_arg(s: &str, ui: &Ui, status: &mut i32) -> i64 {
+    let t = s.trim_start();
+    if t.is_empty() {
+        return 0;
+    }
+    if let Some(rest) = t.strip_prefix(['\'', '"']) {
+        return rest.chars().next().map_or(0, |c| c as i64);
+    }
+    let (neg, body) = match t.as_bytes()[0] {
+        b'-' => (true, &t[1..]),
+        b'+' => (false, &t[1..]),
+        _ => (false, t),
+    };
+    let (radix, digits) = if let Some(h) = body.strip_prefix("0x").or_else(|| body.strip_prefix("0X")) {
+        (16, h)
+    } else if body.len() > 1 && body.starts_with('0') {
+        (8, &body[1..])
+    } else {
+        (10, body)
+    };
+    let end = digits.find(|c: char| !c.is_digit(radix)).unwrap_or(digits.len());
+    let v = i64::from_str_radix(&digits[..end], radix).unwrap_or(if end == 0 { 0 } else { i64::MAX });
+    if end == 0 && radix == 10 {
+        ui.err(&format!("'{s}': expected a numeric value"));
+        *status = 1;
+    } else if end < digits.len() {
+        ui.err(&format!("'{s}': value not completely converted"));
+        *status = 1;
+    }
+    if neg { v.wrapping_neg() } else { v }
+}
+
+fn float_arg(s: &str, ui: &Ui, status: &mut i32) -> f64 {
+    let t = s.trim();
+    if t.is_empty() {
+        return 0.0;
+    }
+    if let Some(rest) = t.strip_prefix(['\'', '"']) {
+        return rest.chars().next().map_or(0.0, |c| c as u32 as f64);
+    }
+    match t.parse::<f64>() {
+        Ok(v) => v,
+        Err(_) => {
+            ui.err(&format!("'{s}': expected a numeric value"));
+            *status = 1;
+            0.0
+        }
+    }
+}
+
+/// One pass over the format, taking arguments from `args`. Returns how many it used, or
+/// `usize::MAX` after `\c` in a `%b` argument (no further output at all).
 fn format_once(fmt: &str, args: &[String], out: &mut Vec<u8>, ui: &Ui, status: &mut i32) -> usize {
     let b = fmt.as_bytes();
     let mut i = 0;
     let mut ai = 0;
+    let next = |ai: &mut usize| -> &str {
+        let a = args.get(*ai).map(|s| s.as_str()).unwrap_or("");
+        *ai += 1;
+        a
+    };
     while i < b.len() {
-        if b[i] == b'\\' && i + 1 < b.len() {
-            i += 1;
-            match b[i] {
-                b'n' => out.push(b'\n'),
-                b't' => out.push(b'\t'),
-                b'r' => out.push(b'\r'),
-                b'\\' => out.push(b'\\'),
-                other => {
-                    out.push(b'\\');
-                    out.push(other);
-                }
-            }
-            i += 1;
+        if b[i] == b'\\' {
+            i = escape(b, i, out, false).0;
             continue;
         }
         if b[i] != b'%' {
@@ -117,128 +259,104 @@ fn format_once(fmt: &str, args: &[String], out: &mut Vec<u8>, ui: &Ui, status: &
             i += 1;
             continue;
         }
+        let start = i;
         i += 1;
-        if i < b.len() && b[i] == b'%' {
+        if b.get(i) == Some(&b'%') {
             out.push(b'%');
             i += 1;
             continue;
         }
-        while i < b.len() && matches!(b[i], b'-' | b'+' | b' ' | b'#' | b'0') {
+        let mut spec = String::from("%");
+        while let Some(&f) = b.get(i).filter(|f| b"-+ #0".contains(f)) {
+            spec.push(f as char);
             i += 1;
         }
-        while i < b.len() && b[i].is_ascii_digit() {
+        if b.get(i) == Some(&b'*') {
             i += 1;
-        }
-        if i < b.len() && b[i] == b'.' {
-            i += 1;
-            while i < b.len() && b[i].is_ascii_digit() {
+            spec += &int_arg(next(&mut ai), ui, status).to_string();
+        } else {
+            while let Some(&d) = b.get(i).filter(|d| d.is_ascii_digit()) {
+                spec.push(d as char);
                 i += 1;
             }
         }
-        if i >= b.len() {
-            break;
-        }
-        let spec = b[i] as char;
-        i += 1;
-        let arg = args.get(ai).map(|s| s.as_str()).unwrap_or("");
-        ai += 1;
-        match spec {
-            's' => out.extend_from_slice(arg.as_bytes()),
-            'c' => {
-                if let Some(c) = arg.chars().next() {
-                    let mut buf = [0u8; 4];
-                    out.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
+        if b.get(i) == Some(&b'.') {
+            i += 1;
+            spec.push('.');
+            if b.get(i) == Some(&b'*') {
+                i += 1;
+                spec += &int_arg(next(&mut ai), ui, status).max(0).to_string();
+            } else {
+                while let Some(&d) = b.get(i).filter(|d| d.is_ascii_digit()) {
+                    spec.push(d as char);
+                    i += 1;
                 }
             }
-            'd' | 'i' => {
-                let n: i64 = parse_or_warn(arg, ui, status);
-                out.extend_from_slice(n.to_string().as_bytes());
+        }
+        while b.get(i).is_some_and(|c| b"hlLjzt".contains(c)) {
+            i += 1;
+        }
+        let Some(&conv) = b.get(i) else {
+            out.extend_from_slice(&b[start..]);
+            break;
+        };
+        i += 1;
+        let arg = next(&mut ai);
+        match conv {
+            b'd' | b'i' => out.extend(c_format(&format!("{spec}lld"), CArg::Int(int_arg(arg, ui, status)))),
+            b'u' | b'o' | b'x' | b'X' => out.extend(c_format(
+                &format!("{spec}ll{}", conv as char),
+                CArg::Uint(int_arg(arg, ui, status) as u64),
+            )),
+            b'f' | b'F' | b'e' | b'E' | b'g' | b'G' | b'a' | b'A' => out.extend(c_format(
+                &format!("{spec}{}", conv as char),
+                CArg::Float(float_arg(arg, ui, status)),
+            )),
+            b'c' => {
+                let first = arg.as_bytes().first().map_or(String::new(), |c| (*c as char).to_string());
+                let c = CString::new(first).unwrap_or_default();
+                out.extend(c_format(&format!("{spec}s"), CArg::Str(&c)));
             }
-            'u' => {
-                let n: u64 = parse_or_warn(arg, ui, status);
-                out.extend_from_slice(n.to_string().as_bytes());
+            b's' | b'b' | b'q' => {
+                let mut text = Vec::new();
+                let mut stop = false;
+                match conv {
+                    b's' => text.extend_from_slice(arg.as_bytes()),
+                    b'q' => text.extend_from_slice(shell_quote(arg).as_bytes()),
+                    _ => {
+                        let a = arg.as_bytes();
+                        let mut k = 0;
+                        while k < a.len() && !stop {
+                            if a[k] == b'\\' {
+                                let (n, s) = escape(a, k, &mut text, true);
+                                k = n;
+                                stop = s;
+                            } else {
+                                text.push(a[k]);
+                                k += 1;
+                            }
+                        }
+                    }
+                }
+                // a NUL from %b ends the C string: write the bytes when no width applies
+                if spec == "%" || text.contains(&0) {
+                    out.extend_from_slice(&text);
+                } else {
+                    let t = CString::new(text).unwrap_or_default();
+                    out.extend(c_format(&format!("{spec}s"), CArg::Str(&t)));
+                }
+                if stop {
+                    return usize::MAX;
+                }
             }
-            'x' => out.extend_from_slice(format!("{:x}", parse_int(arg, ui, status)).as_bytes()),
-            'X' => out.extend_from_slice(format!("{:X}", parse_int(arg, ui, status)).as_bytes()),
-            'o' => out.extend_from_slice(format!("{:o}", parse_int(arg, ui, status)).as_bytes()),
-            'f' => {
-                let n: f64 = parse_or_warn(arg, ui, status);
-                out.extend_from_slice(format!("{n:.6}").as_bytes());
-            }
-            'b' => expand_b(arg.as_bytes(), out),
-            _ => {
-                out.push(b'%');
-                out.push(spec as u8);
+            other => {
+                ui.err(&format!("%{}: invalid conversion specification", other as char));
+                *status = 1;
+                return usize::MAX;
             }
         }
     }
     ai
-}
-
-/// Parse `s` as `T`, or — if empty — silently yield `T::default()` (an
-/// omitted trailing `ARGUMENT` is not an error in `printf`). A non-empty but
-/// unparsable `s` warns via `ui`, sets `*status = 1`, and yields
-/// `T::default()`, matching GNU `printf`'s "expected a numeric value"
-/// recovery.
-fn parse_or_warn<T: std::str::FromStr + Default>(s: &str, ui: &Ui, status: &mut i32) -> T {
-    if s.is_empty() {
-        return T::default();
-    }
-    match s.parse() {
-        Ok(n) => n,
-        Err(_) => {
-            ui.err(&format!("'{s}': expected a numeric value"));
-            *status = 1;
-            T::default()
-        }
-    }
-}
-
-/// Parse `s` as an unsigned integer for `%x`/`%X`/`%o`, accepting an
-/// optional `0x`/`0X` hex prefix. Same empty/malformed handling as
-/// [`parse_or_warn`].
-fn parse_int(s: &str, ui: &Ui, status: &mut i32) -> u64 {
-    if s.is_empty() {
-        return 0;
-    }
-    let parsed = if let Some(h) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
-        u64::from_str_radix(h, 16).ok()
-    } else {
-        s.parse().ok()
-    };
-    match parsed {
-        Some(n) => n,
-        None => {
-            ui.err(&format!("'{s}': expected a numeric value"));
-            *status = 1;
-            0
-        }
-    }
-}
-
-/// Expand `%b`-style backslash escapes in `s` into `out`; unlike
-/// [`expand_literal`], `\c` here means "stop output immediately" (matching
-/// POSIX `printf`'s `%b` semantics), and unrecognized `\X` sequences drop
-/// the backslash (again, `%b`-specific — differs from the plain-text path).
-fn expand_b(s: &[u8], out: &mut Vec<u8>) {
-    let mut i = 0;
-    while i < s.len() {
-        if s[i] != b'\\' || i + 1 >= s.len() {
-            out.push(s[i]);
-            i += 1;
-            continue;
-        }
-        i += 1;
-        match s[i] {
-            b'n' => out.push(b'\n'),
-            b't' => out.push(b'\t'),
-            b'r' => out.push(b'\r'),
-            b'\\' => out.push(b'\\'),
-            b'c' => return, // stop
-            other => out.push(other),
-        }
-        i += 1;
-    }
 }
 
 #[cfg(test)]
@@ -259,6 +377,15 @@ mod tests {
             rest = &rest[used..];
         }
         (String::from_utf8(out).unwrap(), status)
+    }
+
+    #[test]
+    fn width_precision_and_float_conversions() {
+        assert_eq!(expand("%05.2f|%-6s|%6s\n", &["3.14159", "ab", "cd"]).0, "03.14|ab    |    cd\n");
+        assert_eq!(expand("%x %X %o %e\n", &["255", "255", "8", "1234.5"]).0, "ff FF 10 1.234500e+03\n");
+        assert_eq!(expand("%*d|%10.3s|\n", &["5", "42", "abcdef"]).0, "   42|       abc|\n");
+        assert_eq!(expand("%q", &["a b"]).0, "'a b'");
+        assert_eq!(expand("\\x41\\101%d", &["'A"]).0, "AA65");
     }
 
     #[test]
@@ -305,9 +432,8 @@ mod tests {
 
     #[test]
     fn percent_b_stops_at_backslash_c() {
-        let mut out = Vec::new();
-        expand_b(b"abc\\cdef", &mut out);
-        assert_eq!(out, b"abc");
+        let (s, _) = expand("%b|", &["abc\\cdef"]);
+        assert_eq!(s, "abc");
     }
 
     #[test]

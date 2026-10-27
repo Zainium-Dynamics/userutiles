@@ -16,9 +16,18 @@ pub fn run() -> i32 {
     let mut bytes: Option<u64> = None;
     let mut quiet = false;
     let mut verbose = false;
+    // -n -NUM / -c -NUM: everything but the last NUM lines or bytes
+    let mut all_but = false;
     let mut files: Vec<String> = Vec::new();
 
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    // --lines=NUM / --bytes=NUM as two arguments
+    let args: Vec<String> = std::env::args()
+        .skip(1)
+        .flat_map(|a| match a.split_once('=') {
+            Some((k @ ("--lines" | "--bytes"), v)) => vec![k.to_string(), v.to_string()],
+            _ => vec![a],
+        })
+        .collect();
     let mut i = 0;
     while i < args.len() {
         let a = &args[i];
@@ -48,7 +57,7 @@ pub fn run() -> i32 {
                     ui.err("option requires an argument -- 'n'");
                     return 1;
                 };
-                match parse_count(arg) {
+                match parse_count(arg).inspect(|_| all_but = arg.starts_with('-')) {
                     Ok(n) => {
                         lines = Some(n);
                         bytes = None;
@@ -65,7 +74,7 @@ pub fn run() -> i32 {
                     ui.err("option requires an argument -- 'c'");
                     return 1;
                 };
-                match parse_count(arg) {
+                match parse_count(arg).inspect(|_| all_but = arg.starts_with('-')) {
                     Ok(n) => {
                         bytes = Some(n);
                         lines = None;
@@ -76,7 +85,7 @@ pub fn run() -> i32 {
                     }
                 }
             }
-            s if s.starts_with("-n") && s.len() > 2 => match parse_count(&s[2..]) {
+            s if s.starts_with("-n") && s.len() > 2 => match parse_count(&s[2..]).inspect(|_| all_but = s[2..].starts_with('-')) {
                 Ok(n) => {
                     lines = Some(n);
                     bytes = None;
@@ -86,7 +95,7 @@ pub fn run() -> i32 {
                     return 1;
                 }
             },
-            s if s.starts_with("-c") && s.len() > 2 => match parse_count(&s[2..]) {
+            s if s.starts_with("-c") && s.len() > 2 => match parse_count(&s[2..]).inspect(|_| all_but = s[2..].starts_with('-')) {
                 Ok(n) => {
                     bytes = Some(n);
                     lines = None;
@@ -137,7 +146,9 @@ pub fn run() -> i32 {
             }
             let _ = writeln!(out, "==> {f} <==");
         }
-        let r = if let Some(b) = bytes {
+        let r = if all_but {
+            head_all_but(f, bytes.is_some(), bytes.or(lines).unwrap_or(10), &mut out)
+        } else if let Some(b) = bytes {
             head_bytes(f, b, &mut out)
         } else {
             head_lines(f, lines.unwrap_or(10), &mut out)
@@ -157,9 +168,37 @@ pub fn run() -> i32 {
 /// `+` is stripped (accepted but not currently given special "from offset"
 /// semantics), and the remainder must be a valid `u64`.
 fn parse_count(s: &str) -> Result<u64, String> {
-    let s = s.trim_start_matches('+');
+    let s = s.strip_prefix(['+', '-']).unwrap_or(s);
     s.parse::<u64>()
         .map_err(|_| format!("invalid number of lines/bytes: '{s}'"))
+}
+
+/// Everything of `path` (or stdin) but its last `n` bytes, or its last `n` lines.
+fn head_all_but(path: &str, by_bytes: bool, n: u64, out: &mut impl Write) -> io::Result<()> {
+    let mut data = Vec::new();
+    if path == "-" {
+        io::stdin().lock().read_to_end(&mut data)?;
+    } else {
+        File::open(path)?.read_to_end(&mut data)?;
+    }
+    let n = usize::try_from(n).unwrap_or(usize::MAX);
+    let end = if by_bytes {
+        data.len().saturating_sub(n)
+    } else {
+        // line ends, the last line counting even without a newline
+        let mut ends: Vec<usize> = data
+            .iter()
+            .enumerate()
+            .filter(|(_, b)| **b == b'\n')
+            .map(|(i, _)| i + 1)
+            .collect();
+        if data.last().is_some_and(|b| *b != b'\n') {
+            ends.push(data.len());
+        }
+        let keep = ends.len().saturating_sub(n);
+        if keep == 0 { 0 } else { ends[keep - 1] }
+    };
+    out.write_all(&data[..end])
 }
 
 /// Copy the first `n` lines (including their terminators) of `path` (or

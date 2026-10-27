@@ -58,13 +58,16 @@ pub fn run() -> i32 {
             s if s.starts_with("--replace=") => replace = Some(s["--replace=".len()..].to_string()),
             "-d" | "--delimiter" => {
                 i += 1;
-                let d = args.get(i).map(|s| s.as_str()).unwrap_or("\n");
-                delimiter = Some(if d == "\\0" {
-                    0
-                } else {
-                    d.as_bytes().first().copied().unwrap_or(b'\n')
-                });
+                delimiter = Some(delimiter_byte(args.get(i).map(|s| s.as_str()).unwrap_or("\\n")));
             }
+            s if s.starts_with("--delimiter=") => delimiter = Some(delimiter_byte(&s["--delimiter=".len()..])),
+            s if s.starts_with("-d") && s.len() > 2 => delimiter = Some(delimiter_byte(&s[2..])),
+            s if s.starts_with("-L") && s.len() > 2 => max_lines = s[2..].parse().ok(),
+            s if s.starts_with("--max-lines=") => max_lines = s["--max-lines=".len()..].parse().ok(),
+            s if s.starts_with("--max-args=") => max_args = s["--max-args=".len()..].parse().ok(),
+            // one command at a time here
+            "-P" | "--max-procs" => i += 1,
+            s if s.starts_with("-P") || s.starts_with("--max-procs=") => {}
             "--" => {
                 cmd.extend(args[i + 1..].iter().cloned());
                 break;
@@ -85,7 +88,7 @@ pub fn run() -> i32 {
         cmd.push("echo".into());
     }
 
-    let items = match read_items(null, delimiter) {
+    let lines = match read_items(null, delimiter, replace.is_some()) {
         Ok(v) => v,
         Err(e) => {
             eprintln!("xargs: {e}");
@@ -93,35 +96,106 @@ pub fn run() -> i32 {
         }
     };
 
+    let items: Vec<String> = lines.iter().flatten().cloned().collect();
     if items.is_empty() && no_run_if_empty {
         return 0;
     }
 
+    // GNU's exit status: 123 when a command failed, 124/125/126/127 stop at once
+    let mut status = 0;
+    let mut run = |argv: &[String]| -> bool {
+        let code = run_cmd(argv, verbose);
+        status = status.max(code);
+        code < 124
+    };
+
     if let Some(ref token) = replace {
-        // one invocation per item
-        let mut status = 0;
+        // -I: one command per input line, the whole line in place of TOKEN
         for item in &items {
             let argv: Vec<String> = cmd.iter().map(|a| a.replace(token, item)).collect();
-            status |= run_cmd(&argv, verbose);
+            if !run(&argv) {
+                break;
+            }
         }
         return status;
     }
 
-    let batch = max_args.or(max_lines).unwrap_or(usize::MAX).max(1);
-    let mut status = 0;
     if items.is_empty() {
-        status |= run_cmd(&cmd, verbose);
+        run(&cmd);
+    } else if let (None, Some(n)) = (max_args, max_lines) {
+        // -L: N input lines per command
+        for chunk in lines.chunks(n.max(1)) {
+            let mut argv = cmd.clone();
+            argv.extend(chunk.iter().flatten().cloned());
+            if !run(&argv) {
+                break;
+            }
+        }
     } else {
-        for chunk in items.chunks(batch) {
+        for chunk in items.chunks(max_args.unwrap_or(usize::MAX).max(1)) {
             let mut argv = cmd.clone();
             argv.extend(chunk.iter().cloned());
-            status |= run_cmd(&argv, verbose);
+            if !run(&argv) {
+                break;
+            }
         }
     }
     status
 }
 
-fn read_items(null: bool, delimiter: Option<u8>) -> io::Result<Vec<String>> {
+/// `-d`'s argument: one character, or an escape (`\n`, `\t`, `\0`).
+fn delimiter_byte(d: &str) -> u8 {
+    match d {
+        "\\n" => b'\n',
+        "\\t" => b'\t',
+        "\\0" => 0,
+        _ => d.as_bytes().first().copied().unwrap_or(b'\n'),
+    }
+}
+
+/// Default input: blank-separated items, with '...' and "..." grouping and a backslash
+/// taking the next character as it is, one list per input line (for -L).
+fn split_items(line: &str) -> Vec<String> {
+    let mut items = Vec::new();
+    let mut cur = String::new();
+    let mut have = false;
+    let mut quote: Option<char> = None;
+    let mut chars = line.chars();
+    while let Some(c) = chars.next() {
+        match (quote, c) {
+            (Some(q), c) if c == q => quote = None,
+            (Some(_), c) => cur.push(c),
+            (None, '\'' | '"') => {
+                quote = Some(c);
+                have = true;
+            }
+            (None, '\\') => {
+                if let Some(n) = chars.next() {
+                    cur.push(n);
+                }
+                have = true;
+            }
+            (None, c) if c.is_whitespace() => {
+                if have {
+                    items.push(std::mem::take(&mut cur));
+                    have = false;
+                }
+            }
+            (None, c) => {
+                cur.push(c);
+                have = true;
+            }
+        }
+    }
+    if have {
+        items.push(cur);
+    }
+    items
+}
+
+/// The input items, grouped by input line (each -0/-d item is its own line). With -I a
+/// whole line, leading blanks dropped, is one item.
+fn read_items(null: bool, delimiter: Option<u8>, whole_lines: bool) -> io::Result<Vec<Vec<String>>> {
     let mut stdin = io::stdin().lock();
     if null || delimiter == Some(0) {
         let mut data = Vec::new();
@@ -129,7 +203,7 @@ fn read_items(null: bool, delimiter: Option<u8>) -> io::Result<Vec<String>> {
         return Ok(data
             .split(|b| *b == 0)
             .filter(|s| !s.is_empty())
-            .map(|s| String::from_utf8_lossy(s).into_owned())
+            .map(|s| vec![String::from_utf8_lossy(s).into_owned()])
             .collect());
     }
     if let Some(d) = delimiter {
@@ -138,18 +212,26 @@ fn read_items(null: bool, delimiter: Option<u8>) -> io::Result<Vec<String>> {
         return Ok(data
             .split(|b| *b == d)
             .filter(|s| !s.is_empty())
-            .map(|s| String::from_utf8_lossy(s).into_owned())
+            .map(|s| vec![String::from_utf8_lossy(s).into_owned()])
             .collect());
     }
     // whitespace separated (default)
-    let mut items = Vec::new();
+    let mut lines = Vec::new();
     for line in stdin.lines() {
         let line = line?;
-        for tok in line.split_whitespace() {
-            items.push(tok.to_string());
+        if whole_lines {
+            let l = line.trim_start();
+            if !l.is_empty() {
+                lines.push(vec![l.to_string()]);
+            }
+        } else {
+            let items = split_items(&line);
+            if !items.is_empty() {
+                lines.push(items);
+            }
         }
     }
-    Ok(items)
+    Ok(lines)
 }
 
 fn run_cmd(argv: &[String], verbose: bool) -> i32 {
@@ -166,13 +248,18 @@ fn run_cmd(argv: &[String], verbose: bool) -> i32 {
         .stderr(Stdio::inherit())
         .status()
     {
-        Ok(st) => {
-            if st.success() {
-                0
-            } else {
-                st.code().unwrap_or_else(|| 128 + st.signal().unwrap_or(1))
+        Ok(st) => match st.code() {
+            Some(0) => 0,
+            Some(255) => {
+                eprintln!("xargs: {}: exited with status 255; aborting", argv[0]);
+                124
             }
-        }
+            Some(_) => 123,
+            None => {
+                eprintln!("xargs: {}: terminated by signal {}", argv[0], st.signal().unwrap_or(0));
+                125
+            }
+        },
         Err(e) => {
             eprintln!("xargs: {}: {e}", argv[0]);
             if e.kind() == io::ErrorKind::NotFound {

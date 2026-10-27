@@ -63,8 +63,21 @@ pub struct Opts {
     pub verbose: bool,
 
     /// Preserve mode, timestamps, extended attributes, and ownership
-    #[arg(short = 'p', long = "preserve")]
+    #[arg(short = 'p')]
     pub preserve: bool,
+
+    /// Preserve the attributes (mode, ownership, timestamps, ...); all of them here
+    #[arg(long = "preserve", value_name = "ATTR_LIST", num_args = 0..=1, require_equals = true,
+          default_missing_value = "mode,ownership,timestamps")]
+    pub preserve_list: Option<String>,
+
+    /// Hard-link files instead of copying
+    #[arg(short = 'l', long = "link")]
+    pub link: bool,
+
+    /// Make symbolic links instead of copying
+    #[arg(short = 's', long = "symbolic-link")]
+    pub symbolic_link: bool,
 
     /// Same as -dR --preserve=all: archive a whole tree
     #[arg(short = 'a', long = "archive")]

@@ -2,7 +2,7 @@
 use std::env;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 
 use usercore::Ui;
@@ -22,6 +22,8 @@ pub fn run() -> i32 {
     let mut tmpl: Option<String> = None;
     let mut suffix = String::new();
     let mut tmpdir: Option<PathBuf> = None;
+    // -t: TEMPLATE goes in $TMPDIR (or -p DIR) even when given
+    let mut in_tmpdir = false;
 
     let args: Vec<String> = env::args().skip(1).collect();
     let mut i = 0;
@@ -49,6 +51,23 @@ pub fn run() -> i32 {
             "-d" | "--directory" => directory = true,
             "-u" | "--dry-run" => dry_run = true,
             "-q" | "--quiet" => quiet = true,
+            "-t" => in_tmpdir = true,
+            "--suffix" if i + 1 < args.len() => {
+                i += 1;
+                suffix = args[i].clone();
+            }
+            s if s.starts_with('-') && !s.starts_with("--") && s.len() > 2
+                && s[1..].chars().all(|c| "dutq".contains(c)) =>
+            {
+                for c in s[1..].chars() {
+                    match c {
+                        'd' => directory = true,
+                        'u' => dry_run = true,
+                        't' => in_tmpdir = true,
+                        _ => quiet = true,
+                    }
+                }
+            }
             "-p" | "--tmpdir" => {
                 if i + 1 < args.len() && !args[i + 1].starts_with('-') {
                     i += 1;
@@ -70,8 +89,14 @@ pub fn run() -> i32 {
         i += 1;
     }
 
+    // a TEMPLATE alone is relative to the current directory, as in GNU mktemp; without
+    // one, or with -p/-t, it goes in the temporary directory
+    let base = match tmpdir {
+        Some(d) => d,
+        None if tmpl.is_none() || in_tmpdir => default_tmpdir(),
+        None => PathBuf::new(),
+    };
     let template = tmpl.unwrap_or_else(|| "tmp.XXXXXXXXXX".into());
-    let base = tmpdir.unwrap_or_else(default_tmpdir);
     let full_tmpl = if Path::new(&template).is_absolute() {
         PathBuf::from(&template)
     } else {
@@ -123,7 +148,7 @@ fn create_unique(full_tmpl: &str, directory: bool, dry_run: bool) -> Result<Stri
             return Ok(candidate);
         }
         let result = if directory {
-            fs::create_dir(&candidate)
+            fs::DirBuilder::new().mode(0o700).create(&candidate)
         } else {
             OpenOptions::new()
                 .write(true)

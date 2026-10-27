@@ -88,6 +88,21 @@ struct Parser {
 /// Parse and evaluate a full expression from `toks`. Errors if the tokens
 /// don't form a complete expression (trailing garbage) or contain a
 /// syntax/arithmetic error (division by zero, overflow, etc.).
+/// `STRING : REGEX`: a basic regular expression anchored at the start of STRING. With a
+/// `\( \)` group the result is what it matched (empty when nothing did), otherwise the
+/// number of characters matched.
+fn regex_match(s: &str, re: &str) -> Result<Val, String> {
+    let anchored = if re.starts_with('^') { re.to_string() } else { format!("^{re}") };
+    let rx = usercore::posix_regex::Regex::new(&anchored, false, false)?;
+    let groups = re.contains("\\(");
+    match rx.find(s, 0) {
+        Some(m) if groups => Ok(Val::Str(m[1].map_or(String::new(), |(a, b)| s[a..b].to_string()))),
+        Some(m) => Ok(Val::Int(m[0].map_or(0, |(a, b)| s[a..b].chars().count() as i64))),
+        None if groups => Ok(Val::Str(String::new())),
+        None => Ok(Val::Int(0)),
+    }
+}
+
 fn eval_tokens(toks: &[String]) -> Result<Val, String> {
     let mut p = Parser {
         toks: toks.to_vec(),
@@ -195,17 +210,17 @@ impl Parser {
     }
 
     fn parse_mul(&mut self) -> Result<Val, String> {
-        let mut left = self.parse_primary()?;
+        let mut left = self.parse_colon()?;
         loop {
             match self.peek() {
                 Some("*") | Some("\\*") => {
                     self.bump();
-                    let r = self.parse_primary()?.as_int()?;
+                    let r = self.parse_colon()?.as_int()?;
                     left = Val::Int(left.as_int()?.checked_mul(r).ok_or("integer overflow")?);
                 }
                 Some("/") => {
                     self.bump();
-                    let r = self.parse_primary()?.as_int()?;
+                    let r = self.parse_colon()?.as_int()?;
                     if r == 0 {
                         return Err("division by zero".into());
                     }
@@ -213,7 +228,7 @@ impl Parser {
                 }
                 Some("%") => {
                     self.bump();
-                    let r = self.parse_primary()?.as_int()?;
+                    let r = self.parse_colon()?.as_int()?;
                     if r == 0 {
                         return Err("division by zero".into());
                     }
@@ -221,6 +236,17 @@ impl Parser {
                 }
                 _ => break,
             }
+        }
+        Ok(left)
+    }
+
+    /// `STRING : REGEX` binds tighter than `*`, `/` and `%`.
+    fn parse_colon(&mut self) -> Result<Val, String> {
+        let mut left = self.parse_primary()?;
+        while self.peek() == Some(":") {
+            self.bump();
+            let re = self.parse_primary()?.as_str();
+            left = regex_match(&left.as_str(), &re)?;
         }
         Ok(left)
     }
@@ -237,6 +263,11 @@ impl Parser {
                     return Err("syntax error: expected ')'".into());
                 }
                 Ok(v)
+            }
+            "match" => {
+                let s = self.parse_primary()?.as_str();
+                let re = self.parse_primary()?.as_str();
+                regex_match(&s, &re)
             }
             "length" => {
                 let s = self.parse_primary()?.as_str();

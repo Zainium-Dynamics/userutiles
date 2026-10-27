@@ -20,6 +20,26 @@ use filetime::FileTime;
 
 use crate::error::{io_err, Result};
 
+/// The mode a copy gets without -p, as POSIX cp gives it: an existing destination keeps
+/// its own (`existing`), a new one gets the source's permission bits minus the umask.
+pub fn plain_mode(src: &Path, dest: &Path, existing: Option<u32>) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let mode = match existing {
+        Some(m) => m & 0o7777,
+        None => {
+            let src_mode = fs::metadata(src).map_err(|e| io_err(src, e))?.permissions().mode();
+            // SAFETY: umask() only swaps the process mask; it is put back at once
+            let mask = unsafe {
+                let m = libc::umask(0);
+                libc::umask(m);
+                m as u32
+            };
+            src_mode & 0o777 & !mask
+        }
+    };
+    fs::set_permissions(dest, fs::Permissions::from_mode(mode)).map_err(|e| io_err(dest, e))
+}
+
 /// Copy all POSIX metadata from `src` to `dest`.
 ///
 /// `src` is inspected with `symlink_metadata` so preserving a symlink's

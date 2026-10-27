@@ -15,6 +15,8 @@ pub fn run() -> i32 {
     let ui = Ui::new("tail");
     let mut lines: Option<u64> = Some(10);
     let mut bytes: Option<u64> = None;
+    // +NUM: starting with line or byte NUM rather than the last NUM
+    let mut from_start = false;
     let mut quiet = false;
     let mut verbose = false;
     let mut follow = false;
@@ -42,7 +44,7 @@ pub fn run() -> i32 {
                     ui.err("option requires an argument -- 'n'");
                     return 1;
                 }
-                match parse_count(&args[i]) {
+                match parse_count(&args[i]).inspect(|_| from_start = args[i].starts_with('+')) {
                     Ok(n) => {
                         lines = Some(n);
                         bytes = None;
@@ -59,7 +61,7 @@ pub fn run() -> i32 {
                     ui.err("option requires an argument -- 'c'");
                     return 1;
                 }
-                match parse_count(&args[i]) {
+                match parse_count(&args[i]).inspect(|_| from_start = args[i].starts_with('+')) {
                     Ok(n) => {
                         bytes = Some(n);
                         lines = None;
@@ -70,7 +72,7 @@ pub fn run() -> i32 {
                     }
                 }
             }
-            s if s.starts_with("-n") && s.len() > 2 => match parse_count(&s[2..]) {
+            s if s.starts_with("-n") && s.len() > 2 => match parse_count(&s[2..]).inspect(|_| from_start = s[2..].starts_with('+')) {
                 Ok(n) => {
                     lines = Some(n);
                     bytes = None;
@@ -121,9 +123,13 @@ pub fn run() -> i32 {
             let _ = writeln!(out, "==> {f} <==");
         }
         let r = if let Some(b) = bytes {
-            tail_bytes(f, b, &mut out)
+            if from_start { skip_bytes(f, b, &mut out) } else { tail_bytes(f, b, &mut out) }
         } else {
-            tail_lines(f, lines.unwrap_or(10), &mut out)
+            if from_start {
+                skip_lines(f, lines.unwrap_or(10), &mut out)
+            } else {
+                tail_lines(f, lines.unwrap_or(10), &mut out)
+            }
         };
         if let Err(e) = r {
             if e.kind() == io::ErrorKind::BrokenPipe {
@@ -199,6 +205,37 @@ fn tail_lines_from(mut reader: impl BufRead, n: u64, out: &mut impl Write) -> io
     for line in ring {
         out.write_all(&line)?;
     }
+    out.flush()
+}
+
+fn open_input(path: &str) -> io::Result<Box<dyn BufRead>> {
+    Ok(if path == "-" {
+        Box::new(BufReader::new(io::stdin()))
+    } else {
+        Box::new(BufReader::new(File::open(Path::new(path))?))
+    })
+}
+
+/// `-n +N`: `path` from its line N on.
+fn skip_lines(path: &str, n: u64, out: &mut impl Write) -> io::Result<()> {
+    let mut input = open_input(path)?;
+    let mut line = Vec::new();
+    let mut no = 0u64;
+    while input.read_until(b'\n', &mut line)? > 0 {
+        no += 1;
+        if no >= n.max(1) {
+            out.write_all(&line)?;
+        }
+        line.clear();
+    }
+    out.flush()
+}
+
+/// `-c +N`: `path` from its byte N on.
+fn skip_bytes(path: &str, n: u64, out: &mut impl Write) -> io::Result<()> {
+    let mut input = open_input(path)?;
+    io::copy(&mut (&mut input).take(n.saturating_sub(1)), &mut io::sink())?;
+    io::copy(&mut input, out)?;
     out.flush()
 }
 
