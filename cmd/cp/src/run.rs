@@ -57,6 +57,10 @@ pub fn run(args: Vec<String>) -> i32 {
         ui::fatal(&format!("target '{}' is not a directory", dest.display()));
     }
 
+    let backup = opts.backup.clone().or(opts.backup_short.then(|| "existing".to_string()));
+    let backup = backup.filter(|c| c != "none" && c != "off");
+    let suffix = opts.suffix.clone().or_else(|| std::env::var("SIMPLE_BACKUP_SUFFIX").ok()).unwrap_or_else(|| "~".into());
+
     let file_opts = FileCopyOpts {
         reflink: opts.reflink,
         sparse: opts.sparse,
@@ -91,6 +95,19 @@ pub fn run(args: Vec<String>) -> i32 {
             continue;
         }
 
+        let mut backed_up = None;
+        if let Some(control) = backup.as_deref() {
+            if fs::symlink_metadata(&effective_dest).is_ok_and(|m| !m.is_dir()) && !same_file(src, &effective_dest) {
+                let b = usercore::pathx::backup_name(&effective_dest, control, &suffix);
+                if let Err(e) = fs::rename(&effective_dest, &b) {
+                    ui::err(&format!("cannot backup '{}': {e}", effective_dest.display()));
+                    status = 1;
+                    continue;
+                }
+                backed_up = Some(b);
+            }
+        }
+
         let result = if opts.link || opts.symbolic_link {
             make_link(src, &effective_dest, &opts)
         } else {
@@ -109,7 +126,14 @@ pub fn run(args: Vec<String>) -> i32 {
         match result {
             Ok(()) => {
                 if opts.verbose {
-                    println!("'{}' -> '{}'", src.display(), effective_dest.display());
+                    match &backed_up {
+                        Some(b) => println!("'{}' -> '{}' (backup: '{}')", src.display(), effective_dest.display(), b.display()),
+                        None => println!("'{}' -> '{}'", src.display(), effective_dest.display()),
+                    }
+                    let copied_dir = recursive && !opts.link && !opts.symbolic_link;
+                    if copied_dir && (src_meta.is_dir() || (dereference && src.is_dir())) {
+                        list_tree(src, &effective_dest, dereference);
+                    }
                 }
             }
             Err(CpError::NoClobber(_)) => {
@@ -183,6 +207,26 @@ fn make_link(src: &Path, dest: &Path, opts: &Opts) -> Result<()> {
     }
 }
 
+fn same_file(a: &Path, b: &Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    matches!((fs::metadata(a), fs::metadata(b)), (Ok(x), Ok(y)) if x.dev() == y.dev() && x.ino() == y.ino())
+}
+
+/// `-v` on a directory copy: one line per copied entry, each directory before its contents.
+fn list_tree(src: &Path, dest: &Path, dereference: bool) {
+    let Ok(rd) = fs::read_dir(src) else { return };
+    let mut names: Vec<_> = rd.filter_map(|e| e.ok()).map(|e| e.file_name()).collect();
+    names.sort();
+    for n in names {
+        let (s, d) = (src.join(&n), dest.join(&n));
+        println!("'{}' -> '{}'", s.display(), d.display());
+        let is_dir = if dereference { s.is_dir() } else { fs::symlink_metadata(&s).is_ok_and(|m| m.is_dir()) };
+        if is_dir {
+            list_tree(&s, &d, dereference);
+        }
+    }
+}
+
 fn resolve_dereference(opts: &Opts, recursive: bool) -> bool {
     if opts.dereference {
         true
@@ -224,11 +268,8 @@ fn copy_single_file(
         return Ok(());
     }
 
-    if let (Ok(s), Ok(d)) = (fs::metadata(src), fs::metadata(dest)) {
-        use std::os::unix::fs::MetadataExt;
-        if s.dev() == d.dev() && s.ino() == d.ino() {
-            return Err(CpError::SameFile(src.to_owned(), dest.to_owned()));
-        }
+    if same_file(src, dest) {
+        return Err(CpError::SameFile(src.to_owned(), dest.to_owned()));
     }
     let existing = {
         use std::os::unix::fs::PermissionsExt;

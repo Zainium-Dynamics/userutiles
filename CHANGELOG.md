@@ -7,6 +7,15 @@ detailed per-utility rationale and file list behind each item.
 
 ## [Unreleased]
 
+### 1.3.0 — GNU behaviour, round 3
+- grep: -P (Perl regex: lookaround, backreferences), -b, -z; carriage returns stay in lines.
+- cp: --backup/-b/-S, -rv lists every copied entry. mv: -t, -T, -b/--backup, -S, -u, GNU -v/-n.
+- rm -rv lists removed subdirectories. tar keeps "./" member names. stat -t and -f -t in GNU terse form, %W/%w birth time, GNU fsid.
+- md5sum, sha*sum, b2sum: one shared front end with two-space lines, --tag, -b/-t, -z, -c with --quiet/--status/--strict/-w/--ignore-missing, b2sum -l. cksum -a (crc, crc32b, sysv, bsd, digests). sum -s format.
+- basenc rewritten (base64url, base32hex, base16, base2msbf/lsbf, z85, -i, -w 0); base64 and base32 run through it.
+- od rewritten: GNU layout and duplicate suppression, -j/-N/-S/-w/--endian, types a c d o u x f with sizes and z.
+- uniq -f/-s/-w/-D/--group/-z, cut --complement/--output-delimiter/-z, touch -t/-h/--time, readlink/realpath -e/-m/-s/--relative-to, env -C/-S/--unset, du -c/-d, chmod --reference/-c/-v.
+
 ### Fixed (2026-10-27 — second pass against GNU coreutils 9.12)
 - `find`: rewritten with GNU's expression grammar (`-o`, `-a`, `!`, `( )`, `,`) and
   actions (`-print0`, `-printf`, `-ls`, `-exec ... ;`, `-exec ... {} +`, `-execdir`,

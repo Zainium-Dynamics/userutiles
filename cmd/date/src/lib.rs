@@ -401,7 +401,7 @@ fn unit_of(w: &str) -> Option<(bool, i64)> {
 }
 
 /// A `-d` STRING: seconds and nanoseconds since the epoch.
-fn parse_date(input: &str, now: i64, now_ns: u32, utc: bool) -> Option<(i64, u32)> {
+pub fn parse_date(input: &str, now: i64, now_ns: u32, utc: bool) -> Option<(i64, u32)> {
     let s = input.trim().to_ascii_lowercase();
     if let Some(rest) = s.strip_prefix('@') {
         let (sec, frac) = match rest.split_once('.') {

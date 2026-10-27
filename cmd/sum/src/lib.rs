@@ -38,10 +38,11 @@ pub fn run() -> i32 {
     for f in &files {
         match if sysv { sum_sysv(f) } else { sum_bsd(f) } {
             Ok((c, blocks)) => {
+                let line = if sysv { format!("{c} {blocks}") } else { format!("{c:05} {blocks:5}") };
                 if files.len() > 1 || f != "-" {
-                    println!("{c:05} {blocks:5} {f}");
+                    println!("{line} {f}");
                 } else {
-                    println!("{c:05} {blocks}");
+                    println!("{line}");
                 }
             }
             Err(e) => {
@@ -77,7 +78,7 @@ fn read_all(path: &str) -> io::Result<Vec<u8>> {
 
 /// Compute the BSD-style 16-bit rotating checksum (`sum -r`) and 1024-byte
 /// block count for `path`.
-fn sum_bsd(path: &str) -> io::Result<(u16, u64)> {
+pub fn sum_bsd(path: &str) -> io::Result<(u16, u64)> {
     let data = read_all(path)?;
     let mut checksum: u16 = 0;
     for &b in &data {
@@ -92,7 +93,7 @@ fn sum_bsd(path: &str) -> io::Result<(u16, u64)> {
 
 /// Compute the System V-style 16-bit checksum (`sum -s`) and 512-byte block
 /// count for `path`.
-fn sum_sysv(path: &str) -> io::Result<(u16, u64)> {
+pub fn sum_sysv(path: &str) -> io::Result<(u16, u64)> {
     let data = read_all(path)?;
     let mut s: u32 = 0;
     for &b in &data {

@@ -21,6 +21,7 @@ pub fn run() -> i32 {
     let mut bytes = false;
     let mut max_depth: Option<usize> = None;
     let mut apparent = false;
+    let mut grand_total = false;
     let mut paths: Vec<PathBuf> = Vec::new();
 
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -40,6 +41,8 @@ pub fn run() -> i32 {
             "-a" | "--all" => all = true,
             "-b" | "--bytes" => bytes = true,
             "--apparent-size" => apparent = true,
+            "-c" | "--total" => grand_total = true,
+            "-k" | "-x" | "--one-file-system" | "-L" | "--dereference" | "-P" | "--no-dereference" => {}
             "-d" | "--max-depth" => {
                 i += 1;
                 if i >= args.len() {
@@ -51,6 +54,7 @@ pub fn run() -> i32 {
             s if s.starts_with("--max-depth=") => {
                 max_depth = s["--max-depth=".len()..].parse().ok();
             }
+            s if s.starts_with("-d") && s.len() > 2 => max_depth = s[2..].parse().ok(),
             s if s.starts_with('-') && s.len() > 1 && !s.starts_with("--") => {
                 for c in s.chars().skip(1) {
                     match c {
@@ -58,6 +62,8 @@ pub fn run() -> i32 {
                         's' => summarize = true,
                         'a' => all = true,
                         'b' => bytes = true,
+                        'c' => grand_total = true,
+                        'k' | 'x' | 'L' | 'P' => {}
                         _ => {
                             ui.err(&format!("invalid option -- '{c}'"));
                             return 1;
@@ -89,14 +95,18 @@ pub fn run() -> i32 {
     };
     let mut status = 0;
     let mut seen = HashSet::new();
+    let mut sum = 0u64;
     for p in &paths {
         match du_path(p, opts, 0, &mut seen) {
-            Ok(_total) => {}
+            Ok(total) => sum += total,
             Err(e) => {
-                ui.err(&format!("{}: {e}", p.display()));
+                ui.err(&format!("cannot access '{}': {e}", p.display()));
                 status = 1;
             }
         }
+    }
+    if grand_total {
+        print_size(sum, Path::new("total"), human, bytes);
     }
     status
 }
@@ -161,7 +171,8 @@ fn du_path(
     }
 
     let self_size = if bytes || apparent {
-        meta.len()
+        // as GNU du: only regular files and symlinks have a usable apparent size
+        if meta.is_file() || meta.is_symlink() { meta.len() } else { 0 }
     } else {
         // st_blocks is 512-byte units
         (meta.blocks() as u64) * 512

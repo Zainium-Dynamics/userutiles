@@ -1,63 +1,96 @@
 //! user realpath — print the resolved absolute path.
-use std::fs;
 use std::path::{Path, PathBuf};
 
+use usercore::pathx::{canonicalize_mode, Need};
 use usercore::Ui;
 
-/// Entry point for the `realpath` utility. Parses `std::env::args()` and
-/// prints the canonicalized (absolute, symlink-resolved) form of each
-/// `FILE`, optionally relative to `--relative-to=DIR`.
-///
-/// For a `FILE` that doesn't exist, falls back to printing its
-/// (non-canonicalized) absolute form rather than failing outright, unless
-/// the current directory itself can't be determined.
-///
-/// Returns 0 on success, 1 if any path could not be resolved at all (and
-/// `-q` was not given to suppress the error), or on a usage error.
+/// Entry point for `realpath`: each FILE's absolute, resolved path (`-E` by default:
+/// all but the last component must exist), relative to `--relative-to` / under
+/// `--relative-base` when given.
 pub fn run() -> i32 {
     let ui = Ui::new("realpath");
+    let mut need = Need::AllButLast;
+    let mut follow = true;
     let mut zero = false;
     let mut quiet = false;
     let mut relative_to: Option<PathBuf> = None;
+    let mut relative_base: Option<PathBuf> = None;
     let mut paths: Vec<PathBuf> = Vec::new();
-
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut i = 0;
+    let mut operands = false;
     while i < args.len() {
-        match args[i].as_str() {
+        let a = args[i].as_str();
+        if operands || !a.starts_with('-') || a == "-" {
+            paths.push(PathBuf::from(a));
+            i += 1;
+            continue;
+        }
+        match a {
+            "--" => operands = true,
             "-h" | "--help" => {
                 print!(
                     "Usage: realpath [OPTION]... FILE...\n\
- -z, --zero end each line with NUL\n\
- -q, --quiet suppress error messages\n\
- -s, --strip, --no-symlinks don't expand symlinks\n\
- --relative-to=DIR print relative to DIR\n"
+ Print the resolved absolute file name.\n\n\
+ -e, --canonicalize-existing  all components of the path must exist\n\
+ -E, --canonicalize           all but the last component must exist (default)\n\
+ -m, --canonicalize-missing   no path components need exist or be a directory\n\
+ -L, --logical                resolve '..' components before symlinks\n\
+ -P, --physical               resolve symlinks as encountered (default)\n\
+ -q, --quiet                  suppress most error messages\n\
+     --relative-to=DIR        print the resolved path relative to DIR\n\
+     --relative-base=DIR      print absolute paths unless paths below DIR\n\
+ -s, --strip, --no-symlinks   don't expand symlinks\n\
+ -z, --zero                   end each output line with NUL, not newline\n"
                 );
                 return 0;
             }
             "--version" => {
-                println!("realpath (user_utils) 0.1.0");
+                println!("realpath (user_utils) 0.2.0");
                 return 0;
             }
-            "-z" | "--zero" => zero = true,
-            "-q" | "--quiet" => quiet = true,
-            "-s" | "--strip" | "--no-symlinks" => {} // still canonicalize best-effort
-            s if s.starts_with("--relative-to=") => {
-                relative_to = Some(PathBuf::from(&s["--relative-to=".len()..]));
-            }
-            "--relative-to" => {
+            "--relative-to" | "--relative-base" => {
                 i += 1;
-                if i >= args.len() {
-                    ui.err("option requires an argument -- 'relative-to'");
+                let Some(v) = args.get(i) else {
+                    ui.err(&format!("option '{a}' requires an argument"));
                     return 1;
+                };
+                if a == "--relative-to" {
+                    relative_to = Some(PathBuf::from(v));
+                } else {
+                    relative_base = Some(PathBuf::from(v));
                 }
-                relative_to = Some(PathBuf::from(&args[i]));
             }
-            s if s.starts_with('-') && s != "-" => {
-                ui.err(&format!("invalid option -- '{s}'"));
+            s if s.starts_with("--relative-to=") => relative_to = Some(PathBuf::from(&s[14..])),
+            s if s.starts_with("--relative-base=") => relative_base = Some(PathBuf::from(&s[16..])),
+            "--canonicalize-existing" => need = Need::All,
+            "--canonicalize" => need = Need::AllButLast,
+            "--canonicalize-missing" => need = Need::Nothing,
+            "--logical" | "--strip" | "--no-symlinks" => follow = false,
+            "--physical" => follow = true,
+            "--quiet" => quiet = true,
+            "--zero" => zero = true,
+            s if !s.starts_with("--") => {
+                for c in s.chars().skip(1) {
+                    match c {
+                        'e' => need = Need::All,
+                        'E' => need = Need::AllButLast,
+                        'm' => need = Need::Nothing,
+                        'L' | 's' => follow = false,
+                        'P' => follow = true,
+                        'q' => quiet = true,
+                        'z' => zero = true,
+                        _ => {
+                            ui.err(&format!("invalid option -- '{c}'"));
+                            return 1;
+                        }
+                    }
+                }
+            }
+            s => {
+                ui.err(&format!("unrecognized option '{s}'"));
                 return 1;
             }
-            other => paths.push(PathBuf::from(other)),
         }
         i += 1;
     }
@@ -65,33 +98,47 @@ pub fn run() -> i32 {
         ui.err("missing operand");
         return 1;
     }
+    let resolve = |p: &Path| canonicalize_mode(p, need, follow);
+    let to = match relative_to.as_deref().map(resolve).transpose() {
+        Ok(t) => t,
+        Err(e) => {
+            ui.err(&format!("{}: {e}", relative_to.unwrap_or_default().display()));
+            return 1;
+        }
+    };
+    let base = match relative_base.as_deref().map(resolve).transpose() {
+        Ok(b) => b,
+        Err(e) => {
+            ui.err(&format!("{}: {e}", relative_base.unwrap_or_default().display()));
+            return 1;
+        }
+    };
+    // with both, --relative-to only applies when it is itself under --relative-base
+    let to = match (&to, &base) {
+        (Some(t), Some(b)) if !t.starts_with(b) => None,
+        _ => to,
+    };
     let end = if zero { "\0" } else { "\n" };
     let mut status = 0;
     for p in &paths {
-        match fs::canonicalize(p) {
+        match resolve(p) {
             Ok(abs) => {
-                let out = if let Some(ref base) = relative_to {
-                    match fs::canonicalize(base) {
-                        Ok(b) => pathdiff(&b, &abs),
-                        Err(_) => abs.display().to_string(),
-                    }
-                } else {
-                    abs.display().to_string()
+                let shown = match (&to, &base) {
+                    (Some(t), Some(b)) if abs.starts_with(b) => pathdiff(t, &abs),
+                    (Some(_), Some(_)) => abs.display().to_string(),
+                    (Some(t), None) => pathdiff(t, &abs),
+                    (None, Some(b)) if abs.starts_with(b) => pathdiff(b, &abs),
+                    _ => abs.display().to_string(),
                 };
-                print!("{out}{end}");
+                print!("{shown}{end}");
             }
             Err(e) => {
-                // if path does not exist, try absolute without resolve
-                if p.is_absolute() {
-                    print!("{}{end}", p.display());
-                } else if let Ok(cwd) = std::env::current_dir() {
-                    print!("{}{end}", cwd.join(p).display());
-                } else {
-                    if !quiet {
-                        ui.err(&format!("{}: {e}", p.display()));
-                    }
-                    status = 1;
+                if !quiet {
+                    let msg = e.to_string();
+                    let msg = msg.find(" (os error").map_or(msg.as_str(), |i| &msg[..i]).to_string();
+                    ui.err(&format!("{}: {msg}", p.display()));
                 }
+                status = 1;
             }
         }
     }

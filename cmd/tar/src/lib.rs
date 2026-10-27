@@ -387,10 +387,8 @@ fn glob(p: &str, n: &str) -> bool {
 
 fn add_path(out: &mut dyn Write, path: &Path, o: &Opts) -> io::Result<()> {
     let meta = fs::symlink_metadata(path)?;
+    // stored as given, like GNU tar ("." gives "./", "./e/"); only a leading '/' goes
     let mut name = path.to_string_lossy().trim_start_matches('/').to_string();
-    while let Some(r) = name.strip_prefix("./") {
-        name = r.to_string();
-    }
     if name.is_empty() {
         name = ".".into();
     }

@@ -65,9 +65,13 @@ fn non_symlink_target_errors() {
     let file = dir.join("plain.txt");
     fs::write(&file, b"hi").unwrap();
 
+    // quiet by default, as GNU readlink; -v reports it
     let (stdout, stderr, code) = run(&[file.to_str().unwrap()]);
     assert_eq!(code, 1);
     assert_eq!(stdout, "");
+    assert_eq!(stderr, "");
+    let (_, stderr, code) = run(&["-v", file.to_str().unwrap()]);
+    assert_eq!(code, 1);
     assert!(stderr.contains("readlink"));
 }
 

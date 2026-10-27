@@ -19,6 +19,7 @@ path = "src/main.rs"
 [dependencies]
 usercore = { path = "../../core" }
 libc = "0.2"
+fancy-regex = "0.16"
 
 
 [lints]

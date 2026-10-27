@@ -5,7 +5,7 @@ use std::io::{self, BufRead, BufReader, Write};
 use usercore::Ui;
 
 /// Options controlling how [`process`] filters adjacent matching lines.
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 struct Options {
     count: bool,
     repeated: bool,
@@ -13,6 +13,13 @@ struct Options {
     ignore_case: bool,
     skip_fields: usize,
     skip_chars: usize,
+    /// -w: compare at most this many characters
+    check_chars: Option<usize>,
+    /// -D / --all-repeated[=METHOD]: none, prepend, separate
+    all_repeated: Option<String>,
+    /// --group[=METHOD]: separate, prepend, append, both
+    group: Option<String>,
+    zero: bool,
 }
 
 /// Entry point for the `uniq` utility. Parses `std::env::args()`, then
@@ -48,6 +55,33 @@ pub fn run() -> i32 {
                 println!("uniq (user_utils) 0.1.0");
                 return 0;
             }
+            "-z" | "--zero-terminated" => opts.zero = true,
+            "-D" | "--all-repeated" => opts.all_repeated = Some("none".into()),
+            "--group" => opts.group = Some("separate".into()),
+            s if s.starts_with("--all-repeated=") => opts.all_repeated = Some(s[15..].to_string()),
+            s if s.starts_with("--group=") => opts.group = Some(s[8..].to_string()),
+            s if s.starts_with("--skip-fields=") || s.starts_with("--skip-chars=") || s.starts_with("--check-chars=") => {
+                let (k, v) = s.split_once('=').unwrap_or((s, ""));
+                let Ok(n) = v.parse::<usize>() else {
+                    ui.err(&format!("invalid number: '{v}'"));
+                    return 1;
+                };
+                match k {
+                    "--skip-fields" => opts.skip_fields = n,
+                    "--skip-chars" => opts.skip_chars = n,
+                    _ => opts.check_chars = Some(n),
+                }
+            }
+            "-w" | "--check-chars" => {
+                i += 1;
+                match args.get(i).and_then(|v| v.parse().ok()) {
+                    Some(n) => opts.check_chars = Some(n),
+                    None => {
+                        ui.err("invalid number of bytes to compare");
+                        return 1;
+                    }
+                }
+            }
             "-c" | "--count" => opts.count = true,
             "-d" | "--repeated" => opts.repeated = true,
             "-u" | "--unique" => opts.unique_only = true,
@@ -81,17 +115,41 @@ pub fn run() -> i32 {
                 }
             }
             s if s.starts_with('-') && s != "-" && !s.starts_with("--") => {
-                for c in s.chars().skip(1) {
-                    match c {
+                let chars: Vec<char> = s.chars().skip(1).collect();
+                let mut k = 0;
+                while k < chars.len() {
+                    match chars[k] {
                         'c' => opts.count = true,
                         'd' => opts.repeated = true,
                         'u' => opts.unique_only = true,
                         'i' => opts.ignore_case = true,
-                        _ => {
+                        'z' => opts.zero = true,
+                        'D' => opts.all_repeated = Some("none".into()),
+                        c @ ('f' | 's' | 'w') => {
+                            let inline: String = chars[k + 1..].iter().collect();
+                            let v = if inline.is_empty() {
+                                i += 1;
+                                args.get(i).cloned().unwrap_or_default()
+                            } else {
+                                inline
+                            };
+                            let Ok(n) = v.parse::<usize>() else {
+                                ui.err(&format!("invalid number: '{v}'"));
+                                return 1;
+                            };
+                            match c {
+                                'f' => opts.skip_fields = n,
+                                's' => opts.skip_chars = n,
+                                _ => opts.check_chars = Some(n),
+                            }
+                            break;
+                        }
+                        c => {
                             ui.err(&format!("invalid option -- '{c}'"));
                             return 1;
                         }
                     }
+                    k += 1;
                 }
             }
             other => files.push(other.to_string()),
@@ -137,84 +195,117 @@ pub fn run() -> i32 {
 }
 
 /// Read lines from `reader`, drop adjacent duplicates per `opts`, and write
-/// the surviving lines to `writer`.
-fn process(reader: impl BufRead, writer: &mut dyn Write, opts: &Options) -> io::Result<()> {
-    let mut prev: Option<String> = None;
-    let mut prev_key = String::new();
-    let mut n = 0u64;
-
-    for line in reader.lines() {
-        let line = line?;
-        let key = make_key(&line, opts.skip_fields, opts.skip_chars, opts.ignore_case);
-        if let Some(ref p) = prev {
-            if key == prev_key {
-                n = n.saturating_add(1);
-                continue;
+/// Group adjacent lines with equal keys and write what the options ask for.
+fn process(mut reader: impl BufRead, writer: &mut dyn Write, opts: &Options) -> io::Result<()> {
+    let term = if opts.zero { 0u8 } else { b'\n' };
+    let mut groups_seen = 0usize;
+    let mut group: Vec<String> = Vec::new();
+    let mut key = String::new();
+    let mut buf = Vec::new();
+    loop {
+        buf.clear();
+        let n = reader.read_until(term, &mut buf)?;
+        let line = if n == 0 {
+            None
+        } else {
+            if buf.last() == Some(&term) {
+                buf.pop();
             }
-            emit(writer, p, n, opts)?;
+            Some(String::from_utf8_lossy(&buf).into_owned())
+        };
+        let k = line.as_deref().map(|l| make_key(l, opts));
+        if group.is_empty() || k.as_ref() != Some(&key) {
+            if !group.is_empty() {
+                emit_group(writer, &group, opts, &mut groups_seen, term)?;
+            }
+            group.clear();
+            if let Some(k) = k {
+                key = k;
+            }
         }
-        prev = Some(line);
-        prev_key = key;
-        n = 1;
+        match line {
+            Some(l) => group.push(l),
+            None => break,
+        }
     }
-    if let Some(ref p) = prev {
-        emit(writer, p, n, opts)?;
+    if opts.group.as_deref().is_some_and(|m| m == "append" || m == "both") && groups_seen > 0 {
+        writer.write_all(&[term])?;
     }
     Ok(())
 }
 
-/// Write a single (possibly count-prefixed) output line, honoring
-/// `-d`/`-u` filtering.
-fn emit(out: &mut dyn Write, line: &str, n: u64, opts: &Options) -> io::Result<()> {
-    if opts.repeated && n < 2 {
+/// One run of equal lines.
+fn emit_group(out: &mut dyn Write, group: &[String], opts: &Options, seen: &mut usize, term: u8) -> io::Result<()> {
+    let line = |out: &mut dyn Write, l: &str| -> io::Result<()> {
+        out.write_all(l.as_bytes())?;
+        out.write_all(&[term])
+    };
+    if let Some(method) = &opts.group {
+        let sep_before = match method.as_str() {
+            "prepend" | "both" => true,
+            "separate" | "append" => *seen > 0,
+            _ => false,
+        };
+        if sep_before {
+            out.write_all(&[term])?;
+        }
+        for l in group {
+            line(out, l)?;
+        }
+        *seen += 1;
         return Ok(());
     }
-    if opts.unique_only && n != 1 {
+    if let Some(method) = &opts.all_repeated {
+        if group.len() < 2 {
+            return Ok(());
+        }
+        if (method == "prepend") || (method == "separate" && *seen > 0) {
+            out.write_all(&[term])?;
+        }
+        for l in group {
+            line(out, l)?;
+        }
+        *seen += 1;
+        return Ok(());
+    }
+    let n = group.len();
+    if (opts.repeated && n < 2) || (opts.unique_only && n != 1) {
         return Ok(());
     }
     if opts.count {
-        writeln!(out, "{n:7} {line}")
-    } else {
-        writeln!(out, "{line}")
+        out.write_all(format!("{n:7} ").as_bytes())?;
     }
+    line(out, &group[0])
 }
 
-/// Build the comparison key for `line`: skip the first `skip_fields`
-/// whitespace-separated fields, then the first `skip_chars` characters of
-/// what remains, optionally folding to lowercase for `-i`.
-fn make_key(line: &str, skip_fields: usize, skip_chars: usize, ignore_case: bool) -> String {
+/// The part of `line` compared: after `-f` fields (each blanks then non-blanks, the
+/// blanks before the next field kept) and `-s` characters, at most `-w` characters,
+/// lowercased for `-i`.
+fn make_key(line: &str, opts: &Options) -> String {
+    let blank = |c: char| c == ' ' || c == '\t';
     let mut s = line;
-    // skip fields (whitespace-separated)
-    let mut skipped = 0;
-    while skipped < skip_fields {
-        let rest = s.trim_start();
-        if rest.is_empty() {
-            s = rest;
-            break;
-        }
-        if let Some(pos) = rest.find(char::is_whitespace) {
-            s = rest[pos..].trim_start();
-        } else {
-            s = "";
-            break;
-        }
-        skipped += 1;
+    for _ in 0..opts.skip_fields {
+        let t = s.trim_start_matches(blank);
+        s = t.find(blank).map_or("", |p| &t[p..]);
     }
-    let s = if skip_chars > 0 {
-        s.chars().skip(skip_chars).collect::<String>()
+    let mut k: String = s.chars().skip(opts.skip_chars).collect();
+    if let Some(w) = opts.check_chars {
+        k = k.chars().take(w).collect();
+    }
+    if opts.ignore_case {
+        k.to_lowercase()
     } else {
-        s.to_string()
-    };
-    if ignore_case {
-        s.to_ascii_lowercase()
-    } else {
-        s
+        k
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn key(line: &str, skip_fields: usize, skip_chars: usize, ignore_case: bool) -> String {
+        make_key(line, &Options { skip_fields, skip_chars, ignore_case, ..Default::default() })
+    }
 
     fn run_process(input: &str, opts: Options) -> String {
         let mut out = Vec::new();
@@ -224,25 +315,25 @@ mod tests {
 
     #[test]
     fn make_key_plain() {
-        assert_eq!(make_key("hello world", 0, 0, false), "hello world");
+        assert_eq!(key("hello world", 0, 0, false), "hello world");
     }
 
     #[test]
     fn make_key_skip_fields() {
-        assert_eq!(make_key("a b c", 1, 0, false), "b c");
-        assert_eq!(make_key("a b c", 2, 0, false), "c");
-        assert_eq!(make_key("a b c", 10, 0, false), "");
+        assert_eq!(key("a b c", 1, 0, false), " b c");
+        assert_eq!(key("a b c", 2, 0, false), " c");
+        assert_eq!(key("a b c", 10, 0, false), "");
     }
 
     #[test]
     fn make_key_skip_chars() {
-        assert_eq!(make_key("hello", 0, 2, false), "llo");
-        assert_eq!(make_key("hi", 0, 10, false), "");
+        assert_eq!(key("hello", 0, 2, false), "llo");
+        assert_eq!(key("hi", 0, 10, false), "");
     }
 
     #[test]
     fn make_key_ignore_case() {
-        assert_eq!(make_key("HeLLo", 0, 0, true), "hello");
+        assert_eq!(key("HeLLo", 0, 0, true), "hello");
     }
 
     #[test]

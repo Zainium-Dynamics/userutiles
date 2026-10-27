@@ -21,8 +21,9 @@ pub fn run() -> i32 {
     let mut unsets: Vec<String> = Vec::new();
     let mut cmd: Vec<String> = Vec::new();
     let mut parsing_opts = true;
+    let mut chdir: Option<String> = None;
 
-    let args: Vec<String> = env::args().skip(1).collect();
+    let mut args: Vec<String> = env::args().skip(1).collect();
     let mut i = 0;
     while i < args.len() {
         let a = &args[i];
@@ -43,6 +44,90 @@ pub fn run() -> i32 {
                 "--version" => {
                     println!("env (user_utils) 0.1.0");
                     return 0;
+                }
+                "--" => {
+                    i += 1;
+                    // everything after is NAME=VALUE... COMMAND
+                    while let Some(a) = args.get(i).filter(|a| a.contains('=') && !a.starts_with('=')) {
+                        if let Some((k, v)) = a.split_once('=') {
+                            sets.push((k.to_string(), v.to_string()));
+                        }
+                        i += 1;
+                    }
+                    cmd.extend(args[i..].iter().cloned());
+                    break;
+                }
+                "-C" | "--chdir" => {
+                    i += 1;
+                    let Some(d) = args.get(i) else {
+                        ui.err("option requires an argument -- 'C'");
+                        return 125;
+                    };
+                    chdir = Some(d.clone());
+                    i += 1;
+                    continue;
+                }
+                s if s.starts_with("--chdir=") => {
+                    chdir = Some(s[8..].to_string());
+                    i += 1;
+                    continue;
+                }
+                s if s.starts_with("--unset=") => {
+                    unsets.push(s[8..].to_string());
+                    i += 1;
+                    continue;
+                }
+                // -S STRING / -SSTRING (a shebang's `env -S cmd args`): its words become arguments
+                s if s == "-S" || s == "--split-string" || s.starts_with("--split-string=") || (s.starts_with("-S") && s.len() > 2) => {
+                    let (text, used) = if let Some(t) = s.strip_prefix("--split-string=") {
+                        (t.to_string(), 1)
+                    } else if s.len() > 2 && s.starts_with("-S") {
+                        (s[2..].to_string(), 1)
+                    } else {
+                        (args.get(i + 1).cloned().unwrap_or_default(), 2)
+                    };
+                    let words = split_string(&text);
+                    args.splice(i..i + used, words);
+                    continue;
+                }
+                "-v" | "--debug" => {
+                    i += 1;
+                    continue;
+                }
+                s if s.starts_with("--default-signal") || s.starts_with("--ignore-signal") || s.starts_with("--block-signal") || s == "--list-signal-handling" => {
+                    i += 1;
+                    continue;
+                }
+                // bundled: -i0, -iu NAME, -iC DIR
+                s if s.len() > 2 && s.starts_with('-') && !s.starts_with("--") && s[1..].starts_with(['i', '0']) => {
+                    let chars: Vec<char> = s[1..].chars().collect();
+                    for (k, c) in chars.iter().enumerate() {
+                        match c {
+                            'i' => ignore_env = true,
+                            '0' => null = true,
+                            'u' | 'C' => {
+                                let inline: String = chars[k + 1..].iter().collect();
+                                let v = if inline.is_empty() {
+                                    i += 1;
+                                    args.get(i).cloned().unwrap_or_default()
+                                } else {
+                                    inline
+                                };
+                                if *c == 'u' {
+                                    unsets.push(v);
+                                } else {
+                                    chdir = Some(v);
+                                }
+                                break;
+                            }
+                            other => {
+                                ui.err(&format!("invalid option -- '{other}'"));
+                                return 125;
+                            }
+                        }
+                    }
+                    i += 1;
+                    continue;
                 }
                 "-" | "-i" | "--ignore-environment" => {
                     ignore_env = true;
@@ -78,7 +163,7 @@ pub fn run() -> i32 {
                 }
                 s if s.starts_with('-') => {
                     ui.err(&format!("invalid option -- '{s}'"));
-                    return 1;
+                    return 125;
                 }
                 _ => {
                     parsing_opts = false;
@@ -113,6 +198,12 @@ pub fn run() -> i32 {
         return 0;
     }
 
+    if let Some(d) = &chdir {
+        if let Err(e) = env::set_current_dir(d) {
+            ui.err(&format!("cannot change directory to '{d}': {e}"));
+            return 125;
+        }
+    }
     let mut command = Command::new(&cmd[0]);
     if cmd.len() > 1 {
         command.args(&cmd[1..]);
@@ -128,6 +219,60 @@ pub fn run() -> i32 {
     } else {
         126
     }
+}
+
+/// `-S`: the words of STRING, with '...' and "..." quoting, backslash escapes and
+/// ${NAME} from the environment.
+fn split_string(text: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut cur = String::new();
+    let mut have = false;
+    let mut quote: Option<char> = None;
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        match (quote, c) {
+            (Some(q), c) if c == q => quote = None,
+            (Some('\''), c) => cur.push(c),
+            (_, '\\') => {
+                match chars.next() {
+                    Some('t') => cur.push('\t'),
+                    Some('n') => cur.push('\n'),
+                    Some('_') if quote.is_none() => {
+                        words.push(std::mem::take(&mut cur));
+                        have = false;
+                        continue;
+                    }
+                    Some(o) => cur.push(o),
+                    None => {}
+                }
+                have = true;
+            }
+            (_, '$') if chars.peek() == Some(&'{') => {
+                chars.next();
+                let name: String = chars.by_ref().take_while(|c| *c != '}').collect();
+                cur.push_str(&env::var(&name).unwrap_or_default());
+                have = true;
+            }
+            (None, '\'' | '"') => {
+                quote = Some(c);
+                have = true;
+            }
+            (None, c) if c.is_whitespace() => {
+                if have {
+                    words.push(std::mem::take(&mut cur));
+                    have = false;
+                }
+            }
+            (_, c) => {
+                cur.push(c);
+                have = true;
+            }
+        }
+    }
+    if have {
+        words.push(cur);
+    }
+    words
 }
 
 /// Build the final environment from a `base` variable list (pass an empty

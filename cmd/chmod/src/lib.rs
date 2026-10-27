@@ -9,6 +9,8 @@ pub fn run() -> i32 {
     let mut recursive = false;
     let mut verbose = false;
     let mut changes = false;
+    let mut silent = false;
+    let mut reference: Option<PathBuf> = None;
     let args: Vec<String> = std::env::args().skip(1).collect();
 
     // strip flags
@@ -37,12 +39,24 @@ pub fn run() -> i32 {
             "-R" | "--recursive" => recursive = true,
             "-v" | "--verbose" => verbose = true,
             "-c" | "--changes" => changes = true,
+            "-f" | "--silent" | "--quiet" => silent = true,
+            "--preserve-root" | "--no-preserve-root" => {}
+            s if s.starts_with("--reference=") => reference = Some(PathBuf::from(&s[12..])),
+            "--reference" => {
+                i += 1;
+                reference = args.get(i).map(PathBuf::from);
+            }
+            // a mode such as -w or -x,o+r is not an option
+            s if s.len() > 1 && s.starts_with('-') && s[1..].chars().all(|c| "rwxXstugo=+-,".contains(c)) && s[1..].chars().any(|c| "rwxXst".contains(c)) && mode_str.is_none() => {
+                mode_str = Some(s.to_string());
+            }
             s if s.starts_with('-') && s.len() > 1 && !s.starts_with("--") => {
                 for c in s.chars().skip(1) {
                     match c {
                         'R' => recursive = true,
                         'v' => verbose = true,
                         'c' => changes = true,
+                        'f' => silent = true,
                         _ => {
                             eprintln!("chmod: invalid option -- '{c}'");
                             return 1;
@@ -51,7 +65,7 @@ pub fn run() -> i32 {
                 }
             }
             other => {
-                if mode_str.is_none() {
+                if mode_str.is_none() && reference.is_none() {
                     mode_str = Some(other.to_string());
                 } else {
                     paths.push(PathBuf::from(other));
@@ -61,6 +75,16 @@ pub fn run() -> i32 {
         i += 1;
     }
 
+    // --reference=RFILE: RFILE's mode, as octal
+    if let Some(r) = &reference {
+        match fs::metadata(r) {
+            Ok(m) => mode_str = Some(format!("{:o}", m.mode() & 0o7777)),
+            Err(e) => {
+                eprintln!("chmod: failed to get attributes of '{}': {e}", r.display());
+                return 1;
+            }
+        }
+    }
     let mode_str = match mode_str {
         Some(m) => m,
         None => {
@@ -85,7 +109,15 @@ pub fn run() -> i32 {
             continue;
         }
         if let Err(e) = chmod_path(p, &mode_str, recursive, verbose, changes) {
-            eprintln!("chmod: changing permissions of '{}': {e}", p.display());
+            if !silent {
+                let msg = e.to_string();
+                let msg = msg.find(" (os error").map_or(msg.as_str(), |i| &msg[..i]).to_string();
+                if fs::symlink_metadata(p).is_err() {
+                    eprintln!("chmod: cannot access '{}': {msg}", p.display());
+                } else {
+                    eprintln!("chmod: changing permissions of '{}': {msg}", p.display());
+                }
+            }
             status = 1;
         }
     }
@@ -128,16 +160,38 @@ fn apply_mode(path: &Path, mode_str: &str, verbose: bool, changes: bool) -> std:
         fs::set_permissions(path, fs::Permissions::from_mode(new))?;
         if verbose || changes {
             println!(
-                "mode of '{}' changed from {:04o} to {:04o}",
+                "mode of '{}' changed from {:04o} ({}) to {:04o} ({})",
                 path.display(),
                 old,
-                new
+                rwx(old),
+                new,
+                rwx(new)
             );
         }
     } else if verbose {
-        println!("mode of '{}' retained as {:04o}", path.display(), old);
+        println!("mode of '{}' retained as {:04o} ({})", path.display(), old, rwx(old));
     }
     Ok(())
+}
+
+/// `rwxr-xr-x` for the permission bits of `mode`, setuid/setgid/sticky shown as GNU does.
+fn rwx(mode: u32) -> String {
+    let mut s = String::new();
+    for (i, shift) in [6, 3, 0].iter().enumerate() {
+        let b = (mode >> shift) & 7;
+        s.push(if b & 4 != 0 { 'r' } else { '-' });
+        s.push(if b & 2 != 0 { 'w' } else { '-' });
+        let special = mode & [0o4000, 0o2000, 0o1000][i] != 0;
+        s.push(match (special, b & 1 != 0, i) {
+            (true, true, 2) => 't',
+            (true, false, 2) => 'T',
+            (true, true, _) => 's',
+            (true, false, _) => 'S',
+            (false, true, _) => 'x',
+            (false, false, _) => '-',
+        });
+    }
+    s
 }
 
 fn parse_mode(s: &str, current: u32) -> std::io::Result<u32> {

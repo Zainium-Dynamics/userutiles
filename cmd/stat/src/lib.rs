@@ -70,8 +70,11 @@ pub fn run() -> i32 {
         let result = match (&format, filesystem) {
             (Some((fmt, printf)), true) => format_fs(f, fmt, *printf),
             (Some((fmt, printf)), false) => format_file(f, fmt, *printf, deref),
+            // GNU's terse layouts (no SELinux context field: Zainium has no SELinux)
+            (None, true) if terse => format_fs(f, "%n %i %l %t %s %S %b %f %a %c %d", false),
+            (None, false) if terse => format_file(f, "%n %s %b %f %u %g %D %i %h %t %T %X %Y %Z %W %o", false, deref),
             (None, true) => print_fs(f),
-            (None, false) => print_file(f, terse, deref),
+            (None, false) => print_file(f, deref),
         };
         if let Err(e) = result {
             ui.err(&format!("{f}: {e}"));
@@ -118,29 +121,11 @@ fn file_type_label(ft: fs::FileType) -> &'static str {
 }
 
 /// Print status for a single file (or symlink, without following it) at
-/// `path`, in either terse (`-t`) or the default multi-line form.
-fn print_file(path: &str, terse: bool, deref: bool) -> io::Result<()> {
+/// `path`, in the default multi-line form.
+fn print_file(path: &str, deref: bool) -> io::Result<()> {
     let meta = if deref { fs::metadata(path)? } else { fs::symlink_metadata(path)? };
     let ft = meta.file_type();
     let file_type = file_type_label(ft);
-    if terse {
-        println!(
-            "{} {} {:o} {} {} {} {} {} {} {} {} {}",
-            path,
-            meta.len(),
-            meta.mode() & 0o7777,
-            meta.uid(),
-            meta.gid(),
-            meta.dev(),
-            meta.ino(),
-            meta.nlink(),
-            meta.atime(),
-            meta.mtime(),
-            meta.ctime(),
-            file_type
-        );
-        return Ok(());
-    }
     println!(" {} {}", "File:".bright_green(), path.bright_magenta());
     println!(
         " {} {} {} {}",
@@ -282,6 +267,11 @@ fn format_file(path: &str, fmt: &str, printf: bool, deref: bool) -> io::Result<(
     let fmt = if printf { escapes(fmt) } else { fmt.to_string() };
     let m = meta.mode();
     let rdev = meta.rdev();
+    let birth = meta
+        .created()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| (d.as_secs() as i64, i64::from(d.subsec_nanos())));
     let s = expand(&fmt, |d| {
         Some(match d {
             'a' => format!("{:o}", m & 0o7777),
@@ -307,8 +297,8 @@ fn format_file(path: &str, fmt: &str, printf: bool, deref: bool) -> io::Result<(
             'T' => format!("{:x}", libc::minor(rdev)),
             'u' => meta.uid().to_string(),
             'U' => usercore::nss::user_by_uid(meta.uid()).map(|u| u.name).unwrap_or_else(|| "UNKNOWN".into()),
-            'w' => "-".into(),
-            'W' => "0".into(),
+            'w' => birth.map_or("-".into(), |(s, ns)| human_time(s, ns)),
+            'W' => birth.map_or("0".into(), |(s, _)| s.to_string()),
             'x' => human_time(meta.atime(), meta.atime_nsec()),
             'X' => meta.atime().to_string(),
             'y' => human_time(meta.mtime(), meta.mtime_nsec()),
@@ -336,17 +326,26 @@ fn statvfs(path: &str) -> io::Result<libc::statvfs> {
     Ok(st)
 }
 
+/// The filesystem ID as GNU stat prints it: the fsid_t words, first word highest.
+/// (statvfs folds them the other way round, and musl keeps only the first.)
+fn fs_id(sf: &libc::statfs) -> u64 {
+    // SAFETY: fsid_t is two C ints; reading them as two u32 is a plain reinterpretation.
+    let w: [u32; 2] = unsafe { std::mem::transmute(sf.f_fsid) };
+    (u64::from(w[0]) << 32) | u64::from(w[1])
+}
+
 fn format_fs(path: &str, fmt: &str, printf: bool) -> io::Result<()> {
     let st = statvfs(path)?;
     let c = std::ffi::CString::new(path).map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "path contains NUL"))?;
     // SAFETY: as above, for statfs which also reports the filesystem type.
     let mut sf: libc::statfs = unsafe { std::mem::zeroed() };
     let fstype = if unsafe { libc::statfs(c.as_ptr(), &mut sf) } == 0 { sf.f_type as u64 } else { 0 };
+    let fsid = fs_id(&sf);
     let fmt = if printf { escapes(fmt) } else { fmt.to_string() };
     let s = expand(&fmt, |d| {
         Some(match d {
             'n' => path.to_string(),
-            'i' => format!("{:x}", st.f_fsid),
+            'i' => format!("{fsid:x}"),
             'l' => st.f_namemax.to_string(),
             't' => format!("{fstype:x}"),
             'T' => fs_name(fstype).into(),
@@ -410,6 +409,9 @@ fn print_fs(path: &str) -> io::Result<()> {
     // sound only on this success path (the early `return` above prevents
     // reaching here on failure).
     let st = unsafe { st.assume_init() };
+    // SAFETY: c is a valid C string and sf a zeroed out-buffer; on failure the ID stays 0.
+    let mut sf: libc::statfs = unsafe { std::mem::zeroed() };
+    unsafe { libc::statfs(c.as_ptr(), &mut sf) };
     let bsize = st.f_frsize;
     println!(
         " {} {}",
@@ -419,7 +421,7 @@ fn print_fs(path: &str) -> io::Result<()> {
     println!(
         " {} {} {} {}",
         "ID:".bright_green(),
-        format!("{:x}", st.f_fsid).bright_magenta(),
+        format!("{:x}", fs_id(&sf)).bright_magenta(),
         "Namelen:".bright_green(),
         (st.f_namemax).to_string().bright_magenta()
     );

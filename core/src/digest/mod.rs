@@ -1,6 +1,7 @@
 //! Pure-Rust digests for ZEX checksum tools (no external crypto crates).
 
 pub mod blake2b;
+pub mod cli;
 pub mod md5;
 pub mod sha1;
 pub mod sha2;

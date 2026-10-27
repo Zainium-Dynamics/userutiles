@@ -2,6 +2,7 @@
 use std::fs;
 use std::path::PathBuf;
 
+use usercore::pathx::{canonicalize_mode, Need};
 use usercore::Ui;
 
 /// Entry point for the `readlink` utility. Parses `std::env::args()` and,
@@ -12,10 +13,11 @@ use usercore::Ui;
 /// not given to suppress the error), or on a usage error.
 pub fn run() -> i32 {
     let ui = Ui::new("readlink");
-    let mut canonicalize = false;
+    let mut canonicalize: Option<Need> = None;
     let mut zero = false;
     let mut no_newline = false;
-    let mut quiet = false;
+    // GNU readlink is quiet unless -v
+    let mut quiet = true;
     let mut paths: Vec<PathBuf> = Vec::new();
 
     for arg in std::env::args().skip(1) {
@@ -36,19 +38,20 @@ pub fn run() -> i32 {
                 println!("readlink (user_utils) 0.1.0");
                 return 0;
             }
-            "-f"
-            | "--canonicalize"
-            | "-e"
-            | "--canonicalize-existing"
-            | "-m"
-            | "--canonicalize-missing" => canonicalize = true,
+            "-f" | "--canonicalize" => canonicalize = Some(Need::AllButLast),
+            "-e" | "--canonicalize-existing" => canonicalize = Some(Need::All),
+            "-m" | "--canonicalize-missing" => canonicalize = Some(Need::Nothing),
+            "-v" | "--verbose" => quiet = false,
             "-n" | "--no-newline" => no_newline = true,
             "-q" | "--quiet" | "--silent" | "-s" => quiet = true,
             "-z" | "--zero" => zero = true,
             s if s.starts_with('-') && s != "-" => {
                 for c in s.chars().skip(1) {
                     match c {
-                        'f' | 'e' | 'm' => canonicalize = true,
+                        'f' => canonicalize = Some(Need::AllButLast),
+                        'e' => canonicalize = Some(Need::All),
+                        'm' => canonicalize = Some(Need::Nothing),
+                        'v' => quiet = false,
                         'n' => no_newline = true,
                         'q' | 's' => quiet = true,
                         'z' => zero = true,
@@ -75,8 +78,8 @@ pub fn run() -> i32 {
     };
     let mut status = 0;
     for p in &paths {
-        let res = if canonicalize {
-            fs::canonicalize(p)
+        let res = if let Some(need) = canonicalize {
+            canonicalize_mode(p, need, true)
         } else {
             fs::read_link(p)
         };

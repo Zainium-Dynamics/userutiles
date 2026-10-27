@@ -9,6 +9,7 @@ use usercore::posix_regex::Regex;
 struct Opts {
     extended: bool,
     fixed: bool,
+    perl: bool,
     icase: bool,
     invert: bool,
     word: bool,
@@ -26,12 +27,22 @@ struct Opts {
     after: usize,
     before: usize,
     null: bool,
+    byte_offset: bool,
+    nul_data: bool,
     include: Vec<String>,
     exclude: Vec<String>,
     exclude_dir: Vec<String>,
 }
 
-const HELP: &str = "Usage: grep [OPTION]... PATTERNS [FILE]...\n  -E, -F, -G           extended / fixed-string / basic patterns (default -G)\n  -e PAT, -f FILE      use PAT / patterns from FILE (repeatable)\n  -i, -v, -w, -x       ignore case / invert / whole words / whole lines\n  -c, -l, -L, -q, -s   count / files with / files without / quiet / no file errors\n  -n, -o, -h, -H       line numbers / only matching / no names / with names\n  -m NUM               stop after NUM matches\n  -A, -B, -C NUM       context after / before / around\n  -r, -R               recurse into directories (--include, --exclude, --exclude-dir)\n  -Z, --null           NUL after file names\n";
+impl Opts {
+    fn set_kind(&mut self, c: char) {
+        self.extended = c == 'E';
+        self.fixed = c == 'F';
+        self.perl = c == 'P';
+    }
+}
+
+const HELP: &str = "Usage: grep [OPTION]... PATTERNS [FILE]...\n  -E, -F, -G, -P       extended / fixed-string / basic / Perl patterns (default -G)\n  -e PAT, -f FILE      use PAT / patterns from FILE (repeatable)\n  -i, -v, -w, -x       ignore case / invert / whole words / whole lines\n  -c, -l, -L, -q, -s   count / files with / files without / quiet / no file errors\n  -n, -b, -o           line numbers / byte offsets / only matching\n  -h, -H               no names / with names\n  -m NUM               stop after NUM matches\n  -A, -B, -C NUM       context after / before / around\n  -r, -R               recurse into directories (--include, --exclude, --exclude-dir)\n  -Z, --null           NUL after file names\n  -z, --null-data      lines end in NUL, not newline\n";
 
 pub fn run() -> i32 {
     // a closed pipe (`| head`) ends the program quietly instead of panicking
@@ -96,12 +107,12 @@ pub fn run() -> i32 {
                     println!("grep (user_utils) 0.2.0");
                     return 0;
                 }
-                "extended-regexp" => o.extended = true,
-                "fixed-strings" => o.fixed = true,
-                "basic-regexp" => {
-                    o.extended = false;
-                    o.fixed = false;
-                }
+                "extended-regexp" => o.set_kind('E'),
+                "fixed-strings" => o.set_kind('F'),
+                "basic-regexp" => o.set_kind('G'),
+                "perl-regexp" => o.set_kind('P'),
+                "byte-offset" => o.byte_offset = true,
+                "null-data" => o.nul_data = true,
                 "ignore-case" => o.icase = true,
                 "no-ignore-case" => o.icase = false,
                 "invert-match" => o.invert = true,
@@ -196,12 +207,9 @@ pub fn run() -> i32 {
                 break;
             }
             match c {
-                'E' => o.extended = true,
-                'F' => o.fixed = true,
-                'G' => {
-                    o.extended = false;
-                    o.fixed = false;
-                }
+                'E' | 'F' | 'G' | 'P' => o.set_kind(c),
+                'b' => o.byte_offset = true,
+                'z' => o.nul_data = true,
                 'i' | 'y' => o.icase = true,
                 'v' => o.invert = true,
                 'w' => o.word = true,
@@ -352,7 +360,8 @@ fn grep_one(path: &str, m: &Matcher, o: &Opts, show_name: bool, out: &mut dyn Wr
         Box::new(BufReader::new(File::open(path)?))
     };
     let label = if path == "-" { "(standard input)" } else { path };
-    let sep_name = |out: &mut dyn Write, sep: char| -> io::Result<()> {
+    let eol = if o.nul_data { b'\0' } else { b'\n' };
+    let name = |out: &mut dyn Write, sep: char| -> io::Result<()> {
         if show_name {
             write!(out, "{label}")?;
             if o.null {
@@ -363,18 +372,35 @@ fn grep_one(path: &str, m: &Matcher, o: &Opts, show_name: bool, out: &mut dyn Wr
         }
         Ok(())
     };
+    // name, line number and byte offset; `sep` is ':' on selected lines, '-' on context lines
+    let prefix = |out: &mut dyn Write, sep: char, lineno: usize, offset: usize| -> io::Result<()> {
+        name(out, sep)?;
+        if o.number {
+            write!(out, "{lineno}{sep}")?;
+        }
+        if o.byte_offset {
+            write!(out, "{offset}{sep}")?;
+        }
+        Ok(())
+    };
+    let emit = |out: &mut dyn Write, text: &str| -> io::Result<()> {
+        out.write_all(text.as_bytes())?;
+        out.write_all(&[eol])
+    };
 
     let mut selected = 0usize;
-    let mut before: std::collections::VecDeque<(usize, String)> = std::collections::VecDeque::new();
+    let mut before: std::collections::VecDeque<(usize, usize, String)> = std::collections::VecDeque::new();
     let mut after_left = 0usize;
     let mut last_printed: Option<usize> = None;
     let context = o.after > 0 || o.before > 0;
     let listing = o.quiet || o.files_with || o.files_without || o.count;
+    let mut offset = 0usize;
 
-    for (idx, raw) in reader.split(b'\n').enumerate() {
+    for (idx, raw) in reader.split(eol).enumerate() {
         let raw = raw?;
-        let line = String::from_utf8_lossy(&raw);
-        let line = line.strip_suffix('\r').map(str::to_string).unwrap_or_else(|| line.into_owned());
+        let line_off = offset;
+        offset += raw.len() + 1;
+        let line = String::from_utf8_lossy(&raw).into_owned();
         let lineno = idx + 1;
         let hit = m.is_match(&line) != o.invert;
         if hit {
@@ -386,35 +412,26 @@ fn grep_one(path: &str, m: &Matcher, o: &Opts, show_name: bool, out: &mut dyn Wr
             } else {
                 if context {
                     if let Some(lp) = last_printed {
-                        let first = before.front().map(|(n, _)| *n).unwrap_or(lineno);
+                        let first = before.front().map(|(n, _, _)| *n).unwrap_or(lineno);
                         if first > lp + 1 {
                             writeln!(out, "--")?;
                         }
                     } else if selected > 1 {
                         writeln!(out, "--")?;
                     }
-                    for (n, l) in before.drain(..) {
-                        sep_name(out, '-')?;
-                        if o.number {
-                            write!(out, "{n}-")?;
-                        }
-                        writeln!(out, "{l}")?;
+                    for (n, off, l) in before.drain(..) {
+                        prefix(out, '-', n, off)?;
+                        emit(out, &l)?;
                     }
                 }
                 if o.only && !o.invert {
-                    for part in m.find_all(&line) {
-                        sep_name(out, ':')?;
-                        if o.number {
-                            write!(out, "{lineno}:")?;
-                        }
-                        writeln!(out, "{part}")?;
+                    for (start, part) in m.find_all(&line) {
+                        prefix(out, ':', lineno, line_off + start)?;
+                        emit(out, part)?;
                     }
                 } else if !o.only {
-                    sep_name(out, ':')?;
-                    if o.number {
-                        write!(out, "{lineno}:")?;
-                    }
-                    writeln!(out, "{line}")?;
+                    prefix(out, ':', lineno, line_off)?;
+                    emit(out, &line)?;
                 }
                 last_printed = Some(lineno);
                 after_left = o.after;
@@ -425,14 +442,11 @@ fn grep_one(path: &str, m: &Matcher, o: &Opts, show_name: bool, out: &mut dyn Wr
         } else if !listing && context {
             if after_left > 0 {
                 after_left -= 1;
-                sep_name(out, '-')?;
-                if o.number {
-                    write!(out, "{lineno}-")?;
-                }
-                writeln!(out, "{line}")?;
+                prefix(out, '-', lineno, line_off)?;
+                emit(out, &line)?;
                 last_printed = Some(lineno);
             } else if o.before > 0 {
-                before.push_back((lineno, line));
+                before.push_back((lineno, line_off, line));
                 if before.len() > o.before {
                     before.pop_front();
                 }
@@ -441,14 +455,10 @@ fn grep_one(path: &str, m: &Matcher, o: &Opts, show_name: bool, out: &mut dyn Wr
     }
 
     if o.count {
-        sep_name(out, ':')?;
+        name(out, ':')?;
         writeln!(out, "{selected}")?;
     }
-    if o.files_with && selected > 0 {
-        write!(out, "{label}")?;
-        if o.null { write!(out, "\0")? } else { writeln!(out)? }
-    }
-    if o.files_without && selected == 0 {
+    if (o.files_with && selected > 0) || (o.files_without && selected == 0) {
         write!(out, "{label}")?;
         if o.null { write!(out, "\0")? } else { writeln!(out)? }
     }
@@ -458,6 +468,7 @@ fn grep_one(path: &str, m: &Matcher, o: &Opts, show_name: bool, out: &mut dyn Wr
 enum Matcher {
     Fixed { needles: Vec<String>, icase: bool, word: bool, line: bool },
     Re { res: Vec<Regex>, word: bool },
+    Perl { res: Vec<fancy_regex::Regex>, word: bool },
 }
 
 impl Matcher {
@@ -465,6 +476,16 @@ impl Matcher {
         if o.fixed {
             let needles = patterns.iter().map(|p| if o.icase { p.to_lowercase() } else { p.clone() }).collect();
             return Ok(Matcher::Fixed { needles, icase: o.icase, word: o.word, line: o.line });
+        }
+        if o.perl {
+            let res = patterns
+                .iter()
+                .map(|p| {
+                    let p = if o.line { format!("^(?:{p})$") } else { p.clone() };
+                    fancy_regex::RegexBuilder::new(&p).case_insensitive(o.icase).build().map_err(|e| e.to_string())
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            return Ok(Matcher::Perl { res, word: o.word });
         }
         let res = patterns
             .iter()
@@ -484,8 +505,9 @@ impl Matcher {
         !self.spans(line, true).is_empty()
     }
 
-    fn find_all<'a>(&self, line: &'a str) -> Vec<&'a str> {
-        self.spans(line, false).into_iter().filter(|(a, b)| b > a).map(|(a, b)| &line[a..b]).collect()
+    /// Non-empty matches with their byte offsets in the line.
+    fn find_all<'a>(&self, line: &'a str) -> Vec<(usize, &'a str)> {
+        self.spans(line, false).into_iter().filter(|(a, b)| b > a).map(|(a, b)| (a, &line[a..b])).collect()
     }
 
     /// Matched byte ranges, in order; with `first_only` it stops at the first one.
@@ -539,6 +561,22 @@ impl Matcher {
                     }
                 }
             }
+            Matcher::Perl { res, word } => {
+                for re in res {
+                    let mut from = 0;
+                    while from <= line.len() {
+                        let Ok(Some(m)) = re.find_from_pos(line, from) else { break };
+                        let (a, b) = (m.start(), m.end());
+                        if !*word || word_ok(a, b) {
+                            found.push((a, b));
+                            if first_only {
+                                return found;
+                            }
+                        }
+                        from = if b > a { b } else { a + line[a..].chars().next().map_or(1, char::len_utf8) };
+                    }
+                }
+            }
         }
         found.sort();
         found
@@ -578,7 +616,9 @@ mod tests {
 
     #[test]
     fn only_matching_parts() {
-        assert_eq!(m(&["[0-9][0-9]*"], |_| {}).find_all("a1b22c"), vec!["1", "22"]);
+        assert_eq!(m(&["[0-9][0-9]*"], |_| {}).find_all("a1b22c"), vec![(1, "1"), (3, "22")]);
+        assert_eq!(m(&[r"\d+(?= bar)"], |o| o.perl = true).find_all("foo12 bar"), vec![(3, "12")]);
+        assert!(m(&[r"(o)\1"], |o| o.perl = true).is_match("foo"));
     }
 
     #[test]

@@ -95,6 +95,18 @@ pub struct Opts {
     #[arg(short = 'd')]
     pub links: bool,
 
+    /// Make a backup of each existing destination file (CONTROL: none, numbered, existing, simple)
+    #[arg(long = "backup", value_name = "CONTROL", num_args = 0..=1, require_equals = true, default_missing_value = "existing")]
+    pub backup: Option<String>,
+
+    /// Like --backup but does not accept an argument
+    #[arg(short = 'b')]
+    pub backup_short: bool,
+
+    /// Override the usual backup suffix (~)
+    #[arg(short = 'S', long = "suffix", value_name = "SUFFIX")]
+    pub suffix: Option<String>,
+
     /// Copy only when SOURCE is newer than the destination, or destination is missing
     #[arg(short = 'u', long = "update")]
     pub update: bool,

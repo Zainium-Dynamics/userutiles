@@ -13,24 +13,49 @@ use usercore::Ui;
 /// option was given.
 pub fn run() -> i32 {
     let ui = Ui::new("cksum");
-    let mut files: Vec<String> = Vec::new();
-    for arg in std::env::args().skip(1) {
+    let mut algo = String::from("crc");
+    let mut rest: Vec<String> = Vec::new();
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
         match arg.as_str() {
             "-h" | "--help" => {
                 print!(
-                    "Usage: cksum [FILE]...\nPrint CRC checksum and byte counts of each FILE.\n"
+                    "Usage: cksum [OPTION]... [FILE]...\nPrint CRC checksum and byte counts of each FILE.\n\n  -a, --algorithm=TYPE  sysv, bsd, crc (default), crc32b, md5, sha1, sha224,\n                        sha256, sha384, sha512, blake2b\n      --untagged        plain HASH  FILE lines for the digest types\n  -c, --check, -l, --length, --tag, -z  as in md5sum / b2sum\n"
                 );
                 return 0;
             }
             "--version" => {
-                println!("cksum (user_utils) 0.1.0");
+                println!("cksum (user_utils) 0.2.0");
                 return 0;
             }
+            "-a" | "--algorithm" => match args.next() {
+                Some(v) => algo = v,
+                None => {
+                    ui.err("option requires an argument -- 'a'");
+                    return 1;
+                }
+            },
+            s if s.starts_with("--algorithm=") => algo = s["--algorithm=".len()..].to_string(),
+            s if s.starts_with("-a") => algo = s[2..].to_string(),
+            _ => rest.push(arg),
+        }
+    }
+    if let Some(a) = usercore::digest::cli::Algo::from_name(&algo) {
+        return usercore::digest::cli::run_args("cksum", a, rest, true);
+    }
+    if !matches!(algo.as_str(), "crc" | "crc32b" | "sysv" | "bsd") {
+        ui.err(&format!("invalid argument '{algo}' for '--algorithm'"));
+        return 1;
+    }
+    let mut files: Vec<String> = Vec::new();
+    for arg in rest {
+        match arg.as_str() {
+            "--untagged" | "--" => {}
             s if s.starts_with('-') && s != "-" => {
                 ui.err(&format!("invalid option -- '{s}'"));
                 return 1;
             }
-            other => files.push(other.to_string()),
+            _ => files.push(arg),
         }
     }
     if files.is_empty() {
@@ -38,14 +63,15 @@ pub fn run() -> i32 {
     }
     let mut status = 0;
     for f in &files {
-        match cksum_file(f) {
-            Ok((crc, len)) => {
-                if f == "-" && files.len() == 1 {
-                    println!("{crc} {len}");
-                } else {
-                    println!("{crc} {len} {f}");
-                }
-            }
+        let line = match algo.as_str() {
+            "bsd" => user_sum::sum_bsd(f).map(|(c, b)| format!("{c:05} {b:5}")),
+            "sysv" => user_sum::sum_sysv(f).map(|(c, b)| format!("{c} {b}")),
+            "crc32b" => read_all(f).map(|d| format!("{} {}", crc32b(&d), d.len())),
+            _ => cksum_file(f).map(|(crc, len)| format!("{crc} {len}")),
+        };
+        match line {
+            Ok(l) if f == "-" && files.len() == 1 => println!("{l}"),
+            Ok(l) => println!("{l} {f}"),
             Err(e) => {
                 ui.err(&format!("{f}: {e}"));
                 status = 1;
@@ -55,15 +81,32 @@ pub fn run() -> i32 {
     status
 }
 
-/// Read `path` (or standard input, for `-`) fully and compute its POSIX
-/// `cksum` CRC and byte length.
-fn cksum_file(path: &str) -> io::Result<(u32, u64)> {
+fn read_all(path: &str) -> io::Result<Vec<u8>> {
     let mut data = Vec::new();
     if path == "-" {
         io::stdin().read_to_end(&mut data)?;
     } else {
         File::open(path)?.read_to_end(&mut data)?;
     }
+    Ok(data)
+}
+
+/// CRC-32 as zlib/gzip compute it (`cksum -a crc32b`).
+fn crc32b(data: &[u8]) -> u32 {
+    let mut crc = !0u32;
+    for &b in data {
+        crc ^= u32::from(b);
+        for _ in 0..8 {
+            crc = if crc & 1 != 0 { (crc >> 1) ^ 0xedb8_8320 } else { crc >> 1 };
+        }
+    }
+    !crc
+}
+
+/// Read `path` (or standard input, for `-`) fully and compute its POSIX
+/// `cksum` CRC and byte length.
+fn cksum_file(path: &str) -> io::Result<(u32, u64)> {
+    let data = read_all(path)?;
     Ok((posix_crc(&data), data.len() as u64))
 }
 
@@ -113,6 +156,11 @@ mod tests {
     use super::*;
 
     // Reference vectors cross-checked against the system `cksum(1)`.
+    #[test]
+    fn crc32b_vector() {
+        assert_eq!(crc32b(b"123456789"), 0xcbf4_3926);
+    }
+
     #[test]
     fn posix_crc_empty_input() {
         assert_eq!(posix_crc(b""), 4294967295);

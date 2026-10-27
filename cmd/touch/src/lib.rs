@@ -14,13 +14,15 @@ pub fn run() -> i32 {
     let mut modify_only = false;
     let mut date_spec: Option<String> = None;
     let mut ref_file: Option<PathBuf> = None;
+    let mut stamp: Option<String> = None;
+    let mut no_deref = false;
     let mut files: Vec<PathBuf> = Vec::new();
 
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
-            "-h" | "--help" => {
+            "--help" => {
                 print!(
                     "Usage: touch [OPTION]... FILE...\n\
  Update the access and modification times of each FILE to the current time.\n\
@@ -28,7 +30,10 @@ pub fn run() -> i32 {
  -a change only the access time\n\
  -c, --no-create do not create any files\n\
  -d, --date=STRING parse STRING and use it instead of current time\n\
+ -h, --no-dereference affect each symbolic link instead of any referenced file\n\
  -m change only the modification time\n\
+ -t STAMP use [[CC]YY]MMDDhhmm[.ss] instead of current time\n\
+ --time=WORD change the specified time: access/atime/use or modify/mtime\n\
  -r, --reference=FILE use this file's times instead of current time\n\
  --help display this help and exit\n\
  --version output version information and exit\n\n\
@@ -42,6 +47,20 @@ pub fn run() -> i32 {
                 return 0;
             }
             "-a" => access_only = true,
+            "-h" | "--no-dereference" => no_deref = true,
+            "-f" => {}
+            "-t" => {
+                i += 1;
+                stamp = args.get(i).cloned();
+            }
+            s if s.starts_with("--time=") => match &s[7..] {
+                "access" | "atime" | "use" => access_only = true,
+                "modify" | "mtime" => modify_only = true,
+                other => {
+                    eprintln!("touch: invalid argument '{other}' for '--time'");
+                    return 1;
+                }
+            },
             "-m" => modify_only = true,
             "-c" | "--no-create" => no_create = true,
             "-d" | "--date" => {
@@ -62,6 +81,8 @@ pub fn run() -> i32 {
                         'a' => access_only = true,
                         'm' => modify_only = true,
                         'c' => no_create = true,
+                        'h' => no_deref = true,
+                        'f' => {}
                         _ => {
                             eprintln!("touch: invalid option -- '{ch}'");
                             return 1;
@@ -86,6 +107,30 @@ pub fn run() -> i32 {
         modify_only = true;
     }
 
+    // -t [[CC]YY]MMDDhhmm[.ss] is a date in the local zone
+    if let Some(t) = &stamp {
+        let (main, ss) = t.split_once('.').unwrap_or((t.as_str(), "00"));
+        let ok = main.bytes().all(|c| c.is_ascii_digit()) && matches!(main.len(), 8 | 10 | 12) && ss.len() == 2;
+        if !ok {
+            eprintln!("touch: invalid date format '{t}'");
+            return 1;
+        }
+        let (year, rest) = match main.len() {
+            12 => (main[..4].to_string(), &main[4..]),
+            10 => {
+                let yy: u32 = main[..2].parse().unwrap_or(0);
+                ((if yy < 69 { 2000 + yy } else { 1900 + yy }).to_string(), &main[2..])
+            }
+            _ => (String::new(), main),
+        };
+        // MMDDhhmm alone is this year: MM/DD takes the current year
+        date_spec = Some(if year.is_empty() {
+            format!("{}/{} {}:{}:{ss}", &rest[..2], &rest[2..4], &rest[4..6], &rest[6..8])
+        } else {
+            format!("{year}-{}-{} {}:{}:{ss}", &rest[..2], &rest[2..4], &rest[4..6], &rest[6..8])
+        });
+    }
+
     let times = match resolve_times(date_spec.as_deref(), ref_file.as_deref()) {
         Ok(t) => t,
         Err(e) => {
@@ -96,7 +141,7 @@ pub fn run() -> i32 {
 
     let mut status = 0;
     for path in &files {
-        if let Err(e) = touch_one(path, no_create, access_only, modify_only, times) {
+        if let Err(e) = touch_one(path, no_create || no_deref, access_only, modify_only, times, no_deref) {
             eprintln!("touch: cannot touch '{}': {e}", path.display());
             status = 1;
         }
@@ -126,10 +171,12 @@ fn resolve_times(date_spec: Option<&str>, ref_file: Option<&Path>) -> Result<Tim
         });
     }
     if let Some(spec) = date_spec {
-        let secs = parse_date(spec)?;
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e| e.to_string())?;
+        let (secs, nsec) = user_date::parse_date(spec, now.as_secs() as i64, now.subsec_nanos(), false)
+            .ok_or_else(|| format!("invalid date format '{spec}'"))?;
         let ts = libc::timespec {
-            tv_sec: secs,
-            tv_nsec: 0,
+            tv_sec: secs as libc::time_t,
+            tv_nsec: nsec as _,
         };
         return Ok(Times {
             atime: ts,
@@ -150,76 +197,15 @@ fn resolve_times(date_spec: Option<&str>, ref_file: Option<&Path>) -> Result<Tim
     })
 }
 
-/// Accept unix epoch seconds, or YYYY-MM-DD, or YYYY-MM-DDTHH:MM:SS (local).
-fn parse_date(s: &str) -> Result<i64, String> {
-    if let Ok(n) = s.parse::<i64>() {
-        return Ok(n);
-    }
-    // YYYY-MM-DD
-    let s = s.trim();
-    let (date, time) = if let Some((d, t)) = s.split_once('T') {
-        (d, t)
-    } else if let Some((d, t)) = s.split_once(' ') {
-        (d, t)
-    } else {
-        (s, "00:00:00")
-    };
-    let dparts: Vec<_> = date.split('-').collect();
-    if dparts.len() != 3 {
-        return Err(format!("invalid date format '{s}'"));
-    }
-    let year: i32 = dparts[0]
-        .parse()
-        .map_err(|_| format!("invalid date '{s}'"))?;
-    let mon: i32 = dparts[1]
-        .parse()
-        .map_err(|_| format!("invalid date '{s}'"))?;
-    let day: i32 = dparts[2]
-        .parse()
-        .map_err(|_| format!("invalid date '{s}'"))?;
-    let tparts: Vec<_> = time.split(':').collect();
-    let hour: i32 = tparts.first().and_then(|x| x.parse().ok()).unwrap_or(0);
-    let min: i32 = tparts.get(1).and_then(|x| x.parse().ok()).unwrap_or(0);
-    let sec: i32 = tparts
-        .get(2)
-        .and_then(|x| x.split('.').next())
-        .and_then(|x| x.parse().ok())
-        .unwrap_or(0);
-
-    // SAFETY: `libc::tm` (glibc) is a `#[repr(C)]` struct made up only of
-    // integer fields (`c_int`/`c_long`) and, on glibc, a `tm_zone: *const
-    // c_char` pointer field. The all-zero bit pattern is a valid value for
-    // every integer field and is a valid (null) value for the pointer field,
-    // so `mem::zeroed` cannot produce an invalid bit pattern here. Every
-    // field we actually rely on (`tm_year`..`tm_isdst`) is explicitly
-    // overwritten immediately below before the struct is used.
-    let mut tm = unsafe { std::mem::zeroed::<libc::tm>() };
-    tm.tm_year = year - 1900;
-    tm.tm_mon = mon - 1;
-    tm.tm_mday = day;
-    tm.tm_hour = hour;
-    tm.tm_min = min;
-    tm.tm_sec = sec;
-    tm.tm_isdst = -1;
-    // SAFETY: `&mut tm` coerces to a valid, non-null, properly aligned
-    // `*mut libc::tm` pointing at a fully-initialized stack value (all
-    // fields set above), which is exactly what `mktime` requires; it may
-    // normalize the fields in place but performs no out-of-bounds access.
-    let t = unsafe { libc::mktime(&mut tm) };
-    if t == -1 {
-        return Err(format!("invalid date '{s}'"));
-    }
-    Ok(t as i64)
-}
-
 fn touch_one(
     path: &Path,
     no_create: bool,
     access_only: bool,
     modify_only: bool,
     times: Times,
+    no_deref: bool,
 ) -> io::Result<()> {
-    if !path.exists() {
+    if path.symlink_metadata().is_err() {
         if no_create {
             return Ok(());
         }
@@ -234,7 +220,7 @@ fn touch_one(
     let mut at = times.atime;
     let mut mt = times.mtime;
     // UTIME_OMIT = max i64 on some; use libc::UTIME_OMIT if available
-    const UTIME_OMIT: i64 = (1i64 << 30) - 2; // glibc UTIME_OMIT
+    const UTIME_OMIT: i64 = libc::UTIME_OMIT as i64;
     if !access_only {
         at.tv_nsec = UTIME_OMIT;
     }
@@ -265,8 +251,9 @@ fn touch_one(
     // `ts.as_ptr()` points at both valid elements. `libc::AT_FDCWD` is the
     // documented sentinel telling the kernel to resolve `c` relative to the
     // current working directory rather than treating it as an fd, and flags
-    // `0` requests the default (non-symlink-following) behavior.
-    let rc = unsafe { libc::utimensat(libc::AT_FDCWD, c.as_ptr(), ts.as_ptr(), 0) };
+    // flags: AT_SYMLINK_NOFOLLOW for -h (the link itself), else 0 (what it points at).
+    let flags = if no_deref { libc::AT_SYMLINK_NOFOLLOW } else { 0 };
+    let rc = unsafe { libc::utimensat(libc::AT_FDCWD, c.as_ptr(), ts.as_ptr(), flags) };
     if rc != 0 {
         return Err(io::Error::last_os_error());
     }

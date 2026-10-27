@@ -185,6 +185,9 @@ fn remove_dir_recursive(
         let ft = entry.file_type()?;
         if ft.is_dir() && !ft.is_symlink() {
             remove_dir_recursive(&p, force, interactive, verbose)?;
+            if verbose {
+                println!("removed directory '{}'", p.display());
+            }
         } else {
             if interactive && !prompt(&format!("rm: remove '{}'? ", p.display())) {
                 continue;

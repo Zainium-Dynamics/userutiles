@@ -4,6 +4,13 @@ use std::io::{self, BufRead, BufReader, Write};
 
 use usercore::Ui;
 
+/// Output settings shared by all modes.
+struct Extra {
+    complement: bool,
+    out_delim: Option<Vec<u8>>,
+    term: u8,
+}
+
 #[derive(Clone)]
 enum Mode {
     Bytes(Vec<(usize, Option<usize>)>),
@@ -25,9 +32,19 @@ pub fn run() -> i32 {
     let mut mode: Option<Mode> = None;
     let mut delim = b'\t';
     let mut only_delimited = false;
+    let mut extra = Extra { complement: false, out_delim: None, term: b'\n' };
     let mut files: Vec<String> = Vec::new();
 
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    // --opt=VALUE as two arguments
+    let args: Vec<String> = std::env::args()
+        .skip(1)
+        .flat_map(|a| match a.split_once('=') {
+            Some((k @ ("--bytes" | "--characters" | "--fields" | "--delimiter" | "--output-delimiter"), v)) => {
+                vec![k.to_string(), v.to_string()]
+            }
+            _ => vec![a],
+        })
+        .collect();
     let mut i = 0;
     while i < args.len() {
         let a = &args[i];
@@ -51,6 +68,13 @@ pub fn run() -> i32 {
                 return 0;
             }
             "-s" | "--only-delimited" => only_delimited = true,
+            "--complement" => extra.complement = true,
+            "-z" | "--zero-terminated" => extra.term = 0,
+            "-n" => {}
+            "--output-delimiter" => {
+                i += 1;
+                extra.out_delim = args.get(i).map(|d| d.as_bytes().to_vec());
+            }
             "-b" | "--bytes" => {
                 i += 1;
                 if i >= args.len() {
@@ -189,7 +213,7 @@ pub fn run() -> i32 {
     let mut status = 0;
     let mut out = io::stdout().lock();
     for f in &files {
-        if let Err(e) = process_file(f, &mode, &mut out) {
+        if let Err(e) = process_file(f, &mode, &extra, &mut out) {
             if e.kind() == io::ErrorKind::BrokenPipe {
                 return 0;
             }
@@ -256,60 +280,70 @@ fn in_ranges(pos: usize, ranges: &[(usize, Option<usize>)]) -> bool {
 
 /// Read `path` (or stdin if `path == "-"`) line by line and write the
 /// selected bytes/characters/fields of each line to `out`, per `mode`.
-fn process_file(path: &str, mode: &Mode, out: &mut impl Write) -> io::Result<()> {
-    let reader: Box<dyn BufRead> = if path == "-" {
+fn process_file(path: &str, mode: &Mode, x: &Extra, out: &mut impl Write) -> io::Result<()> {
+    let mut reader: Box<dyn BufRead> = if path == "-" {
         Box::new(BufReader::new(io::stdin()))
     } else {
         Box::new(BufReader::new(File::open(path)?))
     };
-    for line in reader.lines() {
-        let line = line?;
+    let selected = |pos: usize, ranges: &[(usize, Option<usize>)]| in_ranges(pos, ranges) != x.complement;
+    let mut raw = Vec::new();
+    loop {
+        raw.clear();
+        if reader.read_until(x.term, &mut raw)? == 0 {
+            break;
+        }
+        if raw.last() == Some(&x.term) {
+            raw.pop();
+        }
+        let line = String::from_utf8_lossy(&raw).into_owned();
         match mode {
             Mode::Bytes(ranges) | Mode::Chars(ranges) => {
-                // For chars: treat as UTF-8 chars; for bytes: raw bytes.
-                let is_bytes = matches!(mode, Mode::Bytes(_));
-                if is_bytes {
-                    let b = line.as_bytes();
-                    for (i, &ch) in b.iter().enumerate() {
-                        if in_ranges(i + 1, ranges) {
-                            out.write_all(&[ch])?;
-                        }
-                    }
+                // characters as UTF-8 for -c, raw bytes for -b; --output-delimiter goes
+                // between selected runs that aren't adjacent
+                let units: Vec<Vec<u8>> = if matches!(mode, Mode::Bytes(_)) {
+                    raw.iter().map(|b| vec![*b]).collect()
                 } else {
-                    for (i, ch) in line.chars().enumerate() {
-                        if in_ranges(i + 1, ranges) {
-                            let mut buf = [0u8; 4];
-                            let s = ch.encode_utf8(&mut buf);
-                            out.write_all(s.as_bytes())?;
+                    line.chars().map(|c| c.to_string().into_bytes()).collect()
+                };
+                let mut prev: Option<usize> = None;
+                for (i, u) in units.iter().enumerate() {
+                    if selected(i + 1, ranges) {
+                        if let (Some(p), Some(d)) = (prev, &x.out_delim) {
+                            if p + 1 != i {
+                                out.write_all(d)?;
+                            }
                         }
+                        out.write_all(u)?;
+                        prev = Some(i);
                     }
                 }
-                out.write_all(b"\n")?;
+                out.write_all(&[x.term])?;
             }
             Mode::Fields {
                 ranges,
                 delim,
                 only_delimited,
             } => {
-                let d = *delim as char;
-                if !line.contains(d) {
+                if !raw.contains(delim) {
                     if !only_delimited {
-                        writeln!(out, "{line}")?;
+                        out.write_all(&raw)?;
+                        out.write_all(&[x.term])?;
                     }
                     continue;
                 }
-                let fields: Vec<&str> = line.split(d).collect();
+                let sep = x.out_delim.clone().unwrap_or_else(|| vec![*delim]);
                 let mut first = true;
-                for (i, field) in fields.iter().enumerate() {
-                    if in_ranges(i + 1, ranges) {
+                for (i, field) in raw.split(|b| b == delim).enumerate() {
+                    if selected(i + 1, ranges) {
                         if !first {
-                            out.write_all(&[*delim])?;
+                            out.write_all(&sep)?;
                         }
-                        out.write_all(field.as_bytes())?;
+                        out.write_all(field)?;
                         first = false;
                     }
                 }
-                out.write_all(b"\n")?;
+                out.write_all(&[x.term])?;
             }
         }
     }
@@ -355,7 +389,7 @@ mod tests {
             only_delimited: false,
         };
         let mut buf: Vec<u8> = Vec::new();
-        process_file(dir.to_str().unwrap(), &mode, &mut buf).unwrap();
+        process_file(dir.to_str().unwrap(), &mode, &Extra { complement: false, out_delim: None, term: b'\n' }, &mut buf).unwrap();
         assert_eq!(String::from_utf8(buf).unwrap(), "b\ne\n");
         std::fs::remove_file(&dir).ok();
     }
@@ -368,7 +402,7 @@ mod tests {
         ));
         let mode = Mode::Bytes(vec![(1, Some(1))]);
         let mut buf: Vec<u8> = Vec::new();
-        let result = process_file(missing.to_str().unwrap(), &mode, &mut buf);
+        let result = process_file(missing.to_str().unwrap(), &mode, &Extra { complement: false, out_delim: None, term: b'\n' }, &mut buf);
         assert!(result.is_err());
     }
 }

@@ -10,7 +10,6 @@
 use std::path::Path;
 use usercore::protect;
 
-use bytesize::ByteSize;
 use clap::Parser;
 use crossbeam_channel::unbounded;
 
@@ -98,25 +97,26 @@ pub fn run(args: Vec<String>) {
     }
 
     // ── Multi-source moves: all sources must go into a dest directory ─────────
-    if sources.len() > 1 && !dest.is_dir() {
-        ui::fatal("When moving multiple sources, the destination must be an existing directory.");
+    if opts.no_target_directory && sources.len() > 1 {
+        ui::fatal(&format!("extra operand '{}'", sources[1]));
     }
+    if sources.len() > 1 && !dest.is_dir() {
+        ui::fatal(&format!("target '{}' is not a directory", dest.display()));
+    }
+    let backup = opts.backup.clone().or(opts.backup_short.then(|| "existing".to_string()));
+    let suffix = opts.suffix.clone().or_else(|| std::env::var("SIMPLE_BACKUP_SUFFIX").ok()).unwrap_or_else(|| "~".into());
 
     // ── Process each source ───────────────────────────────────────────────────
     // silent unless asked: scripts and Makefiles call mv as POSIX mv
-    if opts.verbose {
-        ui::heading("mv — Move");
-    }
-
     for source_str in sources.iter() {
         let src = Path::new(source_str);
 
-        if !src.exists() {
-            ui::fatal(&format!("Source not found: '{}'", src.display()));
+        if src.symlink_metadata().is_err() {
+            ui::fatal(&format!("cannot stat '{}': No such file or directory", src.display()));
         }
 
         // Determine effective destination path.
-        let effective_dest: std::path::PathBuf = if dest.is_dir() {
+        let effective_dest: std::path::PathBuf = if dest.is_dir() && !opts.no_target_directory {
             dest.join(src.file_name().expect("source has no filename"))
         } else {
             dest.to_owned()
@@ -137,9 +137,19 @@ pub fn run(args: Vec<String>) {
             ));
         }
 
-        if opts.verbose {
-            ui::kv("Source", &src.display().to_string());
-            ui::kv("Dest", &effective_dest.display().to_string());
+        if opts.update && dest_is_newer(src, &effective_dest) {
+            continue;
+        }
+        if let Some(control) = backup.as_deref().filter(|c| *c != "none" && *c != "off") {
+            if effective_dest.symlink_metadata().is_ok() {
+                let b = usercore::pathx::backup_name(&effective_dest, control, &suffix);
+                if let Err(e) = std::fs::rename(&effective_dest, &b) {
+                    ui::fatal(&format!("cannot backup '{}': {e}", effective_dest.display()));
+                }
+                if opts.verbose {
+                    println!("renamed '{}' -> '{}'", effective_dest.display(), b.display());
+                }
+            }
         }
 
         // ── --trash-safe: send existing dest to Trash before overwriting ──────
@@ -159,10 +169,6 @@ pub fn run(args: Vec<String>) {
                 continue;
             }
         } else if opts.no_clobber && !opts.force && effective_dest.exists() {
-            ui::warn(&format!(
-                "Skipping '{}' — destination exists (--no-clobber).",
-                src.display()
-            ));
             continue;
         }
 
@@ -179,6 +185,14 @@ pub fn run(args: Vec<String>) {
         } else {
             move_cross_device(src, &effective_dest, &opts, &mut journal);
         }
+    }
+}
+
+/// `-u`: the destination exists and is not older than the source.
+fn dest_is_newer(src: &Path, dest: &Path) -> bool {
+    match (std::fs::symlink_metadata(src).and_then(|m| m.modified()), std::fs::symlink_metadata(dest).and_then(|m| m.modified())) {
+        (Ok(s), Ok(d)) => d >= s,
+        _ => false,
     }
 }
 
@@ -210,11 +224,7 @@ fn move_same_device(src: &Path, dest: &Path, opts: &Opts, journal: &mut Journal)
         Ok(()) => {
             commit_last(journal);
             if opts.verbose {
-                ui::ok(&format!(
-                    "'{}' → '{}' (atomic rename)",
-                    src.display(),
-                    dest.display()
-                ));
+                println!("renamed '{}' -> '{}'", src.display(), dest.display());
             }
         }
         Err(XmvError::Renameat2Unsupported) => {
@@ -223,11 +233,7 @@ fn move_same_device(src: &Path, dest: &Path, opts: &Opts, journal: &mut Journal)
             }
             commit_last(journal);
             if opts.verbose {
-                ui::ok(&format!(
-                    "'{}' → '{}' (rename fallback)",
-                    src.display(),
-                    dest.display()
-                ));
+                println!("renamed '{}' -> '{}'", src.display(), dest.display());
             }
         }
         Err(XmvError::NoClobber(_)) => {
@@ -241,18 +247,6 @@ fn move_same_device(src: &Path, dest: &Path, opts: &Opts, journal: &mut Journal)
 }
 
 fn move_cross_device(src: &Path, dest: &Path, opts: &Opts, journal: &mut Journal) {
-    let src_size: u64 = dir_size(src);
-
-    if opts.verbose {
-        ui::info(&format!(
-            "Cross-device move detected — copying {} ...",
-            ByteSize(src_size)
-        ));
-        ui::kv("Verify", if opts.verify { "XXH3-128" } else { "off" });
-        ui::kv("Archive", if opts.archive { "on" } else { "off" });
-        ui::kv("Jobs", &opts.jobs.to_string());
-        println!();
-    }
 
     if let Err(e) = journal.record(Operation::Move {
         src: src.to_owned(),
@@ -279,13 +273,8 @@ fn move_cross_device(src: &Path, dest: &Path, opts: &Opts, journal: &mut Journal
             let (files, bytes) = progress_handle.join().unwrap_or((0, 0));
             commit_last(journal);
             if opts.verbose {
-                ui::ok(&format!(
-                    "'{}' → '{}' ({} file(s), {})",
-                    src.display(),
-                    dest.display(),
-                    files,
-                    ByteSize(bytes),
-                ));
+                let _ = (files, bytes);
+                println!("renamed '{}' -> '{}'", src.display(), dest.display());
             }
         }
         Err(e) => {
@@ -299,17 +288,4 @@ fn move_cross_device(src: &Path, dest: &Path, opts: &Opts, journal: &mut Journal
 
 fn commit_last(journal: &mut Journal) {
     let _ = journal.commit_last();
-}
-
-fn dir_size(path: &Path) -> u64 {
-    if path.is_file() {
-        return path.metadata().map(|m| m.len()).unwrap_or(0);
-    }
-    walkdir::WalkDir::new(path)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
-        .filter_map(|e| e.metadata().ok())
-        .map(|m| m.len())
-        .sum()
 }

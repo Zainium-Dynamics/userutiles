@@ -74,11 +74,38 @@ pub struct Opts {
     /// Preserve all metadata during cross-device moves (permissions, timestamps, xattrs)
     #[arg(short = 'a', long = "archive")]
     pub archive: bool,
+
+    /// Move all SOURCE arguments into DIRECTORY
+    #[arg(short = 't', long = "target-directory", value_name = "DIRECTORY")]
+    pub target_directory: Option<String>,
+
+    /// Treat DEST as a normal file
+    #[arg(short = 'T', long = "no-target-directory")]
+    pub no_target_directory: bool,
+
+    /// Make a backup of each existing destination file (CONTROL: none, numbered, existing, simple)
+    #[arg(long = "backup", value_name = "CONTROL", num_args = 0..=1, require_equals = true, default_missing_value = "existing")]
+    pub backup: Option<String>,
+
+    /// Like --backup but does not accept an argument
+    #[arg(short = 'b')]
+    pub backup_short: bool,
+
+    /// Override the usual backup suffix (~)
+    #[arg(short = 'S', long = "suffix", value_name = "SUFFIX")]
+    pub suffix: Option<String>,
+
+    /// Move only when the SOURCE is newer than the destination or it is missing
+    #[arg(short = 'u', long = "update")]
+    pub update: bool,
 }
 
 impl Opts {
     /// Split trailing positionals into sources + dest.
     pub fn sources_and_dest(&self) -> (Vec<String>, String) {
+        if let Some(dir) = &self.target_directory {
+            return (self.paths.clone(), dir.clone());
+        }
         if self.paths.is_empty() {
             return (Vec::new(), String::new());
         }
