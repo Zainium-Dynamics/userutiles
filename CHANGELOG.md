@@ -7,6 +7,28 @@ detailed per-utility rationale and file list behind each item.
 
 ## [Unreleased]
 
+### Fixed (2026-10-27 — second pass against GNU coreutils 9.12)
+- `find`: rewritten with GNU's expression grammar (`-o`, `-a`, `!`, `( )`, `,`) and
+  actions (`-print0`, `-printf`, `-ls`, `-exec ... ;`, `-exec ... {} +`, `-execdir`,
+  `-delete`, `-prune`, `-quit`), plus `-iname -ipath -lname -regex -xtype -newer -perm
+  -user -group -uid -gid -links -inum -samefile -amin/-cmin/-mmin -readable -writable`,
+  `-L`, `-xdev`, `-depth`, GNU `-size` rounding, exit 1 for a missing start point.
+- `sort`: GNU keys (`-k F[.C][OPTS],F[.C][OPTS]`, `-t`), per-key options, last-resort
+  comparison (`-s` turns it off), `-u` by key, `-m` merge, `-c`/`-C`, `-o`, `-z`, `-g`,
+  `-d`, `-i`, `-R`.
+- `date`: `-d` takes `@N`, ISO 8601 (with `T`, zones, fractions), `MM/DD/YYYY`, month
+  names, am/pm, `now/today/yesterday/tomorrow/noon/midnight`, weekdays and relative items
+  (`+1 day`, `2 weeks ago`, `next month`); `-R`, `-I[...]`, `--rfc-3339`, `-f`, `-s`;
+  FORMAT through strftime with `%N %:z %q %P` and the `- _ 0 ^ #` flags.
+- `ls`: `-C -x -m` with GNU's column layout, `-l` columns sized to their widest entry,
+  `-g -o -n -G -s -Q -N -p -L -H -c -u -U -f -v -X --sort= --time= --format=
+  --group-directories-first -w -T`, GNU `-h` rounding, file operands before directories,
+  exit 2 for serious trouble, user/group names through the C library as a fallback.
+- `sed`: `N P D h H g G x l z F r R w W`, labels with `b t T`, `first~step`, `addr,+N`,
+  `addr,~N`, `0,/re/`, an empty regex reuses the last one, `\U \L \u \l \E` in
+  replacements, `s///w`, `-z`, `-l N`, no final newline added when the input had none,
+  GNU's `a\`/`i\`/`c\` text escapes.
+
 ### Fixed (2026-10-27 — compared against GNU coreutils 9.12)
 - `cp`: a new copy gets the source's mode minus the umask (it was always 644); no
   "Source/Dest" lines; `-v` prints `'a' -> 'b'`; copying a file onto itself fails;
