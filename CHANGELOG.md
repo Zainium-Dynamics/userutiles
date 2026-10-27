@@ -7,6 +7,28 @@ detailed per-utility rationale and file list behind each item.
 
 ## [Unreleased]
 
+### Fixed (2026-10-27 — compared against GNU coreutils 9.12)
+- `cp`: a new copy gets the source's mode minus the umask (it was always 644); no
+  "Source/Dest" lines; `-v` prints `'a' -> 'b'`; copying a file onto itself fails;
+  `-l`, `-s`, `--preserve[=LIST]`.
+- `install`: `-D`, `-t`/`--target-directory`, `-T`, `-s`, `-c`, `--mode=`, bundled
+  options (`-Dm644`).
+- `ln`: `-r`/`--relative`, `-t`/`--target-directory`, `-T`, `-L`/`-P`, `--`.
+- `test`: `! EXPR` and `( EXPR )` (POSIX rules by argument count), `-o` binding looser
+  than `-a`.
+- `expr`: `STRING : REGEX` and `match STRING REGEX` (what autoconf scripts use).
+- `head`: `-n -N` / `-c -N` (all but the last N), `--lines=`/`--bytes=`.
+- `tail`: `-n +N` / `-c +N` start at line/byte N (+N was read as the last N).
+- `wc`: GNU column widths (`wc -l < f` prints the bare number).
+- `printf`: flags, width, precision and `*`, `%e %g %a %u %q`, `\xHH`, `\NNN`,
+  `\uHHHH` escapes, 'c character values, GNU errors for bad numbers.
+- `seq`: no empty line for an empty sequence, `-f FORMAT`, `--separator=`, decimals as
+  in FIRST/INCREMENT (`seq 1.5 0.5 3` gives 1.5 2.0 2.5 3.0).
+- `mktemp`: a TEMPLATE alone is in the current directory, `-t`, directories 0700.
+- `xargs`: quotes and backslashes in input, `-L N`, `-d`/`--delimiter=` forms, `-I` takes
+  whole lines, exit status 123/124/125 like GNU.
+- `echo -e`: `\NNN` octal escapes; `ls`: exit status 2 for an operand it can't access.
+
 ### Added (2026-08-26 — agetty)
 - `agetty`: opens/reuses a tty, makes it the controlling terminal
   (`setsid` + `TIOCSCTTY`), prints `/etc/issue` with `\l`/`\n`/`\s`/`\r`/
