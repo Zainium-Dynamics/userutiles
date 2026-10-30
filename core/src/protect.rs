@@ -261,7 +261,7 @@ mod tests {
             Some(ProtectReason::ZaisysKernel)
         );
         assert_eq!(
-            removal_denied_resolved(Path::new("/overlayer/zaisys/kernel/linux-evl")),
+            removal_denied_resolved(Path::new("/overlayer/zaisys/kernel/linux-zainium")),
             Some(ProtectReason::ZaisysKernel)
         );
     }
@@ -292,7 +292,7 @@ mod tests {
             Some(ProtectReason::OverlayerTree)
         );
         assert_eq!(
-            modification_denied_resolved(Path::new("/overlayer/zaisys/kernel/linux-evl")),
+            modification_denied_resolved(Path::new("/overlayer/zaisys/kernel/linux-zainium")),
             Some(ProtectReason::ZaisysKernel)
         );
         assert_eq!(
