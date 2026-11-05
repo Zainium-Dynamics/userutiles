@@ -1,5 +1,4 @@
-//! user sed — stream editor on POSIX regex (BRE by default, ERE with -E/-r).
-//! Commands: s y d p q Q = a i c n { } with line, $, /re/ and range addresses, and `!`.
+//! user sed: stream editor on POSIX regex (BRE by default, ERE with -E/-r).
 use std::fs::File;
 use std::io::{self, Read, Write};
 use std::path::Path;
@@ -9,7 +8,6 @@ use usercore::{protect, Ui};
 
 /// Entry point: parse options and scripts, then stream every input through them.
 pub fn run() -> i32 {
-    // a closed pipe (`| head`) ends the program quietly instead of panicking
     // SAFETY: restoring the default SIGPIPE action has no preconditions.
     unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
     let ui = Ui::new("sed");
@@ -81,7 +79,6 @@ pub fn run() -> i32 {
                     return 1;
                 }
             },
-            // combined short flags such as -nE
             s if s.len() > 2 && s[1..].chars().all(|c| "nErsuz".contains(c)) => {
                 for c in s[1..].chars() {
                     match c {
@@ -233,8 +230,6 @@ fn edit_in_place(path: &str, suffix: &str, program: &Program, quiet: bool, term:
     }
     std::fs::rename(&tmp, path)
 }
-
-// ── script ────────────────────────────────────────────────────────────────────
 
 enum Addr {
     Line(usize),
@@ -627,7 +622,6 @@ impl Parser {
     /// a/i/c text: GNU one-liner (`a text`) or POSIX (`a\` newline text, `\` continues lines).
     fn text(&mut self) -> String {
         self.skip(|c| c == ' ' || c == '\t');
-        // `a\` is followed by the text, on the next line or (GNU) the same one
         if self.peek() == Some('\\') {
             self.i += 1;
             if self.peek() == Some('\n') {
@@ -645,7 +639,6 @@ impl Parser {
                     Some('n') => out.push('\n'),
                     Some('r') => out.push('\r'),
                     Some('v') => out.push('\u{b}'),
-                    // \cX: control-X
                     Some('c') => match self.next() {
                         Some(x) => out.push(((x.to_ascii_uppercase() as u8) ^ 0x40) as char),
                         None => break,
@@ -660,8 +653,6 @@ impl Parser {
         out
     }
 }
-
-// ── execution ─────────────────────────────────────────────────────────────────
 
 pub enum Flow {
     Continue,
@@ -686,7 +677,6 @@ struct State {
 impl State {
     fn new(prog: &Program, term: u8, line_len: usize) -> Self {
         let n = prog.cmds.len();
-        // every w file is created (emptied) before the first line, as GNU sed does
         let wfiles = prog
             .wfiles
             .iter()
@@ -730,7 +720,6 @@ impl State {
                     }
                     true
                 } else if hit(a) || (matches!(a, Addr::Zero) && n == 1 && !self.in_range[idx] && self.range_end[idx] == 0) {
-                    // 0,/re/: the range is already open on line 1, so /re/ can end it there
                     let zero = matches!(a, Addr::Zero);
                     if zero {
                         self.range_end[idx] = usize::MAX;
@@ -816,7 +805,6 @@ impl State {
         let mut buf: Vec<u8> = Vec::new();
         let mut ended = false;
         let flow = self.cycles(prog, lines, quiet, &mut buf, &mut ended);
-        // input without a final newline: neither has the output
         if ended && self.unterminated && buf.last() == Some(&self.term) {
             buf.pop();
         }
@@ -827,7 +815,6 @@ impl State {
     fn cycles(&mut self, prog: &Program, lines: Vec<String>, quiet: bool, out: &mut dyn Write, ended: &mut bool) -> io::Result<Flow> {
         let mut it = lines.into_iter().peekable();
         let mut space = String::new();
-        // D restarts the cycle with what is left instead of reading a line
         let mut reuse = false;
         loop {
             if !reuse {
@@ -908,7 +895,6 @@ impl State {
                     }
                     Op::Next => {
                         if it.peek().is_none() {
-                            // no next line: GNU sed ends here, printing as usual
                             break;
                         }
                         if !quiet {
@@ -1026,7 +1012,6 @@ fn substitute(re: &Regex, s: &str, repl: &str, global: bool, nth: usize) -> Opti
             out.push_str(&s[pos..me]);
         }
         if me == ms {
-            // empty match: copy one char and move on
             if let Some(c) = s[me..].chars().next() {
                 out.push(c);
                 pos = me + c.len_utf8();

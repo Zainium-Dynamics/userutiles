@@ -1,4 +1,4 @@
-//! user rev — reverse lines characterwise.
+//! user rev: reverse lines characterwise.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 
@@ -154,13 +154,9 @@ mod tests {
 
     #[test]
     fn unicode_multibyte_chars_reverse_correctly() {
-        // "héllo wörld" — should reverse by codepoint, not byte, so
-        // multi-byte UTF-8 sequences (é, ö) stay intact rather than
-        // becoming invalid byte garbage.
         let input = "héllo wörld\n";
         let out = rev_str(input, b'\n');
         assert_eq!(out, "dlröw olléh\n");
-        // Must still be valid UTF-8.
         assert!(out.is_char_boundary(out.len()));
     }
 

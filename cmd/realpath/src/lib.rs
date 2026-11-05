@@ -1,4 +1,4 @@
-//! user realpath — print the resolved absolute path.
+//! user realpath: print the resolved absolute path.
 use std::path::{Path, PathBuf};
 
 use usercore::pathx::{canonicalize_mode, Need};
@@ -113,7 +113,6 @@ pub fn run() -> i32 {
             return 1;
         }
     };
-    // with both, --relative-to only applies when it is itself under --relative-base
     let to = match (&to, &base) {
         (Some(t), Some(b)) if !t.starts_with(b) => None,
         _ => to,

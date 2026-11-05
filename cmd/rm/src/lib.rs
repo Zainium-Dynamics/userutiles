@@ -1,9 +1,4 @@
-//! user rm — remove files or directories.
-//!
-//! Zainium protected paths (never removable, even as root / with sudo):
-//! - `/overlayer/syshub` and everything under it
-//! - any `zaisys` directory and everything under it
-//! - any `zexlib` directory itself (contents *inside* zexlib may be deleted)
+//! user rm: remove files or directories.
 
 use std::fs;
 use std::io::{self, Write};
@@ -47,7 +42,7 @@ Zainium protected paths (not removable even as root):\n\
             }
             "-f" | "--force" => force = true,
             "-i" => interactive = true,
-            "-I" => {} // soft interactive — treat as non-fatal for automation
+            "-I" => {}
             "-r" | "-R" | "--recursive" => recursive = true,
             "-d" | "--dir" => dir_only = true,
             "-v" | "--verbose" => verbose = true,
@@ -88,7 +83,6 @@ Zainium protected paths (not removable even as root):\n\
     let mut status = 0;
     for p in &paths {
         if let Err(e) = remove_path(p, recursive, force, interactive, verbose, dir_only) {
-            // Protected paths always report (force cannot bypass Zainium guards).
             if protect::removal_denied(p).is_some() || !force || e.kind() != io::ErrorKind::NotFound
             {
                 eprintln!("rm: cannot remove '{}': {e}", p.display());
@@ -117,7 +111,6 @@ fn remove_path(
     verbose: bool,
     dir_only: bool,
 ) -> io::Result<()> {
-    // Refuse before any mutation — even with -f / root / sudo.
     protect_err(path)?;
 
     let meta = match fs::symlink_metadata(path) {
@@ -147,7 +140,6 @@ fn remove_path(
             }
             Ok(())
         } else {
-            // IsADirectory needs Rust 1.83; MSRV here is 1.70.
             Err(io::Error::new(io::ErrorKind::Other, "Is a directory"))
         }
     } else {
@@ -169,13 +161,11 @@ fn remove_dir_recursive(
     interactive: bool,
     verbose: bool,
 ) -> io::Result<()> {
-    // Directory itself must not be a protected root/tree.
     protect_err(path)?;
 
     for entry in fs::read_dir(path)? {
         let entry = entry?;
         let p = entry.path();
-        // Skip (and fail) protected children rather than wiping them via parent -rf.
         if let Some(reason) = protect::removal_denied(&p) {
             return Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,

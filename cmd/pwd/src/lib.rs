@@ -8,9 +8,9 @@ use std::path::Path;
 use usercore::Ui;
 
 /// Entry point for the `pwd` utility. Parses `std::env::args_os()` and
-/// prints the current working directory: logically (`-L`, default — trusts
+/// prints the current working directory: logically (`-L`, default: trusts
 /// `$PWD` from the environment when it still names the same directory as
-/// the real cwd) or physically (`-P` — always resolved via
+/// the real cwd) or physically (`-P`: always resolved via
 /// [`Path::canonicalize`], with all symlinks followed).
 ///
 /// Returns 0 on success, 1 if the current directory could not be
@@ -67,7 +67,7 @@ pub fn run() -> i32 {
 
 /// True if `pwd` (a candidate `$PWD` value) is an absolute, existing path
 /// that canonicalizes to the same directory as the actual current working
-/// directory — i.e. it's safe to trust `$PWD` verbatim (preserving any
+/// directory: i.e. it's safe to trust `$PWD` verbatim (preserving any
 /// symlink components a caller may have `cd`'d through) instead of falling
 /// back to [`env::current_dir`].
 fn logical_pwd_matches_cwd(pwd: &OsStr) -> bool {
@@ -114,8 +114,6 @@ mod tests {
 
     #[test]
     fn logical_pwd_rejects_different_existing_dir() {
-        // "/" exists and is absolute but (almost certainly) isn't the test
-        // process's cwd, so this must not be treated as a match.
         let cwd = env::current_dir().expect("current_dir");
         if cwd != Path::new("/") {
             assert!(!logical_pwd_matches_cwd(OsStr::new("/")));

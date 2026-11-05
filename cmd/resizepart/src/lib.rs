@@ -1,4 +1,4 @@
-//! user resizepart — tell the kernel a partition was resized.
+//! user resizepart: tell the kernel a partition was resized.
 use std::path::Path;
 
 use usercore::blkpg::{self, BLKPG_RESIZE_PARTITION};

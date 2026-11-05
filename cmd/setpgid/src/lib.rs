@@ -1,4 +1,4 @@
-//! user setpgid — run a program in a new process group.
+//! user setpgid: run a program in a new process group.
 use std::io;
 use std::os::fd::AsRawFd;
 use std::os::unix::process::CommandExt;
@@ -50,7 +50,6 @@ pub fn run() -> i32 {
     }
 
     // SAFETY: `setpgid(0, 0)` takes only plain integers ("the calling
-    // process", "make it its own group leader"); no pointer arguments.
     if unsafe { libc::setpgid(0, 0) } != 0 {
         ui.err(&format!(
             "failed to create new process group: {}",
@@ -66,8 +65,6 @@ pub fn run() -> i32 {
             .open("/dev/tty")
         {
             // SAFETY: `tcsetpgrp`/`getpgrp` take a valid open fd and plain
-            // integers; failure (e.g. no controlling tty) is reported via
-            // errno only and is intentionally ignored, matching setpgid(1).
             unsafe {
                 libc::tcsetpgrp(tty.as_raw_fd(), libc::getpgrp());
             }

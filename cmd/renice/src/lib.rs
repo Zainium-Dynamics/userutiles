@@ -1,5 +1,4 @@
-//! user renice — alter the scheduling priority of one or more running
-//! processes, process groups, or all processes owned by a user.
+//! user renice: alter the scheduling priority of one or more running
 use usercore::Ui;
 
 const HELP: &str = "Usage: renice [-n] <priority> [-g | -p | -u] <identifier>...\n\
@@ -19,10 +18,6 @@ enum Mode {
 }
 
 impl Mode {
-    // `__priority_which_t` doesn't exist in musl's libc bindings (only
-    // glibc's) — return a plain c_int and let `as _` at each call site
-    // coerce to whatever `getpriority`/`setpriority` actually expect on
-    // the target libc.
     fn which(self) -> libc::c_int {
         match self {
             Mode::Pid => libc::PRIO_PROCESS as libc::c_int,
@@ -148,12 +143,10 @@ fn lookup_uid(name: &str) -> Option<u32> {
 }
 
 /// Reads the current priority of a target, or `None` if it can't be
-/// determined (e.g. the target doesn't exist) — in which case we still
+/// determined (e.g. the target doesn't exist): in which case we still
 /// proceed to `setpriority` and let that report the real error.
 fn get_priority(mode: Mode, id: u32) -> Option<i32> {
     // SAFETY: plain-integer arguments only. `getpriority` can legitimately
-    // return -1 on success, so errno must be cleared first and checked to
-    // disambiguate from failure.
     unsafe {
         *libc::__errno_location() = 0;
         let rc = libc::getpriority(mode.which() as _, id);
@@ -167,8 +160,6 @@ fn get_priority(mode: Mode, id: u32) -> Option<i32> {
 
 fn apply_priority(mode: Mode, id: u32, priority: i32) -> Result<(), std::io::Error> {
     // SAFETY: `setpriority` takes only plain integer arguments; no pointers
-    // are involved, so this cannot cause UB regardless of `id`/`priority`
-    // (an invalid `id` simply fails with `ESRCH`, reported via errno).
     let rc = unsafe { libc::setpriority(mode.which() as _, id, priority) };
     if rc != 0 {
         Err(std::io::Error::last_os_error())
@@ -195,7 +186,6 @@ mod tests {
 
     #[test]
     fn resolve_id_looks_up_known_user() {
-        // "root" is always UID 0 on any real Linux system.
         assert_eq!(resolve_id(Mode::User, "root"), Ok(0));
     }
 

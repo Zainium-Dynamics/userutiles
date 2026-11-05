@@ -1,5 +1,4 @@
-//! user setsid — run a program in a new session, detached from the
-//! controlling terminal of the calling process.
+//! user setsid: run a program in a new session, detached from the
 use std::io;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
@@ -42,7 +41,6 @@ pub fn run() -> i32 {
             "-c" | "--ctty" => ctty = true,
             "-f" | "--fork" => force_fork = true,
             "-w" | "--wait" => wait = true,
-            // Combined short options, e.g. `-cfw`.
             s if s.starts_with('-') && !s.starts_with("--") && s.len() > 1 => {
                 for c in s[1..].chars() {
                     match c {
@@ -76,9 +74,6 @@ pub fn run() -> i32 {
     let mut to_run = Command::new(&cmd[0]);
     to_run.args(&cmd[1..]);
     // SAFETY: `prepare_child` only calls `setsid(2)` and, if requested,
-    // `ioctl(TIOCSCTTY)` — both are plain syscalls taking no pointers derived
-    // from Rust state, so they remain sound in the async-signal-restricted
-    // post-fork/pre-exec context.
     unsafe {
         to_run.pre_exec(move || prepare_child(ctty));
     }
@@ -122,7 +117,6 @@ fn prepare_child(take_controlling_tty: bool) -> io::Result<()> {
     }
     if take_controlling_tty {
         // SAFETY: wraps `ioctl(0, TIOCSCTTY, 1)`; no Rust-owned memory is
-        // passed, the `1` argument is a plain integer, not a pointer.
         let rc = unsafe { libc::ioctl(0, libc::TIOCSCTTY as _, 1) };
         if rc < 0 {
             return Err(io::Error::last_os_error());

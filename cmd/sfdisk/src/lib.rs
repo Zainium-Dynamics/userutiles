@@ -1,12 +1,4 @@
-//! user sfdisk — scriptable partition table tool.
-//!
-//! Script format is a simplified version of real `sfdisk`'s own dump
-//! format (`sfdisk -d` output is valid input here, modulo the metadata
-//! lines this parser ignores): an optional `label: dos|gpt` line,
-//! optional ignored metadata (`label-id:`, `device:`, `unit:`,
-//! `first-lba:`, `last-lba:`, `sector-size:`), then one partition per
-//! line as `[ignored-prefix :] start=N, size=N, type=T[, bootable][,
-//! name="..."]`.
+//! user sfdisk: scriptable partition table tool.
 use std::io::{self, Read};
 use std::path::Path;
 
@@ -43,8 +35,6 @@ fn parse_script(text: &str) -> (Label, Vec<Partition>) {
             continue;
         }
 
-        // Drop any "<name> : " prefix real sfdisk -d dumps prepend —
-        // find the actual field list by locating "start=".
         let fields_str = match line.find("start=") {
             Some(idx) => &line[idx..],
             None => continue,

@@ -1,4 +1,4 @@
-//! user seq — print a sequence of numbers.
+//! user seq: print a sequence of numbers.
 
 use usercore::Ui;
 
@@ -76,7 +76,6 @@ pub fn run() -> i32 {
                 continue;
             }
         }
-        // numeric or signed number can start with -
         nums.push(a.clone());
         i += 1;
     }
@@ -101,7 +100,6 @@ pub fn run() -> i32 {
         }
     };
 
-    // as many decimals as FIRST and INCREMENT have (seq 1.5 0.5 3: 1.5 2.0 2.5 3.0)
     let decimals = |s: &str| -> usize {
         if s.contains(['e', 'E']) {
             return 0;

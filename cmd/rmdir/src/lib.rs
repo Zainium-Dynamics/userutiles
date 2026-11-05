@@ -1,4 +1,4 @@
-//! user rmdir — remove empty directories.
+//! user rmdir: remove empty directories.
 use std::fs;
 use std::path::PathBuf;
 
@@ -73,7 +73,7 @@ pub fn run() -> i32 {
 }
 
 /// Remove a single directory `d`, updating `*status` to 1 and reporting via
-/// `ui` on failure — unless the only reason it failed was non-emptiness and
+/// `ui` on failure: unless the only reason it failed was non-emptiness and
 /// `ignore_fail` is set, in which case it's silently skipped.
 fn remove_one(d: &std::path::Path, ignore_fail: bool, verbose: bool, ui: &Ui, status: &mut i32) {
     if let Some(reason) = protect::removal_denied(d) {
@@ -214,10 +214,6 @@ mod tests {
 
     #[test]
     fn remove_with_ancestors_removes_empty_chain_and_stops_at_nonempty_container() {
-        // `container` holds a marker file so the ancestor walk is
-        // guaranteed to hit a non-empty directory and stop there
-        // deterministically, regardless of what else lives in the system
-        // temp directory.
         let container = scratch_dir("ancestors");
         fs::write(container.join("marker.txt"), b"keep me").unwrap();
         let nested = container.join("a").join("b");

@@ -1,4 +1,4 @@
-//! user readlink — print value of a symbolic link or canonical path.
+//! user readlink: print value of a symbolic link or canonical path.
 use std::fs;
 use std::path::PathBuf;
 
@@ -16,7 +16,6 @@ pub fn run() -> i32 {
     let mut canonicalize: Option<Need> = None;
     let mut zero = false;
     let mut no_newline = false;
-    // GNU readlink is quiet unless -v
     let mut quiet = true;
     let mut paths: Vec<PathBuf> = Vec::new();
 
@@ -96,7 +95,3 @@ pub fn run() -> i32 {
     status
 }
 
-// `run()`'s behavior (symlink resolution, `-f`/-`e`/`-m` canonicalization,
-// `-n`/`-z` delimiter selection, `-q` error suppression) is exercised
-// end-to-end against the real filesystem by the integration tests in
-// `tests/cli.rs`.
