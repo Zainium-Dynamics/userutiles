@@ -1,7 +1,5 @@
 use crate::error::{PrioError, Result};
 
-// -- I/O Scheduling Mode ------------------------------------------------------
-
 /// Linux I/O scheduling class exposed to the user.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IoMode {
@@ -42,16 +40,14 @@ impl std::fmt::Display for IoMode {
 impl IoMode {
     pub fn ioprio_value(&self) -> u32 {
         let (class, data): (u32, u32) = match self {
-            Self::Realtime => (1, 4), // RT class, mid priority
-            Self::High => (2, 0),     // BE class, highest
-            Self::Normal => (2, 4),   // BE class, mid
-            Self::Idle => (3, 7),     // Idle class, lowest
+            Self::Realtime => (1, 4),
+            Self::High => (2, 0),
+            Self::Normal => (2, 4),
+            Self::Idle => (3, 7),
         };
         (class << 13) | data
     }
 }
-
-// -- CPU Level → Niceness Conversion -----------------------------------------
 
 /// Map a user-supplied CPU level (0–100) to a Linux niceness value (-20..+19).
 ///
@@ -60,7 +56,6 @@ pub fn cpu_level_to_nice(level: u32) -> Result<i32> {
     if level > 100 {
         return Err(PrioError::InvalidCpuLevel(level));
     }
-    // nice = 19 − floor(level * 39 / 100)
     let nice = 19i32 - ((level as i32 * 39) / 100);
     Ok(nice.clamp(-20, 19))
 }
@@ -73,8 +68,6 @@ pub fn validate_nice(n: i32) -> Result<i32> {
         Err(PrioError::InvalidNiceness(n))
     }
 }
-
-// -- Human-readable labels ----------------------------------------------------
 
 /// Return a short label describing a niceness level for display purposes.
 pub fn nice_to_label(nice: i32) -> &'static str {
@@ -95,8 +88,6 @@ pub fn format_nice(nice: i32) -> String {
         std::cmp::Ordering::Greater => format!("+{}", nice),
     }
 }
-
-// -- Memory Parsing -----------------------------------------------------------
 
 /// Parse a human-readable memory string (e.g. "4G", "2.5G", "512M") to bytes.
 pub fn parse_memory(s: &str) -> crate::error::Result<u64> {

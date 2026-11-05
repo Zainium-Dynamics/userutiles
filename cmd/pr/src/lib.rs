@@ -1,4 +1,4 @@
-//! user pr — paginate or columnate files for printing (subset).
+//! user pr: paginate or columnate files for printing (subset).
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 
@@ -123,8 +123,6 @@ pub fn run() -> i32 {
             }
         }
     }
-    // This simplified `pr` does not implement multi-column layout, so the
-    // parsed page width is currently unused beyond validating `-w`'s argument.
     let _ = width;
     status
 }
@@ -133,18 +131,10 @@ pub fn run() -> i32 {
 /// headers.
 fn now_str() -> String {
     // SAFETY: `libc::tm` is a plain C struct of integers (no padding
-    // that must hold an invariant, no pointers/references inside on
-    // Linux) — the all-zero bit pattern is a valid value for it, so
-    // `mem::zeroed` cannot produce UB here.
     let mut tm = unsafe { std::mem::zeroed::<libc::tm>() };
     // SAFETY: `time(2)` with a null `tloc` argument just returns the
-    // current time and performs no pointer dereferencing; it cannot fail.
     let t = unsafe { libc::time(std::ptr::null_mut()) };
     // SAFETY: `t` is a valid, initialized `time_t` local and `tm` is a
-    // valid, initialized (zeroed) `libc::tm` local declared above, so
-    // `&t` and `&mut tm` are both valid non-null pointers of the
-    // expected types for `localtime_r(3)` to read from / write into;
-    // no aliasing since `t` and `tm` are distinct locals.
     unsafe {
         libc::localtime_r(&t, &mut tm);
     }
@@ -165,7 +155,6 @@ mod tests {
     #[test]
     fn now_str_has_expected_shape() {
         let s = now_str();
-        // "YYYY-MM-DD HH:MM" is 16 chars.
         assert_eq!(s.len(), 16);
         assert_eq!(s.as_bytes()[4], b'-');
         assert_eq!(s.as_bytes()[7], b'-');

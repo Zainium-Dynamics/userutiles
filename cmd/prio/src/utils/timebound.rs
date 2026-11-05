@@ -2,8 +2,6 @@ use std::time::Duration;
 
 use crate::error::{PrioError, Result};
 
-// -- Duration Parsing ---------------------------------------------------------
-
 /// Parse a duration string with a suffix: `30s`, `10m`, `2h`.
 /// Fractional values are **not** supported by design; keep the interface simple.
 ///
@@ -57,26 +55,17 @@ pub fn format_duration(d: Duration) -> String {
     }
 }
 
-// -- Time-Bound Priority Reset -------------------------------------------------
-
 /// Spawn a background thread that sleeps for `duration`, then resets `pid`'s
 /// niceness back to `original_nice`.
 ///
 /// The thread is detached (fire-and-forget). If the process has already
-/// exited when the timer fires, `setpriority` will silently fail — which is
+/// exited when the timer fires, `setpriority` will silently fail: which is
 /// the correct behaviour.
 pub fn schedule_reset(pid: u32, original_nice: i32, duration: Duration) {
     std::thread::spawn(move || {
         std::thread::sleep(duration);
         // SAFETY: `setpriority(2)` takes only plain integers, no
-        // pointers involved. `pid as libc::id_t` is a lossless `u32` ->
-        // `u32` widening on Linux, and `original_nice` is the caller's
-        // previously-resolved nice value which was already validated
-        // when it was first applied, so it lies within the kernel's
-        // legal `[-20, 19]` range. If the process has since exited, the
-        // call just fails with ESRCH, which is intentionally ignored.
         unsafe {
-            // Ignore the return code: if the PID is gone, nothing to do.
             libc::setpriority(libc::PRIO_PROCESS, pid as libc::id_t, original_nice);
         }
     });

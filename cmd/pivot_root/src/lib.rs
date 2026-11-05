@@ -1,4 +1,4 @@
-//! user pivot_root — change the root filesystem.
+//! user pivot_root: change the root filesystem.
 use std::ffi::CString;
 use std::io;
 
@@ -9,13 +9,12 @@ fn to_cstring(s: &str) -> io::Result<CString> {
 }
 
 /// `pivot_root(2)` has no libc wrapper (unlike `mount`/`umount2`), so it's
-/// called via the raw syscall — same approach `libc` itself uses for
+/// called via the raw syscall: same approach `libc` itself uses for
 /// syscalls it only exposes a `SYS_*` number for.
 fn pivot_root(new_root: &str, put_old: &str) -> io::Result<()> {
     let c_new = to_cstring(new_root)?;
     let c_old = to_cstring(put_old)?;
     // SAFETY: both `CString`s are valid, NUL-terminated, and kept alive
-    // for the call; `pivot_root(2)` takes only these two path arguments.
     let r = unsafe { libc::syscall(libc::SYS_pivot_root, c_new.as_ptr(), c_old.as_ptr()) };
     if r == -1 {
         Err(io::Error::last_os_error())
@@ -76,7 +75,6 @@ mod tests {
     #[test]
     fn pivot_root_unprivileged_fails_cleanly() {
         // SAFETY: `libc::geteuid` takes no arguments and cannot fail or
-        // cause UB.
         if unsafe { libc::geteuid() } != 0 {
             assert!(pivot_root("/tmp", "/tmp").is_err());
         }

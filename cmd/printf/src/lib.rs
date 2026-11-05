@@ -1,4 +1,4 @@
-//! user printf — format and print data.
+//! user printf: format and print data.
 use std::ffi::{CStr, CString};
 use std::io::{self, Write};
 
@@ -155,7 +155,6 @@ fn c_format(spec: &str, arg: CArg) -> Vec<u8> {
     loop {
         let p = buf.as_mut_ptr() as *mut libc::c_char;
         // SAFETY: buf has buf.len() bytes, f is NUL-terminated and the argument matches the
-        // conversion the caller built (lld / llu / a double conversion / s).
         let n = unsafe {
             match arg {
                 CArg::Int(v) => libc::snprintf(p, buf.len(), f.as_ptr(), v as libc::c_longlong),
@@ -338,7 +337,6 @@ fn format_once(fmt: &str, args: &[String], out: &mut Vec<u8>, ui: &Ui, status: &
                         }
                     }
                 }
-                // a NUL from %b ends the C string: write the bytes when no width applies
                 if spec == "%" || text.contains(&0) {
                     out.extend_from_slice(&text);
                 } else {

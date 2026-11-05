@@ -4,23 +4,9 @@ use crate::utils::priority::{format_memory, format_nice, nice_to_label};
 use crate::utils::process::ProcessInfo;
 use crate::utils::timebound::format_duration;
 
-// -- Colour Palette ------------------------------------------------------------
-//
-// Heading : bright cyan
-// Label key : soft green (bright green)
-// Value : bright magenta / purple
-// Negative nice: bright red / orange (bright_red)
-// Positive nice: yellow
-// Zero nice : bright magenta
-// Success (✓) : bright green
-// Error (✖) : bright red
-// Separator : dark grey / dim white
-
 const TICK: &str = "✓";
 const CROSS: &str = "✖";
 const ARROW: &str = "→";
-
-// -- Internal helpers ----------------------------------------------------------
 
 fn heading(s: &str) -> String {
     format!("{}", s.bright_cyan().bold())
@@ -76,8 +62,6 @@ fn blank() {
     println!();
 }
 
-// -- Mode 1 — Basic Priority with Command -------------------------------------
-
 /// Arguments for [`print_basic`]: the pre-spawn priority summary shown when
 /// launching a command without `--auto` or full-power mode.
 pub struct BasicArgs<'a> {
@@ -117,8 +101,6 @@ pub fn print_basic_success() {
     );
     blank();
 }
-
-// -- Mode 2 — Full Power Mode --------------------------------------------------
 
 /// Arguments for [`print_full_power`]: niceness, CPU/I/O/RAM, and duration
 /// for a full-power launch (nice + I/O + memory cap + time bound all set).
@@ -163,8 +145,6 @@ pub fn print_full_power_success(pid: u32, duration: std::time::Duration) {
     blank();
 }
 
-// -- Mode 3 — Quick Boost ------------------------------------------------------
-
 /// Arguments for [`print_boost`]: the process being boosted and its old/new
 /// niceness values.
 pub struct BoostArgs<'a> {
@@ -198,8 +178,6 @@ pub fn print_boost(args: &BoostArgs) {
     blank();
 }
 
-// -- Mode 4 — Process List -----------------------------------------------------
-
 /// Print the `--list` table: PID, name, niceness, CPU%, and status label for
 /// each process in `processes` (already sorted/truncated by the caller).
 pub fn print_process_list(processes: &[ProcessInfo]) {
@@ -207,7 +185,6 @@ pub fn print_process_list(processes: &[ProcessInfo]) {
     println!("{}", heading("Top Processes by Priority:"));
     blank();
 
-    // Header row
     println!(
         "  {} {} {} {} {}",
         format!("{:<7}", "PID").bright_cyan().bold(),
@@ -247,8 +224,6 @@ pub fn print_process_list(processes: &[ProcessInfo]) {
     blank();
 }
 
-// -- Mode 5 — Auto Mode --------------------------------------------------------
-
 /// Print the "Smart Mode Activated" panel shown when `--auto` throttling is
 /// enabled for a spawned command.
 pub fn print_auto_mode(command: &str) {
@@ -268,7 +243,7 @@ pub fn print_auto_mode(command: &str) {
 }
 
 /// Print one line of live `--auto` telemetry: current niceness, CPU temp,
-/// and load average (currently unused — the monitor thread in
+/// and load average (currently unused: the monitor thread in
 /// `core::monitor` runs silently; kept for a future `--auto --verbose` live
 /// view).
 #[allow(dead_code)]
@@ -290,8 +265,6 @@ pub fn print_auto_update(nice: i32, temp: Option<f32>, load: Option<f32>) {
     );
 }
 
-// -- Mode 6 — Reset ------------------------------------------------------------
-
 /// Print the `--reset` result panel: PID, old niceness, and confirmation
 /// that it's back to the system default (0).
 pub fn print_reset(pid: u32, old_nice: i32) {
@@ -309,8 +282,6 @@ pub fn print_reset(pid: u32, old_nice: i32) {
     );
     blank();
 }
-
-// -- Apply-to-PID (non-spawn) mode ---------------------------------------------
 
 /// Arguments for [`print_apply`]: the existing process being reconfigured
 /// via `--pid`, and the settings applied to it.
@@ -342,8 +313,6 @@ pub fn print_apply(args: &ApplyArgs) {
     blank();
 }
 
-// -- Error Display -------------------------------------------------------------
-
 /// Print a styled error panel for `err`, with an optional `hint` line
 /// suggesting a fix. Prefer [`print_prio_error`], which derives `hint`
 /// automatically via [`crate::error::PrioError::fix_hint`].
@@ -370,8 +339,6 @@ pub fn print_prio_error(err: &crate::error::PrioError) {
     let hint = err.fix_hint();
     print_error(err, hint.as_deref());
 }
-
-// -- Verbose Extras ------------------------------------------------------------
 
 /// If `verbose`, print the `prio` version/build/target banner shown at the
 /// start of every command when `-v`/`--verbose` is given; a no-op
@@ -414,8 +381,6 @@ pub fn print_waiting_for_exit(duration: std::time::Duration) {
         value(&format!("will revert after {}", format_duration(duration)))
     );
 }
-
-// -- Utilities -----------------------------------------------------------------
 
 /// Truncate a string to `max` chars, appending `…` if necessary.
 fn truncate(s: &str, max: usize) -> String {

@@ -1,4 +1,4 @@
-//! user paste — merge lines of files.
+//! user paste: merge lines of files.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 

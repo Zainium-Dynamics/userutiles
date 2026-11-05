@@ -1,4 +1,4 @@
-//! user pinky — lightweight finger (utmpx based).
+//! user pinky: lightweight finger (utmpx based).
 use std::io::{self, Write};
 
 use usercore::Ui;
@@ -90,15 +90,6 @@ fn fixed_cstr(buf: &[libc::c_char]) -> String {
 fn read_utmp() -> Vec<Entry> {
     let mut v = Vec::new();
     // SAFETY: `setutxent`/`getutxent`/`endutxent` are the standard utmpx-iteration
-    // triple, called with no arguments and used here in matched pairs on what is a
-    // single-threaded call path (they operate on process-global/thread-local
-    // state, not per-call-safe, but we don't call them concurrently). `getutxent`
-    // returns either NULL (checked before use) or a pointer to a `utmpx` owned by
-    // libc's internal static buffer, valid until the next `getutxent`/`setutxent`/
-    // `endutxent` call — we only read through `u` before advancing the iterator,
-    // and copy out owned `String`s (via `fixed_cstr`, which itself performs no
-    // unsafe/out-of-bounds access) before doing so. `(*u).ut_tv.tv_sec` is a plain
-    // integer field read, not a pointer.
     unsafe {
         libc::setutxent();
         loop {
@@ -126,9 +117,6 @@ fn read_utmp() -> Vec<Entry> {
 }
 
 fn fmt(epoch: i64) -> String {
-    // `libc::tm` has no `Default` impl, but every field is a public primitive
-    // (int/long/pointer), so we build a zeroed value with a plain struct literal
-    // instead of `mem::zeroed`, avoiding an unsafe block here.
     let mut tm = libc::tm {
         tm_sec: 0,
         tm_min: 0,
@@ -144,9 +132,6 @@ fn fmt(epoch: i64) -> String {
     };
     let t = epoch as libc::time_t;
     // SAFETY: `t` points to a valid, initialized `libc::time_t` on the stack and
-    // `tm` points to a valid, initialized `libc::tm` on the stack that outlives
-    // this call. `localtime_r` only reads through the first pointer and writes
-    // through the second, both for the duration of the call only.
     unsafe {
         libc::localtime_r(&t, &mut tm);
     }
@@ -165,8 +150,6 @@ mod tests {
 
     #[test]
     fn fixed_cstr_full_array_without_nul() {
-        // POSIX does not guarantee NUL-termination when the value fills the
-        // whole fixed-size field; iterating the array must not read past it.
         let buf: [libc::c_char; 4] = [b'w' as _, b'x' as _, b'y' as _, b'z' as _];
         assert_eq!(fixed_cstr(&buf), "wxyz");
     }

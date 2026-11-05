@@ -6,12 +6,9 @@ use std::time::Duration;
 
 use crate::config::AutoConfig;
 
-// -- System Sensors ------------------------------------------------------------
-
 /// Read the first readable CPU thermal zone temperature in degrees Celsius.
 /// Returns `None` if no thermal zone could be read (e.g. inside a container).
 fn read_cpu_temp() -> Option<f32> {
-    // Prefer coretemp or package temperature sensors, fall back to zone0.
     let candidates = [
         "/sys/class/thermal/thermal_zone0/temp",
         "/sys/class/thermal/thermal_zone1/temp",
@@ -45,8 +42,6 @@ fn cpu_count() -> f32 {
         .count()
         .max(1) as f32
 }
-
-// -- AutoMonitor ---------------------------------------------------------------
 
 /// Background monitor that dynamically adjusts a process's nice level based on
 /// CPU temperature and system load average.
@@ -89,7 +84,6 @@ impl AutoMonitor {
                     let cur = nice_clone.load(Ordering::Relaxed);
                     let mut new_nice = cur;
 
-                    // -- Temperature check ----------------------------------
                     if let Some(temp) = read_cpu_temp() {
                         if temp > temp_threshold {
                             new_nice = (cur + 2).min(19);
@@ -98,23 +92,14 @@ impl AutoMonitor {
                         }
                     }
 
-                    // -- Load-average check --------------------------------
                     if let Some(load) = read_load_avg() {
                         if load > cpus * load_multiplier {
                             new_nice = (new_nice + 1).min(19);
                         }
                     }
 
-                    // Apply if changed
                     if new_nice != cur {
                         // SAFETY: `setpriority(2)` only takes plain integers
-                        // (no pointers/buffers to validate); `pid` is a
-                        // `u32` widened to `id_t` (also `u32` on Linux), and
-                        // `new_nice` is clamped to `[base_nice, 19]` above,
-                        // well within the kernel's accepted `[-20, 19]`
-                        // range. If `pid` no longer exists the call simply
-                        // returns -1/ESRCH, which is handled by the `rc ==
-                        // 0` check below — no UB in either case.
                         let rc = unsafe {
                             libc::setpriority(libc::PRIO_PROCESS, pid as libc::id_t, new_nice)
                         };
@@ -146,8 +131,6 @@ impl Drop for AutoMonitor {
         self.stop();
     }
 }
-
-// -- Public sensor accessors (used for verbose display) -----------------------
 
 #[allow(dead_code)]
 pub fn current_temp() -> Option<f32> {

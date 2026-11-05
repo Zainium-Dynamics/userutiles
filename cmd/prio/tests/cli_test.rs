@@ -1,10 +1,3 @@
-// cli_test.rs — Binary-level CLI tests for prio.
-//
-// Unit-level tests for pure functions live as inline `#[cfg(test)]` blocks
-// inside `src/utils/priority.rs` and `src/utils/timebound.rs`, run via
-// `cargo test --bin prio`. Tests here exercise the compiled binary through
-// assert_cmd.
-
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use std::process::Command;

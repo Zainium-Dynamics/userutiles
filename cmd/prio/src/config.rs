@@ -43,8 +43,6 @@ pub struct ListConfig {
     pub max_processes: usize,
 }
 
-// -- Defaults ----------------------------------------------------------------
-
 impl Default for DefaultsConfig {
     fn default() -> Self {
         Self {
@@ -70,8 +68,6 @@ impl Default for ListConfig {
         Self { max_processes: 15 }
     }
 }
-
-// -- Loading ------------------------------------------------------------------
 
 impl Config {
     /// Load configuration from `~/.config/prio/config.toml`.
@@ -120,10 +116,7 @@ fn config_path() -> Option<PathBuf> {
 /// Minimal home-directory lookup without pulling in `dirs` crate.
 fn dirs_next() -> Option<PathBuf> {
     std::env::var_os("HOME").map(PathBuf::from).or_else(|| {
-        // Fallback: parse /etc/passwd for the current UID.
         // SAFETY: `getuid(2)` takes no arguments, performs no pointer
-        // dereferencing, and cannot fail — it is a pure syscall wrapper
-        // that always succeeds, regardless of process state.
         let uid = unsafe { libc::getuid() };
         std::fs::read_to_string("/etc/passwd")
             .ok()

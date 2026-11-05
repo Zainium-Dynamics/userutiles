@@ -6,26 +6,16 @@ pub struct ProcessInfo {
     pub pid: u32,
     pub name: String,
     pub nice: i32,
-    pub cpu: f32, // percentage (per-core, may exceed 100 on multi-core)
+    pub cpu: f32,
     #[allow(dead_code)]
-    pub memory: u64, // resident set size in bytes
+    pub memory: u64,
 }
-
-// -- Niceness via libc --------------------------------------------------------
 
 /// Read the current nice value for `pid` using `getpriority(2)`.
 /// Returns 0 on any failure (safe default for display).
 pub fn get_nice(pid: u32) -> i32 {
     // SAFETY: `__errno_location()` returns a pointer to the calling
-    // thread's `errno` TLS cell, which is always valid to write/read from
-    // this single thread — no aliasing or lifetime issues. `getpriority`
-    // takes only plain integers (`pid` widened to `id_t`, also `u32` on
-    // Linux) and dereferences nothing on the caller's side; a PID that no
-    // longer exists just yields -1/ESRCH, handled by the errno check
-    // below rather than by any unchecked pointer access.
     unsafe {
-        // Clear errno before the call, because getpriority can legitimately
-        // return -1 as a valid nice value.
         *libc::__errno_location() = 0;
         let prio = libc::getpriority(libc::PRIO_PROCESS, pid as libc::id_t);
         if *libc::__errno_location() != 0 {
@@ -40,17 +30,9 @@ pub fn get_nice(pid: u32) -> i32 {
 /// the caller lacks `CAP_SYS_NICE` to raise priority above 0.
 pub fn set_nice(pid: u32, nice: i32) -> Result<()> {
     // SAFETY: `setpriority(2)` takes only plain integers — no pointers
-    // or buffers involved. `pid as libc::id_t` is a lossless `u32` -> `u32`
-    // widening on Linux; `nice` is validated by callers via
-    // `validate_nice`/`cpu_level_to_nice` to lie within the kernel's
-    // accepted `[-20, 19]` range before reaching here (and even an
-    // out-of-range value would just be clamped/rejected by the kernel,
-    // not cause UB).
     let rc = unsafe { libc::setpriority(libc::PRIO_PROCESS, pid as libc::id_t, nice) };
     if rc != 0 {
         // SAFETY: `__errno_location()` returns a pointer to the calling
-        // thread's `errno` TLS cell, valid to dereference; it was just set
-        // by the failed `setpriority` call immediately above.
         let errno = unsafe { *libc::__errno_location() };
         return Err(if errno == libc::EPERM || errno == libc::EACCES {
             PrioError::PermissionDenied
@@ -60,8 +42,6 @@ pub fn set_nice(pid: u32, nice: i32) -> Result<()> {
     }
     Ok(())
 }
-
-// -- Process List -------------------------------------------------------------
 
 /// Return up to `count` processes sorted by ascending niceness (highest
 /// priority first), then descending CPU usage as a tiebreaker.
@@ -97,8 +77,6 @@ pub fn get_top_processes(count: usize) -> Vec<ProcessInfo> {
     list.truncate(count);
     list
 }
-
-// -- Process Lookup -----------------------------------------------------------
 
 /// Find a process by PID or by name (first match).
 pub fn find_process(target: &str) -> Result<ProcessInfo> {
@@ -155,6 +133,5 @@ pub fn find_by_name(name: &str) -> Result<ProcessInfo> {
 /// Check whether the calling process is running as root (UID 0).
 pub fn is_root() -> bool {
     // SAFETY: `getuid(2)` takes no arguments, dereferences no pointers,
-    // and cannot fail — it always returns the calling process's real UID.
     unsafe { libc::getuid() == 0 }
 }

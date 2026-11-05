@@ -32,9 +32,6 @@ fn golden_path_sorts_by_keyword_case_insensitively() {
     assert!(stderr.is_empty());
     let lines: Vec<&str> = stdout.lines().collect();
     assert_eq!(lines.len(), 2);
-    // Each keyword is right-aligned to start at column 31 (30-wide left
-    // context field + a space). "apple" should sort before "Banana"
-    // (case-insensitive), so it's the keyword on the first output line.
     assert!(lines[0][31..].starts_with("apple"));
     assert!(lines[1][31..].starts_with("Banana"));
 }

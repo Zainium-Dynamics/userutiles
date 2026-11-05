@@ -36,14 +36,12 @@ fn run() -> Result<()> {
 
     display::print_verbose_banner(cli.verbose);
 
-    // -- --list ----------------------------------------------------------------
     if cli.list {
         let procs = crate::utils::process::get_top_processes(cfg.list.max_processes);
         display::print_process_list(&procs);
         return Ok(());
     }
 
-    // -- --reset <PID> ---------------------------------------------------------
     if let Some(pid) = cli.reset {
         let info = find_by_pid(pid)?;
         let old = info.nice;
@@ -52,7 +50,6 @@ fn run() -> Result<()> {
         return Ok(());
     }
 
-    // -- --boost <PID|CMD> -----------------------------------------------------
     if let Some(ref target) = cli.boost {
         let info = find_process(target)?;
         display::print_boost_start();
@@ -66,7 +63,6 @@ fn run() -> Result<()> {
         return Ok(());
     }
 
-    // -- --pid <PID> (apply to existing) --------------------------------------
     if let Some(pid) = cli.pid {
         let nice = resolve_nice(&cli)?;
         let info = find_by_pid(pid)?;
@@ -89,7 +85,6 @@ fn run() -> Result<()> {
         return Ok(());
     }
 
-    // -- Spawn a new command ---------------------------------------------------
     if cli.command.is_empty() {
         return Err(PrioError::SpawnError(
             "no command given — provide a COMMAND or use --pid".into(),
@@ -103,12 +98,10 @@ fn run() -> Result<()> {
 
     let cmd_str = cli.command.join(" ");
 
-    // -- Auto mode display -----------------------------------------------------
     if cli.auto {
         display::print_auto_mode(&cmd_str);
     }
 
-    // -- Full-power display ----------------------------------------------------
     let is_full_power = io.is_some() && max_ram.is_some() && dur.is_some();
     if is_full_power {
         let io_str = io
@@ -122,9 +115,8 @@ fn run() -> Result<()> {
             io_mode: &io_str,
             max_ram: max_ram.unwrap(),
             duration: dur.unwrap(),
-            pid: 0, // filled after spawn
+            pid: 0,
         };
-        // Print headers before spawn so the user sees the config immediately.
         print_full_power_pre(&fp);
     } else if !cli.auto {
         display::print_basic(&display::BasicArgs {
@@ -147,7 +139,6 @@ fn run() -> Result<()> {
     let mut child = scheduler::spawn(&spawn_cfg)?;
     let pid = child.id();
 
-    // -- Update display with real PID ------------------------------------------
     if is_full_power {
         display::print_full_power_success(pid, dur.unwrap());
     } else if !cli.auto {
@@ -160,7 +151,6 @@ fn run() -> Result<()> {
         display::print_basic_success();
     }
 
-    // -- Auto monitor ----------------------------------------------------------
     let _monitor = if cli.auto {
         Some(crate::core::monitor::AutoMonitor::start(
             pid, nice, &cfg.auto,
@@ -169,7 +159,6 @@ fn run() -> Result<()> {
         None
     };
 
-    // -- Time-bound revert -----------------------------------------------------
     if let Some(d) = dur {
         if cli.verbose {
             display::print_waiting_for_exit(d);
@@ -177,15 +166,8 @@ fn run() -> Result<()> {
         schedule_reset(pid, 0, d);
     }
 
-    // -- Wait ------------------------------------------------------------------
-    // Register Ctrl-C handler: on SIGINT, kill child and exit cleanly.
     ctrlc::set_handler(move || {
         // SAFETY: `kill(2)` takes only plain integers (`pid_t`, signal
-        // number) and performs no pointer dereferencing, so the call
-        // cannot cause UB regardless of whether `pid` still refers to a
-        // live process — a stale PID just yields ESRCH, which is ignored
-        // here since the handler only wants to *try* to stop the child
-        // before the process exits.
         unsafe {
             libc::kill(pid as libc::pid_t, libc::SIGTERM);
         }
@@ -196,8 +178,6 @@ fn run() -> Result<()> {
     let status = child.wait()?;
     proc::exit(status.code().unwrap_or(0));
 }
-
-// -- Helper: resolve effective nice -------------------------------------------
 
 fn resolve_nice(cli: &Cli) -> Result<i32> {
     match (cli.nice, cli.cpu) {

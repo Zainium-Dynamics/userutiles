@@ -1,4 +1,4 @@
-//! user pgrep — look up or signal processes by name.
+//! user pgrep: look up or signal processes by name.
 use std::fs;
 
 use usercore::posix_regex::Regex;
@@ -98,7 +98,6 @@ fn run_inner(is_pkill: bool) -> i32 {
             s if is_pkill && s.starts_with('-') && s.len() > 1 && parse_sig(&s[1..]).is_some() => {
                 signal = parse_sig(&s[1..]).unwrap_or(libc::SIGTERM);
             }
-            // combined flags such as -fx or -la
             s if s.starts_with('-') && s.len() > 2 && !s.starts_with("--") && s[1..].chars().all(|c| "flaixcnov".contains(c)) => {
                 for c in s[1..].chars() {
                     match c {
@@ -234,7 +233,6 @@ fn iter_procs() -> Vec<P> {
         let field = |k: &str| status.lines().find(|l| l.starts_with(k)).and_then(|l| l[k.len()..].split_whitespace().next()).and_then(|x| x.parse().ok());
         let ppid = field("PPid:").map(|x: i64| x as i32).unwrap_or(0);
         let uid = field("Uid:").map(|x: i64| x as u32).unwrap_or(u32::MAX);
-        // starttime is field 22 of /proc/<pid>/stat, after the ")" that ends the name
         let start = fs::read_to_string(path.join("stat"))
             .ok()
             .and_then(|st| st.rsplit_once(')').and_then(|(_, r)| r.split_whitespace().nth(19).and_then(|x| x.parse().ok())))

@@ -1,4 +1,4 @@
-//! user pathchk — diagnose invalid pathnames.
+//! user pathchk: diagnose invalid pathnames.
 use std::path::Path;
 
 use usercore::Ui;

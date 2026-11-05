@@ -10,7 +10,6 @@ fn main() {
         );
     }
 
-    // Embed build date as env var accessible at runtime via env!()
     let build_date = {
         let output = std::process::Command::new("date").arg("+%Y-%m-%d").output();
         match output {
@@ -20,7 +19,6 @@ fn main() {
     };
     println!("cargo:rustc-env=PRIO_BUILD_DATE={}", build_date);
 
-    // Expose target triple for version output
     let target = std::env::var("TARGET").unwrap_or_else(|_| "unknown".to_string());
     println!("cargo:rustc-env=PRIO_TARGET={}", target);
 }

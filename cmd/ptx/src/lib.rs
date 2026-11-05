@@ -1,4 +1,4 @@
-//! user ptx — permuted index (simplified GNU ptx).
+//! user ptx: permuted index (simplified GNU ptx).
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 
@@ -34,7 +34,7 @@ pub fn run() -> i32 {
     if files.is_empty() {
         files.push("-".into());
     }
-    let mut refs: Vec<(String, String, String)> = Vec::new(); // left, word, right
+    let mut refs: Vec<(String, String, String)> = Vec::new();
     for f in files {
         let reader: Box<dyn BufRead> = if f == "-" {
             Box::new(BufReader::new(io::stdin()))

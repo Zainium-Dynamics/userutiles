@@ -1,4 +1,4 @@
-//! user printenv — print all or part of environment.
+//! user printenv: print all or part of environment.
 use std::env;
 
 use usercore::Ui;
@@ -48,7 +48,3 @@ pub fn run() -> i32 {
     status
 }
 
-// `run()` reads `std::env::args()` and the real process environment, so
-// CLI-level behavior (missing var -> exit 1, `-0` NUL separator, invalid
-// option, etc.) is covered by the integration tests in `tests/cli.rs`
-// instead of unit tests here.

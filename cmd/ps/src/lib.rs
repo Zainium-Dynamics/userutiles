@@ -1,4 +1,4 @@
-//! user ps — process snapshot from /proc (common options).
+//! user ps: process snapshot from /proc (common options).
 use std::fs;
 use std::io::{self, Write};
 
@@ -160,7 +160,6 @@ pub fn run() -> i32 {
                 return 0;
             }
             "--no-headers" | "--no-heading" | "--noheader" | "--noheaders" => headers = false,
-            // a bare -u (or BSD u) is the user format; -u USERS selects users
             "-u" if args.get(i + 1).is_some_and(|n| !n.starts_with('-')) => {
                 i += 1;
                 users.extend(split_list(&args[i]));
@@ -216,7 +215,6 @@ pub fn run() -> i32 {
                 return 1;
             }
             s => {
-                // clusters: -ef, -aux, aux, ax
                 let flags = s.strip_prefix('-').unwrap_or(s);
                 if flags.is_empty() || !flags.chars().all(|c| "auxfeAw".contains(c)) {
                     ui.err(&format!("unrecognized option '{s}'"));
@@ -255,7 +253,6 @@ pub fn run() -> i32 {
                     .iter()
                     .any(|u| *u == p.user || u.parse::<u32>().is_ok_and(|n| n == p.uid))
         } else {
-            // default: same tty as caller
             all || p.tty == my_tty || my_tty == "?"
         }
     });
@@ -529,7 +526,7 @@ struct Proc {
 /// and read its `stat`/`status`/`cmdline` files into a [`Proc`] snapshot.
 /// Per-process files that vanish mid-read (the process exited) or are
 /// malformed simply yield default/placeholder fields for that process
-/// rather than failing the whole listing — this mirrors real `ps`, which
+/// rather than failing the whole listing: this mirrors real `ps`, which
 /// tolerates processes disappearing during a scan.
 ///
 /// Only a failure to open `/proc` itself is treated as fatal.
@@ -555,7 +552,6 @@ fn list_procs() -> io::Result<Vec<Proc>> {
             .unwrap_or("?")
             .to_string();
         let cmd = if cmdline.is_empty() {
-            // kernel thread
             let comm = status
                 .lines()
                 .find(|l| l.starts_with("Name:"))
@@ -633,7 +629,6 @@ fn list_procs() -> io::Result<Vec<Proc>> {
 /// by scanning for the *last* `)` rather than the first, since the process
 /// name itself may legitimately contain `)` characters.
 fn parse_stat(stat: &str) -> (i32, char, i32) {
-    // pid (comm) state ppid ... tty_nr
     let rparen = stat.rfind(')').unwrap_or(0);
     let rest = stat.get(rparen + 2..).unwrap_or("");
     let mut it = rest.split_whitespace();
@@ -664,7 +659,6 @@ struct StatFields {
 fn parse_stat_fields(stat: &str) -> StatFields {
     let rest = stat.rfind(')').and_then(|r| stat.get(r + 2..)).unwrap_or("");
     let f: Vec<&str> = rest.split_whitespace().collect();
-    // f[0] is field 3 (state)
     let num = |n: usize| f.get(n - 3).and_then(|v| v.parse::<i64>().ok()).unwrap_or(0);
     StatFields {
         pgid: num(5) as i32,
@@ -687,7 +681,6 @@ fn tty_name(nr: i32) -> String {
     if nr == 0 {
         return "?".into();
     }
-    // major minor from kernel encoding
     let major = (nr >> 8) & 0xff;
     let minor = (nr & 0xff) | ((nr >> 12) & 0xfff00);
     if major == 4 {
@@ -719,8 +712,6 @@ mod tests {
 
     #[test]
     fn parse_stat_extracts_ppid_state_tty() {
-        // Realistic line, comm containing a space to exercise the
-        // rfind(')')-based skip past `(comm)`.
         let line = "123 (my proc) S 1 456 456 34816 -1 4194560 ...";
         let (ppid, state, tty_nr) = parse_stat(line);
         assert_eq!(ppid, 1);
@@ -738,9 +729,6 @@ mod tests {
 
     #[test]
     fn parse_stat_empty_input_does_not_panic() {
-        // No `)` at all: `rfind` yields `None`, treated as position 0, and
-        // slicing from `0 + 2` on an empty string is out of range and
-        // falls back to `""` — must not panic, and every field defaults.
         let (ppid, state, tty_nr) = parse_stat("");
         assert_eq!(ppid, 0);
         assert_eq!(state, '?');
@@ -749,8 +737,6 @@ mod tests {
 
     #[test]
     fn parse_stat_no_close_paren_does_not_panic() {
-        // Still no `)`, but long enough that `2..` is in-bounds; must not
-        // panic even though there's no real `(comm)` field to skip.
         let (ppid, _state, tty_nr) = parse_stat("garbage with no parens");
         assert_eq!(ppid, 0);
         assert_eq!(tty_nr, 0);
@@ -795,7 +781,6 @@ mod tests {
 
     #[test]
     fn tty_name_decodes_pts_major() {
-        // major 136, minor 5 -> pts/5
         let nr = (136 << 8) | 5;
         assert_eq!(tty_name(nr), "pts/5");
     }
@@ -808,7 +793,6 @@ mod tests {
 
     #[test]
     fn uid_name_root_is_root() {
-        // uid 0 is always "root" on any real Linux system.
         assert_eq!(uid_name(0), "root");
     }
 
@@ -821,9 +805,6 @@ mod tests {
 
     #[test]
     fn read_self_tty_does_not_panic() {
-        // No assertion on the value (varies: "?" when there's no
-        // controlling terminal, e.g. under a test harness), just that it
-        // runs and returns a string.
         let _ = read_self_tty();
     }
 }

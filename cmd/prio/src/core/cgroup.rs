@@ -2,8 +2,6 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{PrioError, Result};
 
-// -- Cgroup Version Detection --------------------------------------------------
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CgroupVersion {
     V2,
@@ -21,8 +19,6 @@ pub fn detect_version() -> CgroupVersion {
         CgroupVersion::Unavailable
     }
 }
-
-// -- CgroupManager ------------------------------------------------------------
 
 /// Manages a single child cgroup scoped to one prio-launched process.
 ///
@@ -54,7 +50,6 @@ impl CgroupManager {
             CgroupVersion::Unavailable => unreachable!(),
         };
 
-        // Ensure the prio parent slice exists.
         if !root.exists() {
             std::fs::create_dir_all(&root).map_err(|e| {
                 if e.kind() == std::io::ErrorKind::PermissionDenied {
@@ -65,7 +60,6 @@ impl CgroupManager {
             })?;
         }
 
-        // For cgroup v2, enable the memory controller on the parent.
         if version == CgroupVersion::V2 {
             let ctrl = root.join("cgroup.subtree_control");
             if ctrl.exists() {
@@ -132,7 +126,7 @@ impl CgroupManager {
     #[allow(dead_code)]
     pub fn set_io_weight(&self, weight: u32) -> Result<()> {
         if self.version != CgroupVersion::V2 {
-            return Ok(()); // No equivalent in v1 without blkio controller
+            return Ok(());
         }
         let weight = weight.clamp(1, 10_000);
         let file = self.path.join("io.weight");
@@ -153,7 +147,7 @@ impl CgroupManager {
 impl Drop for CgroupManager {
     /// Best-effort removal of the cgroup directory once the process exits.
     /// The kernel refuses to remove a cgroup that still has processes, so
-    /// this will silently fail if the child is still alive — which is fine.
+    /// this will silently fail if the child is still alive: which is fine.
     fn drop(&mut self) {
         let _ = std::fs::remove_dir(&self.path);
     }
