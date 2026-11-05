@@ -1,4 +1,4 @@
-//! user env — set environment and run command, or print environment.
+//! user env: set environment and run command, or print environment.
 use std::env;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
@@ -47,7 +47,6 @@ pub fn run() -> i32 {
                 }
                 "--" => {
                     i += 1;
-                    // everything after is NAME=VALUE... COMMAND
                     while let Some(a) = args.get(i).filter(|a| a.contains('=') && !a.starts_with('=')) {
                         if let Some((k, v)) = a.split_once('=') {
                             sets.push((k.to_string(), v.to_string()));
@@ -77,7 +76,6 @@ pub fn run() -> i32 {
                     i += 1;
                     continue;
                 }
-                // -S STRING / -SSTRING (a shebang's `env -S cmd args`): its words become arguments
                 s if s == "-S" || s == "--split-string" || s.starts_with("--split-string=") || (s.starts_with("-S") && s.len() > 2) => {
                     let (text, used) = if let Some(t) = s.strip_prefix("--split-string=") {
                         (t.to_string(), 1)
@@ -98,7 +96,6 @@ pub fn run() -> i32 {
                     i += 1;
                     continue;
                 }
-                // bundled: -i0, -iu NAME, -iC DIR
                 s if s.len() > 2 && s.starts_with('-') && !s.starts_with("--") && s[1..].starts_with(['i', '0']) => {
                     let chars: Vec<char> = s[1..].chars().collect();
                     for (k, c) in chars.iter().enumerate() {
@@ -167,7 +164,6 @@ pub fn run() -> i32 {
                 }
                 _ => {
                     parsing_opts = false;
-                    // fall through to treat as command
                 }
             }
         }
@@ -178,7 +174,6 @@ pub fn run() -> i32 {
                 }
             } else {
                 cmd.push(a.clone());
-                // rest are args
                 cmd.extend(args[i + 1..].iter().cloned());
                 break;
             }

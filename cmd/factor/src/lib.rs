@@ -1,4 +1,4 @@
-//! user factor — print prime factors.
+//! user factor: print prime factors.
 use std::io::{self, BufRead};
 
 use usercore::Ui;
@@ -134,15 +134,12 @@ mod tests {
                 — run explicitly with `cargo test -- --ignored` after \
                 touching the trial-division loop in `factors`"]
     fn factors_near_u64_max_does_not_panic() {
-        // A large prime close to u64::MAX exercises the f*f overflow path
-        // in the trial-division loop; this must not panic or hang.
-        let big_prime = u64::MAX - 58; // known prime
+        let big_prime = u64::MAX - 58;
         assert_eq!(factors(big_prime), vec![big_prime]);
     }
 
     #[test]
     fn factors_of_u64_max_does_not_panic() {
-        // u64::MAX = 3 * 5 * 17 * 257 * 641 * 65537 * 6700417
         let result = factors(u64::MAX);
         assert_eq!(result.iter().product::<u64>(), u64::MAX);
         assert!(result.windows(2).all(|w| w[0] <= w[1]));

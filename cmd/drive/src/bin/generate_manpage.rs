@@ -11,17 +11,12 @@ fn main() -> std::io::Result<()> {
     use std::fs;
     use std::path::PathBuf;
 
-    // Re-use the same Cli definition
     #[path = "../cli.rs"]
     mod cli;
-    // We need just the struct; pull in required modules as stubs
-    // The actual command factory is built via clap derive.
-
     let out_dir = std::env::var("OUT_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("."));
 
-    // Build the clap App from our Cli struct
     let app = clap::command!()
         .name("drive")
         .version(env!("CARGO_PKG_VERSION"))
@@ -32,7 +27,6 @@ fn main() -> std::io::Result<()> {
  It wraps blkid, mount, mkfs, smartctl, btrfs, e2fsck, ddrescue\n\
  and presents them through a consistent, color-coded CLI.",
         )
-        // Subcommands are described inline so the man page is self-contained
         .subcommand(clap::Command::new("list").about("Show all connected storage devices"))
         .subcommand(
             clap::Command::new("info")

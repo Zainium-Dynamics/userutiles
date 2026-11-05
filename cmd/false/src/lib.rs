@@ -1,4 +1,4 @@
-//! user false — always fail.
+//! user false: always fail.
 
 /// Entry point for the `false` utility. `--help` and `--version` are
 /// honored (printing to stdout and exiting 0); any other argument, or no

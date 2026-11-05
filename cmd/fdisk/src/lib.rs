@@ -1,16 +1,11 @@
-//! user fdisk — list partition tables.
-//!
-//! Only the read-only `-l` listing is implemented — real `fdisk`'s
-//! interactive edit REPL is a large stateful undertaking disproportionate
-//! to what's left to build here. For scripted/non-interactive editing,
-//! use `sfdisk` instead, which this workspace does implement.
+//! user fdisk: list partition tables.
 use std::path::{Path, PathBuf};
 
 use usercore::ptable::{self, Label, PartitionTable};
 use usercore::Ui;
 
 /// Human-readable name for a handful of common MBR type bytes / GPT type
-/// GUIDs — real `fdisk`'s own type-name table is much larger; this
+/// GUIDs: real `fdisk`'s own type-name table is much larger; this
 /// covers the everyday cases.
 fn type_name(label: &Label, part_type: &str) -> &'static str {
     match label {
@@ -77,7 +72,7 @@ fn print_table(device: &Path, table: &PartitionTable) {
 }
 
 /// Every top-level (non-partition) device name under `/sys/block`, as
-/// full `/dev/<name>` paths — the same set `fdisk -l` (no args) scans.
+/// full `/dev/<name>` paths: the same set `fdisk -l` (no args) scans.
 fn list_whole_disks() -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir("/sys/block") else {
         return Vec::new();

@@ -131,10 +131,10 @@ fn dispatch_repair(fs: &str, dev: &str, dry_run: bool) -> RepairResult {
 fn repair_ext(dev: &str, dry_run: bool) -> RepairResult {
     let mut args: Vec<&str> = vec!["-v"];
     if dry_run {
-        args.push("-n"); // no changes
+        args.push("-n");
     } else {
-        args.push("-y"); // auto-fix
-        args.push("-f"); // force check
+        args.push("-y");
+        args.push("-f");
     }
     args.push(dev);
 
@@ -143,11 +143,9 @@ fn repair_ext(dev: &str, dry_run: bool) -> RepairResult {
     match out {
         Ok(o) => {
             let code = o.status.code().unwrap_or(-1);
-            // e2fsck exit codes: 0=clean, 1=errors corrected, 2=reboot needed, 4=uncorrected
             match code {
                 0 => RepairResult::NoErrors,
                 1 => {
-                    // Parse stderr/stdout for counts
                     let text = String::from_utf8_lossy(&o.stdout).to_string()
                         + &String::from_utf8_lossy(&o.stderr);
                     let fixed = count_pattern(&text, "fixed") + count_pattern(&text, "corrected");
@@ -259,8 +257,6 @@ fn repair_f2fs(dev: &str, dry_run: bool) -> RepairResult {
         Err(e) => RepairResult::Failed(format!("Could not run fsck.f2fs: {e}")),
     }
 }
-
-// --- Helpers -----------------------------------------------------------------
 
 fn detect_fs(dev: &str) -> Option<String> {
     let out = Command::new("blkid")

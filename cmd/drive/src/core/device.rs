@@ -16,7 +16,7 @@ pub struct BlockDevice {
     pub removable: bool,
     pub rotational: bool,
     pub model: String,
-    pub transport: String, // nvme, sata, usb, mmc, virtio
+    pub transport: String,
     pub partitions: Vec<BlockDevice>,
     pub mountpoint: Option<String>,
     pub filesystem: Option<String>,
@@ -58,13 +58,11 @@ pub fn enumerate_devices() -> Result<Vec<BlockDevice>> {
         let entry = entry?;
         let name = entry.file_name().to_string_lossy().to_string();
 
-        // Skip loop, ram, dm devices unless they have mounts
         if name.starts_with("loop") || name.starts_with("ram") || name.starts_with("dm-") {
             continue;
         }
 
         if let Ok(mut dev) = read_device(&name, &mounts, &labels) {
-            // Read partitions
             let part_dir = entry.path();
             let mut parts: Vec<BlockDevice> = Vec::new();
 
@@ -152,7 +150,6 @@ fn read_device(
 }
 
 fn root_device(name: &str) -> String {
-    // nvme0n1p1 -> nvme0n1 ; nvme0n1 -> nvme0n1 ; sda1 -> sda
     if name.starts_with("nvme") {
         if let Some(pos) = name.rfind('p') {
             let suffix = &name[pos + 1..];
@@ -180,7 +177,6 @@ fn detect_transport(name: &str) -> String {
     if name.starts_with("nvme") {
         "NVMe".to_string()
     } else if name.starts_with("sd") {
-        // Check if USB via /sys
         let link = fs::read_link(format!("/sys/block/{name}"))
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default();
@@ -237,18 +233,8 @@ fn disk_usage_percent(mp: &str) -> Option<u8> {
     use std::ffi::CString;
     let path = CString::new(mp).ok()?;
     // SAFETY: `libc::statvfs` has no `Default` impl — it is a
-    // plain-old-data FFI struct made up entirely of unsigned integer
-    // fields (block/inode counts, flags, name-length limits), for which
-    // an all-zero bit pattern is always a valid value. It is immediately
-    // overwritten by the `libc::statvfs` call below on success, and only
-    // read after checking that call's return value is 0.
     let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
     // SAFETY: `path` is a valid, NUL-terminated `CString` kept alive for
-    // the duration of this call, so `path.as_ptr()` is a sound path
-    // argument. `&mut stat` is a valid, properly aligned reference to a
-    // local `statvfs` for `statvfs(3)` to write into; the fields read
-    // below (`f_blocks`, `f_bfree`) are only used after checking `ret ==
-    // 0`, i.e. only once the kernel has actually populated them.
     let ret = unsafe { libc::statvfs(path.as_ptr(), &mut stat) };
     if ret == 0 && stat.f_blocks > 0 {
         let used = stat.f_blocks - stat.f_bfree;
@@ -300,7 +286,6 @@ pub fn run_list(as_toml: bool) -> Result<()> {
     print_header("Storage Overview");
     println!();
 
-    // Header row
     println!(
         "  {:<14} {:<8} {:<7} {:<9} {:<24} {:<11} {:<6} {}",
         "DEVICE".bold().cyan(),
@@ -516,7 +501,6 @@ pub fn run_info(device: &str, as_toml: bool) -> Result<()> {
 
     println!();
 
-    // SMART check
     let smart_status = smart_passed(clean);
     if smart_status {
         print_success("SMART status: PASSED — drive is healthy and performing optimally");
@@ -529,8 +513,6 @@ pub fn run_info(device: &str, as_toml: bool) -> Result<()> {
     println!();
     Ok(())
 }
-
-// --- Health helpers ----------------------------------------------------------
 
 fn health_badge(name: &str) -> String {
     let temp = read_temp_celsius(name);
@@ -572,7 +554,6 @@ fn read_temp_raw(name: &str) -> String {
 }
 
 fn read_temp_celsius(name: &str) -> Option<u32> {
-    // hwmon nodes under /sys/class/block/<name>/device/hwmon/
     let hwmon_base = format!("/sys/class/block/{name}/device/hwmon");
     if let Ok(entries) = fs::read_dir(&hwmon_base) {
         for entry in entries.flatten() {
@@ -584,7 +565,6 @@ fn read_temp_celsius(name: &str) -> Option<u32> {
             }
         }
     }
-    // NVMe thermal via /sys/class/nvme/<dev>/hwmon
     let nvme_hwmon = format!("/sys/class/nvme/{name}/hwmon");
     if let Ok(entries) = fs::read_dir(&nvme_hwmon) {
         for entry in entries.flatten() {
@@ -598,7 +578,6 @@ fn read_temp_celsius(name: &str) -> Option<u32> {
 }
 
 fn smart_passed(name: &str) -> bool {
-    // Try running smartctl if available
     if let Ok(which) = which::which("smartctl") {
         let out = std::process::Command::new(which)
             .args(["-H", &format!("/dev/{name}")])
@@ -655,7 +634,6 @@ mod tests {
 
     #[test]
     fn disk_usage_percent_range() {
-        // /tmp always exists and has some usage
         if let Some(pct) = disk_usage_percent("/tmp") {
             assert!(pct <= 100, "usage percent should be 0-100, got {pct}");
         }
@@ -664,7 +642,6 @@ mod tests {
     #[test]
     fn read_mounts_parses_proc_mounts() {
         let mounts = read_mounts().expect("Should be able to read /proc/mounts on Linux");
-        // There must be at least one mount (rootfs)
         assert!(
             !mounts.is_empty(),
             "/proc/mounts should have at least one entry"

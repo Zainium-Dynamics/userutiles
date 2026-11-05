@@ -24,7 +24,6 @@ pub fn run_benchmark(target: &str, block_size_kib: u64, duration_secs: u64) -> R
     let block_bytes = block_size_kib * 1024;
     let duration = Duration::from_secs(duration_secs);
 
-    // Determine whether target is a block device or a directory/file path
     let bench_file = resolve_bench_path(target)?;
     let is_device = Path::new(target).to_string_lossy().starts_with("/dev/");
 
@@ -46,27 +45,22 @@ pub fn run_benchmark(target: &str, block_size_kib: u64, duration_secs: u64) -> R
     }
     println!();
 
-    // -- Sequential Write --------------------------------------------------
     println!("  {} Sequential write...", "→".bright_cyan());
     let seq_write = measure_seq_write(&bench_file, block_bytes as usize, duration)
         .context("Sequential write test failed")?;
 
-    // -- Sequential Read ---------------------------------------------------
     println!("  {} Sequential read...", "→".bright_cyan());
     let seq_read = measure_seq_read(&bench_file, block_bytes as usize, duration)
         .context("Sequential read test failed")?;
 
-    // -- Random Write ------------------------------------------------------
     println!("  {} Random write (4K)...", "→".bright_cyan());
     let (rw_iops, rw_lat) =
         measure_rand_write(&bench_file, duration).context("Random write test failed")?;
 
-    // -- Random Read -------------------------------------------------------
     println!("  {} Random read (4K)...", "→".bright_cyan());
     let (rr_iops, rr_lat) =
         measure_rand_read(&bench_file, duration).context("Random read test failed")?;
 
-    // Clean up temp file if we created one
     if !is_device {
         let _ = std::fs::remove_file(&bench_file);
     }
@@ -83,8 +77,6 @@ pub fn run_benchmark(target: &str, block_size_kib: u64, duration_secs: u64) -> R
     print_results(&result);
     Ok(())
 }
-
-// --- Measurements ------------------------------------------------------------
 
 fn measure_seq_write(path: &str, block: usize, duration: Duration) -> Result<f64> {
     let buf = vec![0xA5u8; block];
@@ -103,7 +95,6 @@ fn measure_seq_write(path: &str, block: usize, duration: Duration) -> Result<f64
         total_bytes += block as u64;
     }
     f.flush()?;
-    // fsync to flush OS cache to device
     f.sync_all()?;
 
     let elapsed = start.elapsed().as_secs_f64();
@@ -125,7 +116,6 @@ fn measure_seq_read(path: &str, block: usize, duration: Duration) -> Result<f64>
     while start.elapsed() < duration {
         let n = f.read(&mut buf)?;
         if n == 0 {
-            // Wrap around
             f.seek(SeekFrom::Start(0))?;
             continue;
         }
@@ -147,7 +137,7 @@ fn measure_rand_write(path: &str, duration: Duration) -> Result<(f64, f64)> {
         .open(path)
         .context("Cannot open file for random write")?;
 
-    let file_size = f.metadata()?.len().max(64 * 1024 * 1024); // at least 64 MiB
+    let file_size = f.metadata()?.len().max(64 * 1024 * 1024);
     let max_offset = file_size / RAND_BLOCK as u64;
 
     let start = Instant::now();
@@ -197,8 +187,6 @@ fn measure_rand_read(path: &str, duration: Duration) -> Result<(f64, f64)> {
     let lat_us = elapsed * 1_000_000.0 / ops as f64;
     Ok((iops, lat_us))
 }
-
-// --- Output ------------------------------------------------------------------
 
 fn print_results(r: &BenchResult) {
     println!();
@@ -275,8 +263,6 @@ fn rate_iops(iops: f64) -> &'static str {
     }
 }
 
-// --- Helpers -----------------------------------------------------------------
-
 /// Resolve the path to use for benchmarking.
 /// - Block device: use directly
 /// - Directory: create a temp file inside it
@@ -291,15 +277,13 @@ fn resolve_bench_path(target: &str) -> Result<String> {
 }
 
 /// Simple linear congruential generator for reproducible pseudo-random offsets.
-/// No external dep needed — we only need uniform distribution across sectors.
+/// No external dep needed: we only need uniform distribution across sectors.
 #[inline]
 fn lcg_next(state: u64) -> u64 {
     state
         .wrapping_mul(6_364_136_223_846_793_005)
         .wrapping_add(1_442_695_040_888_963_407)
 }
-
-// --- Unit tests ---------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -350,7 +334,6 @@ mod tests {
         let path = dir.path().join("rand.tmp");
         let path_str = path.to_str().unwrap();
 
-        // Pre-fill so rand read has data
         measure_seq_write(path_str, 4096, Duration::from_millis(100)).unwrap();
 
         let (iops, lat) = measure_rand_write(path_str, Duration::from_millis(200)).unwrap();

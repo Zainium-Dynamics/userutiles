@@ -1,4 +1,4 @@
-//! user expand — convert tabs to spaces.
+//! user expand: convert tabs to spaces.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 

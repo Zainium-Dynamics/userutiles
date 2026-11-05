@@ -1,4 +1,4 @@
-//! user echo — GNU-compatible echo with -n/-e/-E.
+//! user echo: GNU-compatible echo with -n/-e/-E.
 use std::ffi::OsString;
 use std::io::{self, Write};
 use std::os::unix::ffi::OsStrExt;
@@ -28,7 +28,6 @@ pub fn run() -> i32 {
         }
         if escape {
             if !append_escaped(&mut out, arg) {
-                // \c — suppress rest + newline
                 trailing_nl = false;
                 break;
             }
@@ -110,7 +109,6 @@ fn append_escaped(out: &mut Vec<u8>, s: &[u8]) -> bool {
             b'r' => out.push(b'\r'),
             b't' => out.push(b'\t'),
             b'v' => out.push(0x0b),
-            // \NNN without the leading 0, as GNU echo also takes it
             b'1'..=b'7' => {
                 let mut val = s[i] - b'0';
                 let mut count = 1;
@@ -122,7 +120,6 @@ fn append_escaped(out: &mut Vec<u8>, s: &[u8]) -> bool {
                 out.push(val);
             }
             b'0' => {
-                // up to 3 octal digits including this 0? GNU: \0nnn octal
                 let mut val = 0u8;
                 let mut count = 0;
                 while count < 3 && i + 1 < s.len() && s[i + 1].is_ascii_digit() && s[i + 1] <= b'7'
@@ -243,8 +240,6 @@ mod tests {
     #[test]
     fn append_escaped_hex_and_octal() {
         let mut out = Vec::new();
-        // \x41 is hex 'A'; \0101 is octal 101 = 65 = 'A' (octal escapes
-        // require the leading `0`, unlike hex's `x`).
         assert!(append_escaped(&mut out, b"\\x41\\0101"));
         assert_eq!(out, b"AA");
     }

@@ -1,12 +1,9 @@
-// io_bench.rs — I/O performance benchmarks
-// Run with: cargo bench
-
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::time::Instant;
 
-const BLOCK_SIZE: usize = 4 * 1024 * 1024; // 4 MiB
-const BLOCKS: usize = 256; // 1 GiB total
+const BLOCK_SIZE: usize = 4 * 1024 * 1024;
+const BLOCKS: usize = 256;
 
 fn main() {
     println!("drive I/O Benchmark\n");
@@ -14,7 +11,6 @@ fn main() {
     let buf = vec![0xABu8; BLOCK_SIZE];
     let path = "/tmp/drive_bench_tmp";
 
-    // ─── Sequential Write ─────────────────────────────────────────────────
     let mut f = OpenOptions::new()
         .write(true)
         .create(true)
@@ -32,7 +28,6 @@ fn main() {
     let mb = (BLOCK_SIZE * BLOCKS) as f64 / 1_000_000.0;
     println!("Sequential Write : {:.0} MB/s", mb / elapsed);
 
-    // ─── Sequential Read ──────────────────────────────────────────────────
     let mut f = OpenOptions::new()
         .read(true)
         .open(path)

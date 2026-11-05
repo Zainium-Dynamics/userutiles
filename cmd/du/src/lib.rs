@@ -1,4 +1,4 @@
-//! user du — estimate file space usage.
+//! user du: estimate file space usage.
 use std::collections::HashSet;
 use std::fs;
 use std::io::{self, Write};
@@ -131,7 +131,7 @@ fn print_help() {
 /// usage of `path`.
 ///
 /// Uses `symlink_metadata` (lstat) rather than following symlinks, so a
-/// symlink — including a self-referential one — is counted as its own
+/// symlink: including a self-referential one — is counted as its own
 /// entry and never descended into; this is what keeps recursion bounded
 /// on a directory tree containing a symlink loop.
 ///
@@ -164,22 +164,18 @@ fn du_path(
         max_depth,
     } = opts;
     let meta = fs::symlink_metadata(path)?;
-    // hardlink de-dup
     let key = (meta.dev(), meta.ino());
     if !meta.is_dir() && !seen.insert(key) {
         return Ok(0);
     }
 
     let self_size = if bytes || apparent {
-        // as GNU du: only regular files and symlinks have a usable apparent size
         if meta.is_file() || meta.is_symlink() { meta.len() } else { 0 }
     } else {
-        // st_blocks is 512-byte units
         (meta.blocks() as u64) * 512
     };
 
     if meta.is_symlink() {
-        // don't follow
         if all || depth == 0 {
             print_size(self_size, path, human, bytes);
         }
@@ -193,7 +189,6 @@ fn du_path(
         return Ok(self_size);
     }
 
-    // directory
     let mut total = self_size;
     for entry in fs::read_dir(path)? {
         let entry = entry?;
@@ -219,7 +214,6 @@ fn print_size(size: u64, path: &Path, human: bool, bytes: bool) {
     } else if bytes {
         let _ = writeln!(out, "{size}\t{}", path.display());
     } else {
-        // 1K blocks
         let blocks = (size + 1023) / 1024;
         let _ = writeln!(out, "{blocks}\t{}", path.display());
     }
@@ -254,9 +248,6 @@ mod tests {
 
     #[test]
     fn du_path_does_not_hang_on_self_referential_symlink() {
-        // Regression: a symlink loop must not cause unbounded recursion.
-        // du_path already uses symlink_metadata (never follows symlinks
-        // during traversal), so this should terminate immediately.
         let dir = tmp_dir("symlink_loop");
         let loop_link = dir.join("loop");
         std::os::unix::fs::symlink(&dir, &loop_link).unwrap();
@@ -282,8 +273,6 @@ mod tests {
             ..DuOpts::default()
         };
         let total = du_path(&dir, opts, 0, &mut seen).unwrap();
-        // apparent size, bytes mode: exact byte sum plus the dir entry's
-        // own apparent size (typically small but nonzero on most fs).
         assert!(
             total >= 12,
             "expected at least 12 bytes of file content, got {total}"
@@ -305,12 +294,6 @@ mod tests {
 
     #[test]
     fn du_path_hardlinks_counted_once() {
-        // Two directories with the same entry count and same-length entry
-        // names (so their own directory-inode apparent size matches),
-        // differing only in whether the second file is a hardlink to the
-        // first (same inode) or an independent file with equal-length
-        // content. The hardlinked total should be exactly one file's worth
-        // of bytes smaller.
         let dir = tmp_dir("hardlink");
         let a = dir.join("a.txt");
         let b = dir.join("b.txt");

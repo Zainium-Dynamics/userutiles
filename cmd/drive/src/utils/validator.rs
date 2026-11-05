@@ -4,7 +4,6 @@ use std::path::Path;
 /// (no path traversal, no embedded separators, safe character set).
 pub fn is_valid_device(device: &str) -> bool {
     let clean = device.trim_start_matches("/dev/");
-    // Must be non-empty, contain only safe chars, not include traversal
     !clean.is_empty()
         && !clean.contains("..")
         && !clean.contains('/')
@@ -48,7 +47,7 @@ pub fn is_supported_fs(fs: &str) -> bool {
 }
 
 /// Returns true if `name` is safe to join onto a directory path as a single
-/// path component — rejects empty names, `.`/`..`, and any path separator,
+/// path component: rejects empty names, `.`/`..`, and any path separator,
 /// preventing path traversal via `drive snapshot delete/restore <name>`.
 pub fn is_valid_snapshot_name(name: &str) -> bool {
     !name.is_empty() && name != "." && name != ".." && !name.contains(['/', '\\'])

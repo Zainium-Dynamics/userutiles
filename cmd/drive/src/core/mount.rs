@@ -19,7 +19,6 @@ pub fn run_mount(device: &str, custom_mp: Option<&str>, verbose: bool) -> Result
     print_header("Mount Device");
     println!();
 
-    // Check device exists
     if !Path::new(&dev_path).exists() {
         print_error(&format!("Device not found: {dev_path}"));
         println!(
@@ -31,7 +30,6 @@ pub fn run_mount(device: &str, custom_mp: Option<&str>, verbose: bool) -> Result
         return Ok(());
     }
 
-    // Detect filesystem & label
     let (fs_type, label, size) = probe_device(&dev_path);
 
     let mountpoint = match custom_mp {
@@ -64,7 +62,6 @@ pub fn run_mount(device: &str, custom_mp: Option<&str>, verbose: bool) -> Result
     );
     println!();
 
-    // Create mountpoint if needed
     if !mountpoint.exists() {
         fs::create_dir_all(&mountpoint)
             .with_context(|| format!("Cannot create mountpoint {}", mountpoint.display()))?;
@@ -77,7 +74,6 @@ pub fn run_mount(device: &str, custom_mp: Option<&str>, verbose: bool) -> Result
         }
     }
 
-    // Build mount args
     let mut args: Vec<String> = Vec::new();
     if let Some(fs) = &fs_type {
         args.push("-t".to_string());
@@ -163,7 +159,6 @@ pub fn run_umount(device: &str, verbose: bool) -> Result<()> {
         return Ok(());
     }
 
-    // Sync buffers first
     if verbose {
         println!("  {} Flushing buffers (sync)...", "→".bright_cyan());
     }
@@ -179,7 +174,6 @@ pub fn run_umount(device: &str, verbose: bool) -> Result<()> {
             ));
         }
         Ok(_) => {
-            // Try lazy unmount
             let lazy = Command::new("umount").args(["-l", &dev_path]).status();
             if lazy.map(|s| s.success()).unwrap_or(false) {
                 print_success("Lazy unmount succeeded (device was busy)");
@@ -204,8 +198,6 @@ pub fn run_umount(device: &str, verbose: bool) -> Result<()> {
     Ok(())
 }
 
-// --- Helpers -----------------------------------------------------------------
-
 /// Returns (fstype, label, size_bytes)
 fn probe_device(dev: &str) -> (Option<String>, Option<String>, u64) {
     let blkid = Command::new("blkid").args(["-o", "export", dev]).output();
@@ -225,7 +217,6 @@ fn probe_device(dev: &str) -> (Option<String>, Option<String>, u64) {
         }
     }
 
-    // Size from blockdev
     let size = Command::new("blockdev")
         .args(["--getsize64", dev])
         .output()
@@ -249,7 +240,6 @@ fn suggest_mountpoint(dev: &str, label: Option<&str>) -> PathBuf {
         return base.join(lbl.to_lowercase().replace(' ', "_"));
     }
 
-    // Use last component of device name
     let short = Path::new(dev)
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -309,8 +299,6 @@ mod tests {
 
     #[test]
     fn probe_device_dev_null_does_not_panic() {
-        // blkid on /dev/null won't crash — may return empty
         let (_fs, _label, _size) = probe_device("/dev/null");
-        // Just ensure it runs without panic
     }
 }

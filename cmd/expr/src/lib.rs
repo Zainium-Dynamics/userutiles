@@ -1,4 +1,4 @@
-//! user expr — evaluate expressions (integer + string core).
+//! user expr: evaluate expressions (integer + string core).
 
 use usercore::Ui;
 
@@ -356,8 +356,6 @@ mod tests {
 
     #[test]
     fn eval_division_overflow_does_not_panic() {
-        // i64::MIN / -1 overflows a signed division; must be a caught
-        // error, not a panic.
         assert!(eval(&[&i64::MIN.to_string(), "/", "-1"]).is_err());
     }
 

@@ -26,7 +26,7 @@ pub struct Cli {
     #[arg(short, long, global = true)]
     pub verbose: bool,
 
-    /// Machine-readable TOML output (user_utils uses .toml only — never JSON)
+    /// Machine-readable TOML output (user_utils uses .toml only: never JSON)
     #[arg(long, global = true)]
     pub toml: bool,
 
@@ -109,7 +109,7 @@ pub enum Commands {
         /// Device path to repair
         device: String,
 
-        /// Dry-run — only report issues, no changes
+        /// Dry-run: only report issues, no changes
         #[arg(long)]
         dry_run: bool,
     },

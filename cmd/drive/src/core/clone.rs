@@ -23,7 +23,6 @@ pub fn run_clone(source: &str, target: &str, verify: bool) -> Result<()> {
     print_header("Clone Device");
     println!();
 
-    // Validate devices
     if !Path::new(&src).exists() {
         print_error(&format!("Source device not found: {src}"));
         println!();
@@ -71,7 +70,6 @@ pub fn run_clone(source: &str, target: &str, verify: bool) -> Result<()> {
 
     let start = Instant::now();
 
-    // Prefer ddrescue if available, else dd with status=progress
     let success = if which::which("ddrescue").is_ok() {
         run_ddrescue(&src, &dst, src_size)
     } else {
@@ -113,7 +111,6 @@ pub fn run_clone(source: &str, target: &str, verify: bool) -> Result<()> {
 }
 
 fn run_ddrescue(src: &str, dst: &str, _size: u64) -> bool {
-    // ddrescue with a temporary log file
     let log = "/tmp/drive_clone.log";
     let status = Command::new("ddrescue")
         .args(["-f", "-n", src, dst, log])
@@ -136,18 +133,17 @@ fn run_dd(src: &str, dst: &str, _size: u64) -> bool {
 }
 
 fn run_verify(src: &str, dst: &str, size: u64) -> bool {
-    // SHA256 of first and last 64MB for quick integrity check
     let chunk = std::cmp::min(size / 2, 64 * 1024 * 1024);
     let src_hash = hash_head(src, chunk);
     let dst_hash = hash_head(dst, chunk);
     src_hash == dst_hash && src_hash.is_some()
 }
 
-/// Read the first `bytes` of `dev` via `dd` (no shell involved — `dev` is
+/// Read the first `bytes` of `dev` via `dd` (no shell involved: `dev` is
 /// passed as a single argv element, never interpolated into a command
 /// string) and hash it in-process with usercore's pure-Rust SHA-256.
 fn hash_head(dev: &str, bytes: u64) -> Option<String> {
-    let count = bytes / (512 * 1024); // count in 512K blocks
+    let count = bytes / (512 * 1024);
     let out = Command::new("dd")
         .args([&format!("if={dev}"), "bs=512K", &format!("count={count}")])
         .stderr(std::process::Stdio::null())
@@ -213,7 +209,6 @@ mod tests {
 
     #[test]
     fn hash_head_dev_null_is_deterministic() {
-        // /dev/null always reads 0 bytes — both calls return same hash
         let a = hash_head("/dev/null", 0);
         let b = hash_head("/dev/null", 0);
         assert_eq!(a, b);

@@ -168,7 +168,6 @@ fn collect_health(filter: Option<&str>) -> Result<Vec<DeviceHealth>> {
 }
 
 fn read_hwmon_temp(name: &str) -> Option<u32> {
-    // Try /sys/class/block/<name>/device/hwmon/hwmonX/temp1_input
     let paths = [
         format!("/sys/class/block/{name}/device/hwmon"),
         format!("/sys/class/nvme/{name}/hwmon"),
@@ -196,7 +195,6 @@ fn read_smart_data(name: &str) -> (Option<bool>, Option<u64>, Option<u8>) {
         return (None, None, None);
     };
 
-    // Text mode only — user_utils never depends on JSON (including smartctl --json).
     let out = Command::new(&smartctl)
         .args(["-A", "-H", &format!("/dev/{name}")])
         .output();
@@ -287,8 +285,6 @@ fn format_temp(temp: Option<u32>) -> String {
     }
 }
 
-// --- Unit tests ---------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -348,7 +344,6 @@ mod tests {
     #[test]
     fn format_temp_none_is_dash() {
         let s = format_temp(None);
-        // strip ANSI for assertion
         assert!(s.contains('-'));
     }
 

@@ -45,7 +45,6 @@ pub fn run_format(
 
     let size = device_size_bytes(&dev_path);
 
-    // --- Danger warning ---------------------------------------------------
     println!(
         "  {} {} All data on {} will be {} erased!",
         "⚠".bright_yellow(),
@@ -84,7 +83,6 @@ pub fn run_format(
     println!("  {} Preparing to format...", "→".bright_cyan());
     println!();
 
-    // Unmount first if mounted
     if is_mounted(&dev_path) {
         println!("  {} Device is mounted — unmounting...", "→".bright_cyan());
         let _ = Command::new("umount").arg(&dev_path).status();
@@ -95,7 +93,6 @@ pub fn run_format(
     if status {
         print_success("Formatting completed successfully");
 
-        // btrfs gets compression hint
         if fs == "btrfs" {
             print_success("Filesystem created with compression support enabled");
             println!(
@@ -198,8 +195,6 @@ fn is_mounted(dev: &str) -> bool {
         .unwrap_or(false)
 }
 
-// --- Unit tests ---------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,7 +202,6 @@ mod tests {
     #[test]
     fn supported_fs_list_is_complete() {
         for fs in SUPPORTED_FS {
-            // Every entry must be lowercase and non-empty
             assert!(!fs.is_empty());
             assert_eq!(*fs, fs.to_lowercase());
         }
@@ -215,9 +209,6 @@ mod tests {
 
     #[test]
     fn unsupported_fs_caught() {
-        // run_format with bad fs should print error and return Ok (graceful)
-        // We can't call run_format without a real device, but we can verify the
-        // supported list doesn't contain obviously wrong entries.
         assert!(!SUPPORTED_FS.contains(&"reiserfs"));
         assert!(!SUPPORTED_FS.contains(&"zfs"));
     }
@@ -231,7 +222,6 @@ mod tests {
 
     #[test]
     fn is_mounted_on_nonexistent_returns_false() {
-        // /dev/drive_test_xyz should never be in /proc/mounts
         assert!(!is_mounted("/dev/drive_test_xyz_nonexistent"));
     }
 }

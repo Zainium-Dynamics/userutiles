@@ -1,4 +1,4 @@
-//! user findmnt — list or search mounted filesystems.
+//! user findmnt: list or search mounted filesystems.
 use std::fs;
 
 use usercore::Ui;
@@ -42,7 +42,7 @@ fn parse_mounts(text: &str) -> Vec<Mount> {
         .collect()
 }
 
-/// The mount whose target is the longest prefix of `path` — i.e. the
+/// The mount whose target is the longest prefix of `path`: i.e. the
 /// filesystem `path` actually resides on.
 fn find_covering<'a>(mounts: &'a [Mount], path: &str) -> Option<&'a Mount> {
     mounts
@@ -137,7 +137,6 @@ pub fn run() -> i32 {
     // SAFETY: restoring the default SIGPIPE action has no preconditions.
     unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
     let ui = Ui::new("findmnt");
-    // combined flags such as -rn or -no SOURCE
     let args = usercore::args::expand_short(std::env::args().skip(1), "nrPfDlkmvAuhV", "tSTMOo");
 
     let mut fstype: Option<String> = None;
@@ -221,7 +220,6 @@ pub fn run() -> i32 {
     };
     let mounts = parse_mounts(&text);
 
-    // a bare argument is a source if it names one, else a target path
     if let Some(p) = positional {
         if mounts.iter().any(|m| m.source == p) {
             source = Some(p);

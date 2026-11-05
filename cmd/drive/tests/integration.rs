@@ -7,13 +7,9 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 fn drive() -> Command {
     Command::cargo_bin("drive").expect("drive binary not found — run `cargo build` first")
 }
-
-// ─── Basic invocation ─────────────────────────────────────────────────────────
 
 #[test]
 fn no_args_prints_usage() {
@@ -46,8 +42,6 @@ fn help_flag_works() {
         .stdout(predicate::str::contains("Commands"))
         .stdout(predicate::str::contains("Options"));
 }
-
-// ─── Subcommand help ──────────────────────────────────────────────────────────
 
 #[test]
 fn format_help_shows_fs_flag() {
@@ -117,16 +111,12 @@ fn health_help_shows_device_arg() {
         .stdout(predicate::str::contains("device").or(predicate::str::contains("DEVICE")));
 }
 
-// ─── Error paths (no real device needed) ─────────────────────────────────────
-
 #[test]
 fn info_nonexistent_device_exits_ok_with_error_message() {
-    // drive prints a colored error and returns Ok — it does not panic
     drive()
         .args(["info", "drive_no_such_device_xyzzy"])
         .assert()
         .success()
-        // Should either say "not found" or list devices and not find ours
         .stdout(
             predicate::str::is_match("(?i)(not found|unknown)")
                 .unwrap()
@@ -179,8 +169,6 @@ fn clone_nonexistent_source_exits_ok() {
         .stdout(predicate::str::contains("✖").or(predicate::str::contains("not found")));
 }
 
-// ─── TOML output (user_utils: TOML only, never JSON) ──────────────────────────
-
 #[test]
 fn list_toml_produces_valid_table() {
     let out = drive()
@@ -211,15 +199,12 @@ fn health_toml_produces_valid_table() {
     assert!(parsed.is_ok(), "Expected valid TOML, got:\n{stdout}");
 }
 
-// ─── Benchmark against a real temp directory ─────────────────────────────────
-
 #[test]
 fn benchmark_against_tmp_directory() {
     use tempfile::tempdir;
     let dir = tempdir().expect("cannot create tempdir");
     let path = dir.path().to_str().unwrap();
 
-    // Use very short duration so the test is fast
     drive()
         .args([
             "benchmark",
@@ -235,8 +220,6 @@ fn benchmark_against_tmp_directory() {
         .stdout(predicate::str::contains("MB/s"));
 }
 
-// ─── Snapshot against a non-btrfs path (graceful fail) ───────────────────────
-
 #[test]
 fn snapshot_create_on_non_btrfs_reports_gracefully() {
     use tempfile::tempdir;
@@ -247,13 +230,10 @@ fn snapshot_create_on_non_btrfs_reports_gracefully() {
         .args(["snapshot", "create", "--volume", path])
         .assert()
         .success()
-        // Should report that btrfs is required, not panic
         .stdout(predicate::str::contains("btrfs").or(predicate::str::contains("✖")));
 }
 
-// ─── Invalid subcommand rejected ─────────────────────────────────────────────
-
 #[test]
 fn unknown_subcommand_is_rejected() {
-    drive().arg("frobinate").assert().failure(); // clap returns non-zero for unknown subcommands
+    drive().arg("frobinate").assert().failure();
 }

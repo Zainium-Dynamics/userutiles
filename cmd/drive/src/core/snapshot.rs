@@ -37,7 +37,6 @@ fn snapshot_create(volume: &str, name: Option<&str>) -> Result<()> {
     print_header("Create Snapshot");
     println!();
 
-    // Verify btrfs subvolume
     if !is_btrfs(volume) {
         print_error(&format!(
             "{volume} is not a btrfs filesystem — snapshots require btrfs"
@@ -65,7 +64,6 @@ fn snapshot_create(volume: &str, name: Option<&str>) -> Result<()> {
     print_row("Type", &"manual".bright_magenta().to_string());
     println!();
 
-    // Ensure snapshot directory exists as a directory (not subvolume)
     if !snap_dir.exists() {
         fs::create_dir_all(&snap_dir)
             .with_context(|| format!("Cannot create snapshot dir {}", snap_dir.display()))?;
@@ -265,7 +263,6 @@ fn snapshot_restore(name: &str, skip_confirm: bool) -> Result<()> {
     }
     println!();
 
-    // Create a new writable subvolume from the read-only snapshot
     let restore_target = format!("/_restore_{name}");
     let status = Command::new("btrfs")
         .args([
@@ -295,8 +292,6 @@ fn snapshot_restore(name: &str, skip_confirm: bool) -> Result<()> {
     Ok(())
 }
 
-// --- Helpers -----------------------------------------------------------------
-
 fn is_btrfs(path: &str) -> bool {
     let out = Command::new("stat").args(["-f", "-c", "%T", path]).output();
     out.map(|o| String::from_utf8_lossy(&o.stdout).trim() == "btrfs")
@@ -319,14 +314,12 @@ mod tests {
 
     #[test]
     fn is_btrfs_returns_false_for_tmpfs() {
-        // /tmp is typically tmpfs, not btrfs
         assert!(!is_btrfs("/tmp"));
     }
 
     #[test]
     fn dir_size_returns_some_for_existing_dir() {
         let dir = tempdir().unwrap();
-        // du should succeed on any real directory
         let size = dir_size(dir.path().to_path_buf());
         assert!(
             size.is_some(),
@@ -337,14 +330,11 @@ mod tests {
     #[test]
     fn dir_size_returns_none_for_missing_path() {
         let size = dir_size(std::path::PathBuf::from("/no/such/path/xyz_drive_test"));
-        // du will fail, so we expect None
         assert!(size.is_none());
     }
 
     #[test]
     fn snapshot_delete_rejects_path_traversal_before_touching_disk() {
-        // A traversal name must be rejected by validation, never reaching
-        // the snap_path.exists()/btrfs invocation.
         let result = snapshot_delete("../../etc/passwd", true);
         assert!(
             result.is_ok(),

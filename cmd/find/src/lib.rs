@@ -1,9 +1,4 @@
-//! user find — search for files in a directory hierarchy.
-//!
-//! The expression is parsed the way GNU find does it: `-o` binds loosest, then `-a`
-//! (also implied between two terms), then `!`/`-not`, then `( )`. Without an action
-//! (`-print`, `-print0`, `-printf`, `-ls`, `-exec`, `-execdir`, `-delete`, `-quit`) the
-//! whole expression is followed by `-print`.
+//! user find: search for files in a directory hierarchy.
 use std::ffi::CString;
 use std::fs;
 use std::io::{self, Write};
@@ -236,7 +231,6 @@ impl Parser<'_> {
             } else if op == "," {
                 self.pos += 1;
                 let right = self.parse_and()?;
-                // both evaluated, the value is the right one's
                 left = Expr::And(Box::new(Expr::Or(Box::new(left), Box::new(Expr::Test(Test::True)))), Box::new(right));
             } else {
                 break;
@@ -292,7 +286,6 @@ impl Parser<'_> {
             p.pos += 1;
         };
         match tok.as_str() {
-            // options: true wherever they stand
             "-maxdepth" | "-mindepth" => {
                 let a = self.arg(&tok)?;
                 let n = parse_depth(&a).map_err(|_| format!("invalid argument `{a}' to `{tok}'"))?;
@@ -386,7 +379,6 @@ impl Parser<'_> {
                 let f = self.arg(&tok)?;
                 let m = fs::metadata(&f).map_err(|e| format!("'{f}': {}", io_reason(&e)))?;
                 let field = if tok == "-newer" { 'm' } else { tok.as_bytes()[1] as char };
-                // compared against the reference file's modification time
                 test(Test::Newer { field, secs: m.mtime(), nsecs: m.mtime_nsec() })
             }
             "-perm" => {
@@ -438,7 +430,6 @@ impl Parser<'_> {
                 let m = fs::metadata(&f).map_err(|e| format!("'{f}': {}", io_reason(&e)))?;
                 test(Test::SameFile(m.dev(), m.ino()))
             }
-            // actions
             "-print" | "-print0" | "-ls" | "-delete" | "-prune" | "-quit" => {
                 one(self);
                 if tok != "-prune" {
@@ -577,7 +568,6 @@ fn walk(path: &Path, start: &Path, depth: usize, meta: fs::Metadata, dev: u64, o
     if is_dir && depth < o.max_depth && !pruned && !st.quit {
         match fs::read_dir(path) {
             Ok(rd) => {
-                // directory order, as GNU find
                 let names: Vec<_> = rd.filter_map(|e| e.ok()).map(|e| e.path()).collect();
                 for child in names {
                     let m = if o.follow {
@@ -611,7 +601,6 @@ fn walk(path: &Path, start: &Path, depth: usize, meta: fs::Metadata, dev: u64, o
 
 fn eval(e: &Expr, f: &Entry, st: &mut State) -> bool {
     match e {
-        // -quit ends the evaluation where it stands
         Expr::And(a, b) => eval(a, f, st) && !st.quit && eval(b, f, st),
         Expr::Or(a, b) => {
             let left = eval(a, f, st);
@@ -672,7 +661,6 @@ fn test(t: &Test, f: &Entry, st: &State) -> bool {
         Test::False => false,
         Test::Name { pat, icase } => {
             let name = f.path.file_name().map_or_else(|| f.path.as_os_str().as_bytes().to_vec(), |n| n.as_bytes().to_vec());
-            // a start point like "dir/" is matched without its trailing slash
             let name = if name.is_empty() { f.path.as_os_str().as_bytes().to_vec() } else { name };
             fnmatch(pat, &name, *icase)
         }
@@ -687,7 +675,6 @@ fn test(t: &Test, f: &Entry, st: &State) -> bool {
                 .is_ok_and(|r| r.is_match(&f.path.to_string_lossy()))
         }
         Test::Type { types, follow } => {
-            // -type looks at the file itself (or what -L follows); -xtype at the other one
             let ft = if *follow != f.follow {
                 if f.follow { f.lmeta().map(|m| m.file_type()) } else { fs::metadata(f.path).ok().map(|m| m.file_type()) }
                     .unwrap_or(m.file_type())
@@ -709,7 +696,6 @@ fn test(t: &Test, f: &Entry, st: &State) -> bool {
         Test::Readable => access_ok(f.path, libc::R_OK),
         Test::Writable => access_ok(f.path, libc::W_OK),
         Test::Size { op, n, unit } => {
-            // GNU rounds the size up to whole units
             let units = m.len().div_ceil(*unit);
             cmp(*op, units as i64, *n as i64)
         }
@@ -721,7 +707,6 @@ fn test(t: &Test, f: &Entry, st: &State) -> bool {
             };
             let span = if *minutes { 60 } else { 86400 };
             let age = st.now - t;
-            // -mtime N: whole days, fractions dropped; -mmin N: minutes rounded up
             let units = if *minutes { (age + span - 1).div_euclid(span) } else { age.div_euclid(span) };
             cmp(*op, units, *n)
         }
@@ -938,7 +923,6 @@ fn printf(fmt: &str, f: &Entry) -> Vec<u8> {
                 i += 1;
             }
             b'%' if i + 1 < b.len() => {
-                // optional width/flags before the directive
                 let mut j = i + 1;
                 while j < b.len() && (b[j] == b'-' || b[j].is_ascii_digit()) {
                     j += 1;
@@ -1095,7 +1079,6 @@ mod tests {
 
     #[test]
     fn parse_depth_rejects_garbage_instead_of_defaulting_to_zero() {
-        // Regression: this used to silently become 0 via unwrap_or(0).
         assert!(parse_depth("abc").is_err());
         assert!(parse_depth("-1").is_err());
         assert!(parse_depth("").is_err());
@@ -1131,7 +1114,6 @@ mod tests {
         let args: Vec<String> = ["-name", "a", "-o", "-name", "b", "-type", "f"].iter().map(|s| s.to_string()).collect();
         let mut o = Opts { max_depth: 0, min_depth: 0, depth_first: false, follow: false, xdev: false };
         let mut p = Parser { args: &args, pos: 0, opts: &mut o, has_action: false, batches: 0 };
-        // -o is looser: a OR (b AND f)
         assert!(matches!(p.parse_or().unwrap(), Expr::Or(_, r) if matches!(*r, Expr::And(..))));
     }
 }

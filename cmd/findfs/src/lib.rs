@@ -1,5 +1,4 @@
-//! user findfs — find a filesystem by LABEL or UUID.
-//! Thin wrapper over `user_blkid`'s shared lookup logic.
+//! user findfs: find a filesystem by LABEL or UUID.
 use usercore::Ui;
 
 fn print_help() {
