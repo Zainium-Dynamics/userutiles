@@ -1,4 +1,4 @@
-//! user comm — compare two sorted files line by line.
+//! user comm: compare two sorted files line by line.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 

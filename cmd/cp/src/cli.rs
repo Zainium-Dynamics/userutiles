@@ -1,5 +1,3 @@
-// cli.rs — Command-line interface for cp.
-
 use clap::{Parser, ValueEnum};
 
 /// Controls whether `cp` attempts a copy-on-write reflink (Linux `FICLONE`)
@@ -25,11 +23,11 @@ pub enum SparseMode {
     Auto,
     /// Always copy via `SEEK_HOLE`/`SEEK_DATA`, even for dense files.
     Always,
-    /// Never skip holes — every byte (including zero-filled holes) is written.
+    /// Never skip holes: every byte (including zero-filled holes) is written.
     Never,
 }
 
-/// cp — copy files and directories: reflink/sparse-aware, atomic overwrite.
+/// cp: copy files and directories: reflink/sparse-aware, atomic overwrite.
 #[derive(Parser, Debug, Clone)]
 #[command(
     name = "cp",
@@ -123,7 +121,7 @@ pub struct Opts {
     )]
     pub no_target_directory: bool,
 
-    /// Stay on the source filesystem — do not descend into other mount points
+    /// Stay on the source filesystem: do not descend into other mount points
     #[arg(long = "one-file-system")]
     pub one_file_system: bool,
 

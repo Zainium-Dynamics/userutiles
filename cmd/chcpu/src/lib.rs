@@ -1,6 +1,4 @@
-//! user chcpu — configure CPUs (enable/disable/configure/deconfigure,
-//! set the CPU dispatching mode, or trigger a CPU rescan) via the
-//! `/sys/devices/system/cpu` sysfs interface.
+//! user chcpu: configure CPUs (enable/disable/configure/deconfigure,
 use std::collections::BTreeSet;
 use std::fmt;
 use std::fs;
@@ -31,7 +29,7 @@ addresses are: 0, 2, 7, 10, 11, 12, and 13.\n";
 /// prints one status line per CPU touched.
 ///
 /// Returns 0 on full success, 64 on partial success (some CPUs in the
-/// list failed, at least one succeeded — matches util-linux's `chcpu`),
+/// list failed, at least one succeeded: matches util-linux's `chcpu`),
 /// and 1 on a usage error or total failure.
 pub fn run() -> i32 {
     let ui = Ui::new("chcpu");
@@ -227,7 +225,7 @@ impl fmt::Display for DispatchMode {
     }
 }
 
-/// A parsed `<cpu-list>` such as `0-3,5` — a set of CPU indices.
+/// A parsed `<cpu-list>` such as `0-3,5`: a set of CPU indices.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct CpuList(BTreeSet<usize>);
 
@@ -470,8 +468,6 @@ mod tests {
         dir
     }
 
-    // --- CpuList parsing -----------------------------------------------
-
     #[test]
     fn cpu_list_parses_single_index() {
         let l = CpuList::parse("3").unwrap();
@@ -512,8 +508,6 @@ mod tests {
         assert!(err.contains("greater than"));
     }
 
-    // --- DispatchMode parsing -------------------------------------------
-
     #[test]
     fn dispatch_mode_parses_known_values() {
         assert_eq!(
@@ -530,8 +524,6 @@ mod tests {
     fn dispatch_mode_rejects_unknown_value() {
         assert!(DispatchMode::parse("diagonal").is_err());
     }
-
-    // --- CLI parsing ------------------------------------------------------
 
     #[test]
     fn parse_action_enable() {
@@ -563,13 +555,8 @@ mod tests {
         assert!(matches!(parse_action(&args), Ok(Action::Rescan)));
     }
 
-    // --- SysCpu against a real (unprivileged) system, when present ------
-
     #[test]
     fn real_sysfs_cpu_tree_if_present_reports_cpu0_not_hotpluggable_or_missing() {
-        // On this sandbox /sys/devices/system/cpu/cpu0 exists but (like most
-        // real x86 systems) the boot CPU has no `online` attribute, so
-        // enabling/disabling it must fail cleanly rather than panicking.
         let sys = SysCpu::new(Path::new(PATH_SYS_CPU));
         if !sys.base.exists() {
             eprintln!("skipping: {PATH_SYS_CPU} not present in this sandbox");
@@ -600,8 +587,6 @@ mod tests {
         }
     }
 
-    // --- SysCpu against a fully-controlled fixture directory -------------
-
     #[test]
     fn fixture_enable_disable_round_trip() {
         let root = tmp_cpu_root();
@@ -616,7 +601,6 @@ mod tests {
         assert_eq!(msg, "CPU 2 enabled");
         assert_eq!(fs::read_to_string(cpu2.join("online")).unwrap(), "1");
 
-        // Enabling again reports "already enabled" and doesn't error.
         let msg2 = sys.enable_cpu(enabled.as_mut(), 2, true).unwrap();
         assert_eq!(msg2, "CPU 2 is already enabled");
 
@@ -646,7 +630,7 @@ mod tests {
         let cpu3 = root.join("cpu3");
         fs::create_dir_all(&cpu3).unwrap();
         fs::write(cpu3.join("configure"), "1\n").unwrap();
-        fs::write(root.join("online"), "0-2\n").unwrap(); // cpu3 not enabled
+        fs::write(root.join("online"), "0-2\n").unwrap();
 
         let sys = SysCpu::new(&root);
         let enabled = sys.enabled_cpu_list();
@@ -663,7 +647,7 @@ mod tests {
         let cpu1 = root.join("cpu1");
         fs::create_dir_all(&cpu1).unwrap();
         fs::write(cpu1.join("configure"), "1\n").unwrap();
-        fs::write(root.join("online"), "0-1\n").unwrap(); // cpu1 enabled
+        fs::write(root.join("online"), "0-1\n").unwrap();
 
         let sys = SysCpu::new(&root);
         let enabled = sys.enabled_cpu_list();

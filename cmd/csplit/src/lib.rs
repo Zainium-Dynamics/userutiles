@@ -1,4 +1,4 @@
-//! user csplit — split a file into sections determined by context lines.
+//! user csplit: split a file into sections determined by context lines.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 
@@ -193,8 +193,6 @@ mod tests {
     fn split_on_multiple_patterns_searches_forward() {
         let l = lines(&["one", "two", "three", "two", "five"]);
         let cuts = find_split_points(&l, &["/two/".to_string(), "/two/".to_string()]).unwrap();
-        // First /two/ matches index 1; second search resumes at pos=1 and
-        // finds the same line again (skip(pos) includes pos itself).
         assert_eq!(cuts, vec![0, 1, 5]);
     }
 
@@ -216,9 +214,6 @@ mod tests {
     fn empty_input_with_line_number_pattern() {
         let l: Vec<String> = Vec::new();
         let cuts = find_split_points(&l, &["1".to_string()]).unwrap();
-        // With no lines, both the pattern's index (clamped to 0) and the
-        // trailing `lines.len()` cut collapse to 0 after dedup, so there's
-        // a single cut point and no windows to create files from.
         assert_eq!(cuts, vec![0]);
     }
 }

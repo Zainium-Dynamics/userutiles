@@ -1,4 +1,4 @@
-//! user cat — concatenate FILE(s) to standard output.
+//! user cat: concatenate FILE(s) to standard output.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
@@ -32,7 +32,7 @@ pub fn run() -> i32 {
                 println!("cat (user_utils) 0.1.0");
                 return 0;
             }
-            "-u" => {} // ignored (POSIX historical)
+            "-u" => {}
             "--" => {
                 files.extend(args);
                 break;
@@ -88,7 +88,7 @@ pub fn run() -> i32 {
     }
 
     if number_nonblank {
-        number = false; // -b overrides -n
+        number = false;
     }
     if files.is_empty() {
         files.push("-".into());
@@ -180,9 +180,7 @@ fn cat_fancy(
         }
         *prev_blank = blank;
 
-        // `if A {act} else if B {act}` with an identical action is just
         // `if A || B {act}` — clippy (rightly) flags the two-armed form
-        // as duplicated blocks.
         if (number_nonblank && !blank) || number {
             write!(out, "{:6}\t", *line_no)?;
             *line_no += 1;
@@ -216,7 +214,6 @@ fn write_byte(out: &mut impl Write, b: u8, show_tabs: bool, show_nonprint: bool)
     } else if b == 0x7f {
         out.write_all(b"^?")
     } else if b >= 0x80 {
-        // meta
         out.write_all(b"M-")?;
         write_byte(out, b & 0x7f, show_tabs, true)
     } else {

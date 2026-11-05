@@ -1,4 +1,4 @@
-//! user chgrp — change group ownership.
+//! user chgrp: change group ownership.
 use std::ffi::CString;
 use std::fs;
 use std::io;
@@ -106,7 +106,7 @@ fn resolve_group(name: &str) -> Result<u32, String> {
 /// symlink to a directory as a subdirectory to walk into, which can
 /// recurse forever on a self-referential symlink (e.g. `dir/self ->
 /// dir`) and, more generally, would follow `-R` outside the intended
-/// tree via any directory symlink — matching neither GNU `chgrp`'s
+/// tree via any directory symlink: matching neither GNU `chgrp`'s
 /// default (non-`-H`/`-L`) behavior nor safe recursive-walk practice.
 fn chgrp_path(
     path: &Path,
@@ -137,10 +137,6 @@ fn do_chown(path: &Path, gid: u32) -> io::Result<()> {
     let c = CString::new(path.as_os_str().as_bytes())
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "NUL in path"))?;
     // SAFETY: `c` is a valid, NUL-terminated `CString` kept alive for the
-    // duration of this call, so `c.as_ptr()` is a sound `chown(2)` path
-    // argument. Passing `u32::MAX` (i.e. `(uid_t)-1`) as the uid is the
-    // documented POSIX sentinel meaning "leave the owner unchanged", so
-    // only the group is modified.
     let rc = unsafe { libc::chown(c.as_ptr(), u32::MAX as libc::uid_t, gid as libc::gid_t) };
     if rc != 0 {
         Err(io::Error::last_os_error())
@@ -183,9 +179,6 @@ mod tests {
 
     #[test]
     fn resolve_group_own_gid_by_name_or_number() {
-        // Resolving our own gid by its numeric form must always work,
-        // regardless of what group databases are configured in the test
-        // sandbox.
         let gid = own_gid();
         assert_eq!(resolve_group(&gid.to_string()).unwrap(), gid);
     }
@@ -230,15 +223,9 @@ mod tests {
 
     #[test]
     fn chgrp_path_recursive_does_not_follow_self_referential_symlink() {
-        // Regression: recursing via `path.is_dir()` follows symlinks, so
-        // a symlink pointing back at its own parent directory would be
-        // walked forever. `fs::symlink_metadata`-based recursion treats
-        // the symlink as a non-directory leaf, so this returns promptly.
         let dir = scratch_dir("symlink_loop");
         std::os::unix::fs::symlink(&dir, dir.join("self_link")).expect("create symlink");
         let gid = own_gid();
-        // Must terminate (not hang) and must succeed: chown on the
-        // symlink itself follows it to `dir`, which we already own.
         chgrp_path(&dir, gid, true, false, "self").unwrap();
     }
 }

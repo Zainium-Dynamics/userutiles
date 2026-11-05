@@ -13,8 +13,6 @@ fn cp() -> Command {
     Command::cargo_bin("cp").expect("cp binary not found — run `cargo build` first")
 }
 
-// ─── Basic invocation ─────────────────────────────────────────────────────────
-
 #[test]
 fn help_flag_works() {
     cp().arg("--help")
@@ -28,8 +26,6 @@ fn help_flag_works() {
 fn missing_operands_fail_with_usage_error() {
     cp().assert().failure();
 }
-
-// ─── Plain file copy ──────────────────────────────────────────────────────────
 
 #[test]
 fn plain_file_copy() {
@@ -60,8 +56,6 @@ fn copy_into_existing_directory_keeps_basename() {
 
     assert_eq!(fs::read(target_dir.join("a.txt")).unwrap(), b"data");
 }
-
-// ─── Recursive directory copy ─────────────────────────────────────────────────
 
 #[test]
 fn recursive_directory_copy() {
@@ -94,8 +88,6 @@ fn directory_without_recursive_flag_is_rejected() {
 
     assert!(!dst.exists(), "no partial copy should be created");
 }
-
-// ─── Symlink handling: -P (preserve link) vs -L (dereference) ────────────────
 
 #[test]
 fn no_dereference_recreates_the_symlink_itself() {
@@ -138,8 +130,6 @@ fn dereference_copies_symlink_target_content() {
     assert_eq!(fs::read(&dst).unwrap(), b"real content");
 }
 
-// ─── -p/--preserve: permissions and timestamps ────────────────────────────────
-
 #[test]
 fn preserve_flag_carries_over_permissions() {
     use std::os::unix::fs::PermissionsExt;
@@ -158,8 +148,6 @@ fn preserve_flag_carries_over_permissions() {
     assert_eq!(mode, 0o600);
 }
 
-// ─── -n/--no-clobber ───────────────────────────────────────────────────────────
-
 #[test]
 fn no_clobber_refuses_to_overwrite_existing_destination() {
     let dir = tempdir().unwrap();
@@ -168,7 +156,6 @@ fn no_clobber_refuses_to_overwrite_existing_destination() {
     fs::write(&src, b"new content").unwrap();
     fs::write(&dst, b"original content").unwrap();
 
-    // -n prints a warning and continues rather than failing hard.
     cp().args(["-n", src.to_str().unwrap(), dst.to_str().unwrap()])
         .assert()
         .success();
@@ -179,8 +166,6 @@ fn no_clobber_refuses_to_overwrite_existing_destination() {
         "destination must be untouched with --no-clobber"
     );
 }
-
-// ─── Atomic overwrite: no stray temp files, correct final content ────────────
 
 #[test]
 fn overwrite_leaves_no_stray_temp_files() {
@@ -205,13 +190,8 @@ fn overwrite_leaves_no_stray_temp_files() {
     assert!(leftovers.is_empty(), "leftover temp files: {leftovers:?}");
 }
 
-// ─── --reflink=auto silently falls back when unsupported ─────────────────────
-
 #[test]
 fn reflink_auto_falls_back_silently_when_unsupported() {
-    // tmpfs (where tempdir() usually lands) doesn't support FICLONE, so
-    // --reflink=auto (the default) must still succeed via a normal copy
-    // rather than erroring out.
     let dir = tempdir().unwrap();
     let src = dir.path().join("a.txt");
     let dst = dir.path().join("b.txt");
@@ -228,22 +208,15 @@ fn reflink_auto_falls_back_silently_when_unsupported() {
     assert_eq!(fs::read(&dst).unwrap(), b"reflink me");
 }
 
-// ─── Self-referential symlink during recursive copy errors, doesn't hang ─────
-
 #[test]
 fn recursive_copy_rejects_symlink_cycle_instead_of_hanging() {
     let dir = tempdir().unwrap();
     let src = dir.path().join("src");
     fs::create_dir_all(&src).unwrap();
     fs::write(src.join("f.txt"), b"x").unwrap();
-    // A symlink inside src pointing back at src's parent — if dereferenced,
-    // this would recurse forever without cycle detection.
     symlink(&src, src.join("loop")).unwrap();
     let dst = dir.path().join("dst");
 
-    // -L forces dereferencing, which is what would walk into the cycle;
-    // the (dev, ino) visited-set in ops::tree must catch it and error out
-    // instead of hanging.
     cp().args(["-R", "-L", src.to_str().unwrap(), dst.to_str().unwrap()])
         .timeout(Duration::from_secs(10))
         .assert()

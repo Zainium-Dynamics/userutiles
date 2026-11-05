@@ -1,6 +1,3 @@
-// error.rs — Unified CpError type.
-// Every sub-module returns Result<T, CpError>. No unwrap() anywhere.
-
 use std::path::PathBuf;
 use thiserror::Error;
 

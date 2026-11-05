@@ -1,12 +1,3 @@
-// verify.rs — Post-copy integrity verification via XXH3-128.
-//
-// Enabled with --verify: after copying every byte to the destination, hash
-// both sides and compare. A mismatch is reported as an error but the
-// destination is left in place (unlike mv, cp never deletes the source).
-//
-// XXH3-128 is significantly faster than SHA-256 for bulk data and is
-// sufficient to detect I/O corruption, bit-rot, and partial writes.
-
 use std::{
     fs::File,
     io::{BufReader, Read},
@@ -17,7 +8,7 @@ use xxhash_rust::xxh3::Xxh3;
 
 use crate::error::{io_err, CpError, Result};
 
-const BUF: usize = 4 * 1024 * 1024; // 4 MiB read buffer
+const BUF: usize = 4 * 1024 * 1024;
 
 /// Hash a file with XXH3-128 and return the 128-bit digest.
 pub fn hash_file(path: &Path) -> Result<u128> {

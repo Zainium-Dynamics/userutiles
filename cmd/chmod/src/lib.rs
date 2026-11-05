@@ -1,4 +1,4 @@
-//! user chmod — change file mode bits.
+//! user chmod: change file mode bits.
 use std::fs;
 
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
@@ -13,7 +13,6 @@ pub fn run() -> i32 {
     let mut reference: Option<PathBuf> = None;
     let args: Vec<String> = std::env::args().skip(1).collect();
 
-    // strip flags
     let mut mode_str = None;
     let mut paths: Vec<PathBuf> = Vec::new();
     let mut i = 0;
@@ -46,7 +45,6 @@ pub fn run() -> i32 {
                 i += 1;
                 reference = args.get(i).map(PathBuf::from);
             }
-            // a mode such as -w or -x,o+r is not an option
             s if s.len() > 1 && s.starts_with('-') && s[1..].chars().all(|c| "rwxXstugo=+-,".contains(c)) && s[1..].chars().any(|c| "rwxXst".contains(c)) && mode_str.is_none() => {
                 mode_str = Some(s.to_string());
             }
@@ -75,7 +73,6 @@ pub fn run() -> i32 {
         i += 1;
     }
 
-    // --reference=RFILE: RFILE's mode, as octal
     if let Some(r) = &reference {
         match fs::metadata(r) {
             Ok(m) => mode_str = Some(format!("{:o}", m.mode() & 0o7777)),
@@ -132,11 +129,6 @@ fn chmod_path(
     changes: bool,
 ) -> std::io::Result<()> {
     apply_mode(path, mode_str, verbose, changes)?;
-    // Use symlink_metadata (lstat), not path.is_dir() (stat): the latter
-    // follows symlinks, so a symlink pointing at a directory — or worse, a
-    // self-referential symlink — would be treated as a directory and
-    // recursed into forever. Matching GNU chmod, -R never follows symlinks
-    // during recursion.
     if recursive {
         let is_real_dir = fs::symlink_metadata(path)
             .map(|m| m.file_type().is_dir())
@@ -195,13 +187,11 @@ fn rwx(mode: u32) -> String {
 }
 
 fn parse_mode(s: &str, current: u32) -> std::io::Result<u32> {
-    // octal?
     if s.chars().all(|c| c.is_ascii_digit()) {
         let v = u32::from_str_radix(s, 8)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e.to_string()))?;
         return Ok(v & 0o7777);
     }
-    // symbolic: [ugoa]*[+-=][rwxXst]*
     let mut mode = current;
     for part in s.split(',') {
         mode = apply_symbolic(part, mode)?;
@@ -218,7 +208,7 @@ fn apply_symbolic(spec: &str, mut mode: u32) -> std::io::Result<u32> {
     }
     let bytes = spec.as_bytes();
     let mut i = 0;
-    let mut who = 0u32; // bitflags: u=4 g=2 o=1 a=7
+    let mut who = 0u32;
     while i < bytes.len() && matches!(bytes[i], b'u' | b'g' | b'o' | b'a') {
         match bytes[i] {
             b'u' => who |= 4,
@@ -230,7 +220,7 @@ fn apply_symbolic(spec: &str, mut mode: u32) -> std::io::Result<u32> {
         i += 1;
     }
     if who == 0 {
-        who = 7; // default all
+        who = 7;
     }
     if i >= bytes.len() {
         return Err(std::io::Error::new(
@@ -275,7 +265,6 @@ fn apply_symbolic(spec: &str, mut mode: u32) -> std::io::Result<u32> {
         }
         i += 1;
     }
-    // mask bits by who
     let mut mask = 0u32;
     if who & 4 != 0 {
         mask |= 0o700 | 0o4000;
@@ -312,10 +301,6 @@ mod tests {
 
     #[test]
     fn recursive_chmod_does_not_hang_on_self_referential_symlink() {
-        // Regression: chmod_path used path.is_dir() (follows symlinks), so a
-        // symlink pointing back into its own parent directory caused
-        // unbounded recursion during -R. symlink_metadata-based detection
-        // must skip the symlink instead of descending into it.
         let dir = tmp_dir("symlink_loop");
         let loop_link = dir.join("loop");
         std::os::unix::fs::symlink(&dir, &loop_link).unwrap();

@@ -1,5 +1,4 @@
-//! user chattr — change ext2/3/4 file attributes.
-//! Ported from e2fsprogs' `misc/chattr.c` (GPL-2.0).
+//! user chattr: change ext2/3/4 file attributes.
 use std::fs::{self, OpenOptions};
 use std::io;
 use std::os::unix::fs::OpenOptionsExt;
@@ -8,8 +7,6 @@ use std::path::Path;
 
 use usercore::Ui;
 
-// ext2/3/4 inode flag bits (linux/fs.h — stable ABI, mirrors e2fsprogs'
-// ext2fs/ext2_fs.h). libc doesn't expose these.
 const FS_SECRM_FL: u32 = 0x0000_0001;
 const FS_UNRM_FL: u32 = 0x0000_0002;
 const FS_COMPR_FL: u32 = 0x0000_0004;
@@ -29,7 +26,7 @@ const FS_DAX_FL: u32 = 0x0200_0000;
 const FS_PROJINHERIT_FL: u32 = 0x2000_0000;
 const FS_CASEFOLD_FL: u32 = 0x4000_0000;
 
-/// (bit, option char) pairs `chattr` can set/clear — matches e2fsprogs'
+/// (bit, option char) pairs `chattr` can set/clear: matches e2fsprogs'
 /// `chattr.c` `flags_array` exactly.
 const SETTABLE_FLAGS: &[(u32, char)] = &[
     (FS_NOATIME_FL, 'A'),
@@ -102,9 +99,6 @@ fn get_flags(path: &Path) -> io::Result<u32> {
     let f = open_for_ioctl(path, true)?;
     let mut flags: libc::c_int = 0;
     // SAFETY: `flags` is a valid 4-byte out-param; e2fsprogs' own
-    // `fgetflags` uses the same `int` (not the `long` the ioctl number's
-    // encoded size suggests — the kernel handler always copies an `int`
-    // regardless), and `f` stays open for the call.
     let r = unsafe { libc::ioctl(f.as_raw_fd(), libc::FS_IOC_GETFLAGS as _, &mut flags) };
     if r == -1 {
         return Err(io::Error::last_os_error());
@@ -116,7 +110,6 @@ fn set_flags(path: &Path, flags: u32) -> io::Result<()> {
     let f = open_for_ioctl(path, true)?;
     let val: libc::c_int = flags as libc::c_int;
     // SAFETY: `val` is a valid 4-byte in-param for FS_IOC_SETFLAGS, same
-    // reasoning as `get_flags`.
     let r = unsafe { libc::ioctl(f.as_raw_fd(), libc::FS_IOC_SETFLAGS as _, &val) };
     if r == -1 {
         return Err(io::Error::last_os_error());
@@ -139,14 +132,12 @@ fn set_project(path: &Path, project: u32) -> io::Result<()> {
     let f = open_for_ioctl(path, false)?;
     let mut fsx = FsXAttr::default();
     // SAFETY: `fsx` is a correctly-sized (28-byte) `fsxattr` out-param for
-    // FS_IOC_FSGETXATTR; `f` stays open for the call.
     let r = unsafe { libc::ioctl(f.as_raw_fd(), FS_IOC_FSGETXATTR as _, &mut fsx) };
     if r == -1 {
         return Err(io::Error::last_os_error());
     }
     fsx.fsx_projid = project;
     // SAFETY: `fsx` is a valid, correctly-sized `fsxattr` in-param for
-    // FS_IOC_FSSETXATTR, round-tripped from the GETXATTR call above.
     let r = unsafe { libc::ioctl(f.as_raw_fd(), FS_IOC_FSSETXATTR as _, &fsx) };
     if r == -1 {
         return Err(io::Error::last_os_error());
@@ -229,9 +220,6 @@ fn decode_arg(opts: &mut Options, args: &[String], i: &mut usize) -> Result<bool
 }
 
 fn change_attributes(ui: &Ui, opts: &Options, name: &Path) -> bool {
-    // Attribute changes (especially clearing -i) can otherwise be used to
-    // defeat rm/chmod/chown's own protection of these trees, so chattr
-    // guards them the same way those tools do.
     if let Some(reason) = usercore::protect::modification_denied(name) {
         if !opts.silent {
             ui.err(&format!(
@@ -450,8 +438,6 @@ mod tests {
             silent: true,
             ..Default::default()
         };
-        // Same guard rm/chmod/chown use — `-i` here would otherwise be a
-        // way to defeat their protection of this tree.
         assert!(!change_attributes(
             &ui,
             &opts,
@@ -472,12 +458,8 @@ mod tests {
             af: FS_IMMUTABLE_FL,
             ..Default::default()
         };
-        // Immutable/append-only ioctls need CAP_LINUX_IMMUTABLE; skip
-        // assertions (not the failure) when unprivileged so this still
-        // exercises the ioctl path in CI.
         let set_ok = change_attributes(&ui, &opts, &file);
         // SAFETY: `libc::geteuid` takes no arguments and cannot fail or
-        // cause UB.
         if unsafe { libc::geteuid() } == 0 {
             assert!(set_ok);
             assert_eq!(get_flags(&file).unwrap() & FS_IMMUTABLE_FL, FS_IMMUTABLE_FL);

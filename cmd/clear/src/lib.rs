@@ -1,4 +1,4 @@
-//! user clear — clear the terminal screen.
+//! user clear: clear the terminal screen.
 use std::io::{self, Write};
 
 use usercore::Ui;
@@ -102,8 +102,6 @@ mod tests {
 
     #[test]
     fn only_first_argument_is_consulted() {
-        // Matches the original behavior: `clear -x --help` clears without
-        // scrollback and never looks at `--help`.
         assert_eq!(parse(&["-x", "--help"]), Action::NoScrollback);
     }
 }

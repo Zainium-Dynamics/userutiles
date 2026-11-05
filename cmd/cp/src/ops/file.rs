@@ -1,18 +1,3 @@
-// ops/file.rs — Single-file copy engine.
-//
-// Strategy chain for every regular file:
-// 1. FICLONE ioctl — instant CoW reflink (Btrfs / XFS / bcachefs)
-// 2. copy_file_range(2) — kernel zero-copy (Linux >= 4.5)
-// 3. Sparse copy via SEEK_HOLE / SEEK_DATA when the source has holes
-// 4. Buffered read/write — always works
-//
-// Every strategy writes into a temporary file created next to the
-// destination (same directory, so the final rename is same-filesystem and
-// atomic). Only after the copy succeeds and the temp file is fsync'd does
-// `rename(2)` publish it at `dest` — a crash or interruption mid-copy can
-// never leave a truncated destination file, because the old destination
-// (if any) is untouched until the rename.
-
 use std::{
     fs::{self, File, OpenOptions},
     io::{Read, Seek, SeekFrom, Write},
@@ -71,7 +56,6 @@ pub fn copy_file_atomic(
         }
     };
 
-    // fsync the temp file's contents before the rename makes them visible.
     match File::open(&tmp) {
         Ok(f) => {
             let _ = f.sync_all();
@@ -84,7 +68,6 @@ pub fn copy_file_atomic(
         io_err(dest, e)
     })?;
 
-    // Best-effort durability: fsync the directory entry too.
     if let Ok(dir) = File::open(parent) {
         let _ = dir.sync_all();
     }
@@ -117,7 +100,6 @@ fn copy_into(
     src_size: u64,
     tx: &Sender<ProgressEvent>,
 ) -> Result<u64> {
-    // ── Strategy 1: FICLONE reflink ───────────────────────────────────────────
     if opts.reflink != ReflinkMode::Never {
         if try_ficlone(src, tmp).is_ok() {
             let _ = tx.send(ProgressEvent::Progress {
@@ -131,7 +113,6 @@ fn copy_into(
         }
     }
 
-    // ── Strategy 2/3: sparse-aware copy when the source has holes ────────────
     let use_sparse = match opts.sparse {
         SparseMode::Never => false,
         SparseMode::Always => true,
@@ -142,42 +123,21 @@ fn copy_into(
         return copy_sparse(src, tmp, src_size, tx);
     }
 
-    // ── Strategy 4: copy_file_range with buffered fallback ───────────────────
     copy_file_range_loop(src, tmp, src_size, tx)
 }
 
-// ─── Strategy 1: FICLONE reflink ─────────────────────────────────────────────
-//
-// Sends the FICLONE ioctl to the kernel. On supported CoW filesystems
-// (Btrfs, XFS, bcachefs) this duplicates the file's extent tree in O(1)
-// time; no data is moved on disk.
-
 #[cfg(target_os = "linux")]
 fn try_ficlone(src: &Path, dest: &Path) -> std::io::Result<()> {
-    // FICLONE = 0x40049409 (from <linux/fs.h>)
     const FICLONE: libc::c_ulong = 0x4004_9409;
 
     let src_file = File::open(src)?;
     let dest_file = OpenOptions::new().write(true).create_new(true).open(dest)?;
 
     // SAFETY: `dest_file`/`src_file` are open files for the duration of this
-    // call and their raw fds are valid; `FICLONE` is the documented ioctl
-    // request number for a reflink clone and takes the source fd (cast to
-    // `libc::c_int` via the `From` impl `ioctl` expects) as its argument,
-    // not a pointer, so there is no buffer for the kernel to over-read or
-    // over-write. The (checked) return value is the only thing observed
-    // afterwards.
-    // `libc::ioctl`'s request parameter type (`Ioctl`) is `c_int` on musl
-    // but `c_ulong` on glibc — `as _` lets each target's signature pick the
-    // right width instead of hardcoding one and breaking the other.
     let ret = unsafe { libc::ioctl(dest_file.as_raw_fd(), FICLONE as _, src_file.as_raw_fd()) };
 
     if ret == -1 {
         let err = std::io::Error::last_os_error();
-        // `create_new` above already created `dest` (empty) before the ioctl
-        // told us reflink isn't supported here. Without removing it, the
-        // caller's next strategy (sparse / copy_file_range, both also using
-        // `create_new`) would fail with EEXIST on this now-stale empty file.
         drop(dest_file);
         let _ = std::fs::remove_file(dest);
         Err(err)
@@ -191,8 +151,6 @@ fn try_ficlone(_src: &Path, _dest: &Path) -> std::io::Result<()> {
     Err(std::io::Error::from(std::io::ErrorKind::Unsupported))
 }
 
-// ─── Sparse-file detection via SEEK_HOLE / SEEK_DATA ─────────────────────────
-
 #[cfg(target_os = "linux")]
 fn file_has_holes(path: &Path) -> Result<bool> {
     let f = File::open(path).map_err(|e| io_err(path, e))?;
@@ -202,19 +160,13 @@ fn file_has_holes(path: &Path) -> Result<bool> {
     }
 
     // SAFETY: `f` is an open file kept alive for this call, so its raw fd is
-    // valid. `SEEK_DATA` is a plain `libc::c_int` seek-whence constant; the
-    // syscall's return value (an offset or -1 on error, checked below) is
-    // the only side effect observed.
     let data_start = unsafe { libc::lseek(f.as_raw_fd(), 0, libc::SEEK_DATA) };
     if data_start < 0 {
         let err = std::io::Error::last_os_error();
-        // ENXIO: no data at/after offset 0 — a fully sparse file, or the
-        // filesystem doesn't implement SEEK_DATA (treated as "not sparse").
         return Ok(err.raw_os_error() == Some(libc::ENXIO) && size > 0);
     }
 
     // SAFETY: same reasoning as above — `f`'s fd is valid, `SEEK_HOLE` is a
-    // plain seek-whence constant, and only the checked return value matters.
     let hole_start = unsafe { libc::lseek(f.as_raw_fd(), data_start, libc::SEEK_HOLE) };
     if hole_start < 0 {
         return Ok(false);
@@ -228,12 +180,6 @@ fn file_has_holes(_path: &Path) -> Result<bool> {
     Ok(false)
 }
 
-// ─── Strategy: sparse copy via SEEK_HOLE / SEEK_DATA ─────────────────────────
-//
-// Iterates over only the data extents of the source file. Holes in the
-// destination are created with lseek() rather than write(), so they never
-// consume blocks on disk.
-
 #[cfg(target_os = "linux")]
 fn copy_sparse(src: &Path, dest: &Path, src_size: u64, tx: &Sender<ProgressEvent>) -> Result<u64> {
     use libc::{SEEK_DATA, SEEK_HOLE};
@@ -246,7 +192,6 @@ fn copy_sparse(src: &Path, dest: &Path, src_size: u64, tx: &Sender<ProgressEvent
         .map_err(|e| io_err(dest, e))?;
 
     if src_size > 0 {
-        // Pre-size the destination so trailing holes end up correct.
         dest_file
             .seek(SeekFrom::Start(src_size - 1))
             .and_then(|_| dest_file.write_all(&[0u8]))
@@ -262,16 +207,12 @@ fn copy_sparse(src: &Path, dest: &Path, src_size: u64, tx: &Sender<ProgressEvent
 
     loop {
         // SAFETY: `src_file`'s fd is valid for the call's duration; `offset`
-        // is a plain `i64` byte offset within (or at) the file's size, and
-        // `SEEK_DATA` is a seek-whence constant. Only the checked return
-        // value (an offset or -1/errno) is observed.
         let data_start = unsafe { libc::lseek(src_file.as_raw_fd(), offset, SEEK_DATA) };
         if data_start < 0 {
-            break; // No more data regions — done.
+            break;
         }
 
         // SAFETY: same reasoning — valid fd, plain offset, `SEEK_HOLE`
-        // constant, checked return value.
         let hole_start = unsafe { libc::lseek(src_file.as_raw_fd(), data_start, SEEK_HOLE) };
         let hole_start = if hole_start < 0 {
             src_size as i64
@@ -322,12 +263,6 @@ fn copy_sparse(src: &Path, dest: &Path, src_size: u64, tx: &Sender<ProgressEvent
     buffered_copy(src, dest, src_size, tx)
 }
 
-// ─── Strategy: copy_file_range(2) with buffered fallback ────────────────────
-//
-// Copies data entirely inside the kernel — no user-space buffers, no
-// context-switch per page. Falls back to buffered I/O if the syscall is
-// unavailable (old kernels, network mounts, etc.).
-
 fn copy_file_range_loop(
     src: &Path,
     dest: &Path,
@@ -353,16 +288,6 @@ fn copy_file_range_loop(
         let chunk = remaining.min(COPY_CHUNK);
 
         // SAFETY: `src_file`/`dest_file` are open for the duration of this
-        // call and their raw fds are valid; `&mut src_off`/`&mut dest_off`
-        // are valid pointers to live, properly-aligned `i64` locals matching
-        // the syscall's `loff_t*` ABI, which the kernel reads and updates in
-        // place. `chunk` is a `usize` bounded above by `remaining` (itself
-        // bounded by `src_size`), so it cannot overflow to something absurd,
-        // and `flags` is `0`. The return value is a plain `i64` (bytes
-        // copied or a negative errno), checked below before use; a
-        // negative/zero result (e.g. `ENOSYS` on old kernels or a
-        // cross-filesystem pair) falls back to `buffered_copy` rather than
-        // being trusted.
         #[cfg(target_os = "linux")]
         let n = unsafe {
             libc::syscall(

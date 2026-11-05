@@ -1,19 +1,3 @@
-// ops/tree.rs — Recursive directory-tree copy.
-//
-// Walks the source tree using `symlink_metadata` exclusively — never
-// `Path::is_dir()`, which follows symlinks and can spin forever on a
-// self-referential symlink. Symlink entries are copied as symlinks (never
-// descended into) unless `dereference` is set, in which case a visited-set
-// keyed by (dev, ino) still catches true cycles (e.g. a symlink pointing at
-// an ancestor directory) and reports `CpError::SymlinkLoop` instead of
-// hanging.
-//
-// Directories are created first (serially, parents-before-children — walk
-// order guarantees this), then symlinks are recreated, then regular files
-// are copied in parallel on a rayon thread-pool. Directory metadata (mode,
-// timestamps) is preserved last, after all children have been written, so
-// a child write can't bump the parent's mtime back out from under us.
-
 use std::{
     collections::HashSet,
     fs,
@@ -76,21 +60,18 @@ pub fn copy_tree(
         &mut entries,
     )?;
 
-    // ── Directories first, serially, parents before children ────────────────
     for entry in &entries {
         if let Entry::Dir(_, d) = entry {
             fs::create_dir_all(d).map_err(|e| io_err(d, e))?;
         }
     }
 
-    // ── Symlinks: cheap, order-independent ───────────────────────────────────
     for entry in &entries {
         if let Entry::Symlink(s, d) = entry {
             copy_symlink(s, d, opts)?;
         }
     }
 
-    // ── Regular files: parallel copy on a sized rayon pool ───────────────────
     let file_entries: Vec<(&Path, &Path)> = entries
         .iter()
         .filter_map(|e| match e {
@@ -115,7 +96,6 @@ pub fn copy_tree(
 
     drop(tx);
 
-    // ── Directory metadata last ───────────────────────────────────────────────
     if opts.preserve {
         for entry in entries.iter().rev() {
             if let Entry::Dir(s, d) = entry {
@@ -146,8 +126,6 @@ fn walk(
             return Ok(());
         }
 
-        // -L/--dereference: follow the symlink. If it targets a directory,
-        // descend into it too, guarding against cycles via (dev, ino).
         let target_meta = match fs::metadata(src) {
             Ok(m) => m,
             Err(e) => return Err(io_err(src, e)),
@@ -175,7 +153,6 @@ fn walk(
         return Ok(());
     }
 
-    // Regular file (or other special file, copied as a regular file).
     out.push(Entry::File(src.to_owned(), dest.to_owned()));
     Ok(())
 }

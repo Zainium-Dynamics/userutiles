@@ -1,4 +1,4 @@
-//! user cksum — POSIX CRC checksum.
+//! user cksum: POSIX CRC checksum.
 use std::fs::File;
 use std::io::{self, Read};
 use std::sync::OnceLock;
@@ -112,7 +112,7 @@ fn cksum_file(path: &str) -> io::Result<(u32, u64)> {
 
 /// The 256-entry CRC-32/POSIX lookup table, built once and cached (it's
 /// identical on every call, so recomputing it per invocation of
-/// `posix_crc` — as the original implementation did — is wasted work,
+/// `posix_crc`: as the original implementation did — is wasted work,
 /// though not a correctness issue for a short-lived CLI process).
 fn crc_table() -> &'static [u32; 256] {
     static TABLE: OnceLock<[u32; 256]> = OnceLock::new();
@@ -141,7 +141,6 @@ fn posix_crc(data: &[u8]) -> u32 {
     for &b in data {
         crc = (crc << 8) ^ table[(((crc >> 24) as u8) ^ b) as usize];
     }
-    // length
     let mut n = data.len() as u64;
     while n != 0 {
         let b = (n & 0xff) as u8;
@@ -155,7 +154,6 @@ fn posix_crc(data: &[u8]) -> u32 {
 mod tests {
     use super::*;
 
-    // Reference vectors cross-checked against the system `cksum(1)`.
     #[test]
     fn crc32b_vector() {
         assert_eq!(crc32b(b"123456789"), 0xcbf4_3926);

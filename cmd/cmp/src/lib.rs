@@ -1,7 +1,4 @@
-//! user cmp — compare two files byte by byte.
-//!
-//! Thin wrapper: all argument parsing and comparison logic lives in the
-//! vendored `user_diffutils` crate.
+//! user cmp: compare two files byte by byte.
 
 /// Entry point for the `cmp` utility. Delegates entirely to
 /// `user_diffutils::run_cmp`, which reads `std::env::args()` itself.

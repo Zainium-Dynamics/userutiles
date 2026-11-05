@@ -1,4 +1,3 @@
-// user chroot — run command or interactive shell with special root directory.
 use std::ffi::CString;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
@@ -37,10 +36,6 @@ pub fn run() -> i32 {
         }
     };
     // SAFETY: `c` is a valid, NUL-terminated `CString` kept alive for the
-    // duration of this call, so `c.as_ptr()` is a sound `chroot(2)`
-    // argument. `chroot` does not retain the pointer past the call and
-    // reports failure via a normal errno/return-value contract, which is
-    // handled below.
     let rc = unsafe { libc::chroot(c.as_ptr()) };
     if rc != 0 {
         ui.err(&format!(

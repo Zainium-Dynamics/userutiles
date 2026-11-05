@@ -1,16 +1,3 @@
-// run.rs — cp CLI entry for the unified `zutils` binary.
-//
-// Decision tree per source:
-// source is a symlink and not dereferencing => recreate the symlink itself
-// source is a directory (after following, if dereferencing) =>
-//     -R/-r/-a required, else CpError::IsDirectory
-//     => ops::tree::copy_tree (parallel, atomic per-file)
-// otherwise (regular file) => copy_single_file (atomic temp-file + rename)
-//
-// Dereference default follows GNU cp: symlinks are followed for a plain
-// (non-recursive) copy unless -P/-d/-a says otherwise; symlinks are NOT
-// followed during a recursive copy unless -L overrides it.
-
 use std::{fs, path::Path};
 
 use clap::Parser;
@@ -47,8 +34,6 @@ pub fn run(args: Vec<String>) -> i32 {
         ui::fatal("extra operand — -T disallows more than one source.");
     }
 
-    // -a implies -R --preserve=all --no-dereference; -d implies
-    // --no-dereference (copy symlinks as symlinks, no full metadata copy).
     let recursive = opts.recursive || opts.archive;
     let preserve = opts.preserve || opts.preserve_list.is_some() || opts.archive;
     let dereference = resolve_dereference(&opts, recursive);
@@ -172,8 +157,6 @@ fn dispatch_one(
     }
 
     let is_dir = if is_symlink {
-        // Already decided to dereference above — follow it to see what it
-        // points at. A dangling symlink here surfaces as a normal I/O error.
         fs::metadata(src).map_err(|e| io_err(src, e))?.is_dir()
     } else {
         src_meta.is_dir()
@@ -233,8 +216,6 @@ fn resolve_dereference(opts: &Opts, recursive: bool) -> bool {
     } else if opts.no_dereference || opts.links || opts.archive {
         false
     } else {
-        // GNU default: follow symlinks for a plain copy, don't follow them
-        // when copying recursively.
         !recursive
     }
 }
