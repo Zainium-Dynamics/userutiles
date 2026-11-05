@@ -1,15 +1,4 @@
-//! usercore — shared foundation for ZEX utils (Zainium OS coreutils replacement).
-//!
-//! Intentionally independent of uutils/uucore. Zainium OS only, zero dummy stubs.
-//!
-//! # Colour palette (Zainium cyber-tech)
-//! - Heading → bright cyan
-//! - Label key → soft / bright green
-//! - Value → bright magenta
-//! - Success ✓ -> bright green
-//! - Warning ⚠ -> bright yellow
-//! - Error ✖ -> bright red
-//! - Separator -> dim
+//! usercore: shared foundation for ZEX utils (Zainium OS coreutils replacement).
 
 #![cfg_attr(not(target_os = "linux"), allow(dead_code))]
 

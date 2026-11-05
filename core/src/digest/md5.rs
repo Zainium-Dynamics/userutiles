@@ -1,4 +1,4 @@
-//! MD5 (RFC 1321) — for checksum compatibility only.
+//! MD5 (RFC 1321): for checksum compatibility only.
 pub struct Md5 {
     h: [u32; 4],
     len: u64,

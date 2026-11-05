@@ -1,12 +1,4 @@
-//! Zainium protected paths — never removable or modifiable via user_utils tools (even as root).
-//!
-//! Rules:
-//! - `/overlayer/syshub` and everything under it: **cannot be modified or deleted**
-//! - `zaisys` itself (the directory, not its contents): **cannot be deleted**
-//! - `zaisys/kernel` and everything under it: **cannot be modified or deleted**
-//! - everything else under `zaisys`: writable (carve's install-only files live here)
-//! - `zexlib` (both root and contents): **fully modifiable and deletable**
-//! - `.syshub-pending` / `.syshub-rollback` (staged base upgrades): **only zex and quantra-ramfs touch them**
+//! Zainium protected paths: never removable or modifiable via user_utils tools (even as root).
 
 use std::fs;
 use std::path::{Component, Path, PathBuf};

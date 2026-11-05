@@ -1,17 +1,11 @@
 //! Minimal filesystem superblock probing (ext2/3/4, swap, xfs, vfat/FAT,
-//! iso9660) — a practical, from-scratch stand-in for libblkid, since this
-//! workspace doesn't vendor or link it. Not a full port: just the common
-//! on-disk signature/UUID/label fields, verified field-for-field against
-//! util-linux's own `libblkid/src/superblocks/{ext,swap,xfs,vfat,
-//! iso9660}.c` struct layouts and magic offsets, so the numbers here are
-//! real ABI, not guessed.
 use std::fs::File;
 use std::io;
 use std::os::unix::fs::FileExt;
 use std::path::Path;
 
 /// One probe result: filesystem type plus whatever UUID/label it carries
-/// (FAT has no true UUID — its 4-byte volume serial is formatted the same
+/// (FAT has no true UUID: its 4-byte volume serial is formatted the same
 /// `XXXX-XXXX` way `blkid` reports it).
 #[derive(Clone)]
 pub struct Probe {
@@ -34,7 +28,7 @@ fn format_uuid(raw: &[u8; 16]) -> String {
     )
 }
 
-/// Trim trailing NULs/spaces and decode as UTF-8 (lossily — labels are
+/// Trim trailing NULs/spaces and decode as UTF-8 (lossily: labels are
 /// usually plain ASCII in practice); `None` if nothing's left.
 fn clean_label(raw: &[u8]) -> Option<String> {
     let end = raw
@@ -53,7 +47,6 @@ fn clean_label(raw: &[u8]) -> Option<String> {
     }
 }
 
-// --- ext2/3/4 --- (libblkid's ext.c: struct ext2_super_block)
 const EXT3_FEATURE_COMPAT_HAS_JOURNAL: u32 = 0x0004;
 const EXT4_FEATURE_INCOMPAT_EXTENTS: u32 = 0x0040;
 const EXT4_FEATURE_INCOMPAT_64BIT: u32 = 0x0080;
@@ -84,9 +77,6 @@ fn probe_ext(f: &File) -> Option<Probe> {
     })
 }
 
-// --- swap --- (libblkid's swap.c: struct swap_header_v1_2, header always
-// at absolute offset 1024 regardless of which page size the magic sits
-// at — try each real page size the kernel supports in turn).
 fn probe_swap(f: &File) -> Option<Probe> {
     for pagesize in [4096u64, 8192, 16384, 32768, 65536] {
         let magic_off = pagesize - 10;
@@ -99,7 +89,6 @@ fn probe_swap(f: &File) -> Option<Probe> {
             continue;
         }
         if is_v0 {
-            // v0 has no UUID/label field at all.
             return Some(Probe {
                 fstype: "swap".to_string(),
                 uuid: None,
@@ -118,7 +107,6 @@ fn probe_swap(f: &File) -> Option<Probe> {
     None
 }
 
-// --- xfs --- (libblkid's xfs.c: struct xfs_super_block)
 fn probe_xfs(f: &File) -> Option<Probe> {
     let sb = read_at(f, 0, 120)?;
     if &sb[0..4] != b"XFSB" {
@@ -133,22 +121,14 @@ fn probe_xfs(f: &File) -> Option<Probe> {
     })
 }
 
-// --- vfat / FAT12/16/32 --- (libblkid's vfat.c: struct vfat_super_block /
-// msdos_super_block — the magic-string path, which covers the vast
-// majority of real-world FAT filesystems; the cluster-count fallback
-// libblkid also has for magic-less filesystems isn't implemented here).
 fn probe_vfat(f: &File) -> Option<Probe> {
     let boot = read_at(f, 0, 0x200)?;
     if boot[0x1FE] != 0x55 || boot[0x1FF] != 0xAA {
         return None;
     }
-    // FAT32 BPB: magic at 0x52, ext-boot-sign at 0x42, serial at 0x43,
-    // label at 0x47.
     if &boot[0x52..0x5A] == b"FAT32   " {
         return Some(fat_result(&boot, 0x42, 0x43, 0x47));
     }
-    // FAT12/16 BPB: magic at 0x36, ext-boot-sign at 0x26, serial at
-    // 0x27, label at 0x2b.
     let magic = &boot[0x36..0x3E];
     if magic == b"FAT12   " || magic == b"FAT16   " || magic == b"FAT     " {
         return Some(fat_result(&boot, 0x26, 0x27, 0x2b));
@@ -178,8 +158,6 @@ fn fat_result(boot: &[u8], ext_sign_off: usize, serial_off: usize, label_off: us
     }
 }
 
-// --- iso9660 --- (libblkid's iso9660.c: primary volume descriptor at
-// sector 16; no native UUID field, so `uuid` is always `None`).
 fn probe_iso9660(f: &File) -> Option<Probe> {
     let pvd = read_at(f, 32768, 190)?;
     if pvd[0] != 1 || &pvd[1..6] != b"CD001" {
@@ -245,9 +223,7 @@ mod tests {
         {
             let f = std::fs::OpenOptions::new().write(true).open(&p).unwrap();
             f.write_at(&[0x53, 0xEF], 1024 + 56).unwrap();
-            // feature_compat = HAS_JOURNAL
             f.write_at(&0x0004u32.to_le_bytes(), 1024 + 92).unwrap();
-            // feature_incompat = EXTENTS
             f.write_at(&0x0040u32.to_le_bytes(), 1024 + 96).unwrap();
             let uuid = [1u8; 16];
             f.write_at(&uuid, 1024 + 104).unwrap();

@@ -1,11 +1,4 @@
 //! Direct passwd/group lookups, bypassing libc's `getpwnam`/`getgrnam`/etc.
-//! entirely -- those internally open `/etc/passwd`/`/etc/group` via musl's
-//! own internal, non-interposable call chain, which only resolves to
-//! Zainium's real path (`/overlayer/syshub/etc/...`) if the deployed
-//! `libc.so` happens to be built from an already-patched musl source.
-//! Every userutiles tool that needs a name<->id lookup should go through
-//! here instead, so it works correctly regardless of which musl build is
-//! actually deployed.
 
 use crate::zainium;
 use std::fs;

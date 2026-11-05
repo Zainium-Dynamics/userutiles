@@ -1,4 +1,4 @@
-//! BLAKE2b (RFC 7693) — default 64-byte digest for `b2sum`.
+//! BLAKE2b (RFC 7693): default 64-byte digest for `b2sum`.
 
 const IV: [u64; 8] = [
     0x6a09e667f3bcc908,
@@ -43,7 +43,6 @@ impl Blake2b {
     pub fn with_out_len(out_len: usize) -> Self {
         assert!((1..=64).contains(&out_len));
         let mut h = IV;
-        // Parameter block: digest length in low byte of h[0]
         h[0] ^= 0x0101_0000 | (out_len as u64);
         Self {
             h,
@@ -78,7 +77,6 @@ impl Blake2b {
         if self.t[0] < self.buf_len as u64 {
             self.t[1] = self.t[1].wrapping_add(1);
         }
-        // pad
         for i in self.buf_len..128 {
             self.buf[i] = 0;
         }

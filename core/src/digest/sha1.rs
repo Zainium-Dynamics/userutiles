@@ -1,4 +1,4 @@
-//! SHA-1 (FIPS 180-4) — legacy checksum compatibility.
+//! SHA-1 (FIPS 180-4): legacy checksum compatibility.
 pub struct Sha1 {
     h: [u32; 5],
     len: u64,

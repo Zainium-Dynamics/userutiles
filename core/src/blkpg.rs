@@ -1,7 +1,4 @@
-//! `BLKPG` ioctl — tell the running kernel about a partition without
-//! touching on-disk data. Shared by `partx`/`addpart`/`delpart`/
-//! `resizepart`. Structs mirror the kernel's `linux/blkpg.h`, which
-//! `libc` doesn't expose.
+//! `BLKPG` ioctl: tell the running kernel about a partition without
 use std::fs::File;
 use std::io;
 use std::os::unix::io::AsRawFd;
@@ -61,9 +58,6 @@ pub fn notify(
         data: &mut bp,
     };
     // SAFETY: `arg.data` points at `bp`, a live `BlkpgPartition` of
-    // exactly `arg.datalen` bytes, for the duration of this call; `arg`
-    // itself is a correctly-sized `blkpg_ioctl_arg` kept alive here.
-    // `f` is the caller's open block-device descriptor.
     let r = unsafe { libc::ioctl(f.as_raw_fd(), BLKPG as _, &mut arg) };
     if r == -1 {
         Err(io::Error::last_os_error())
@@ -78,10 +72,6 @@ mod tests {
 
     #[test]
     fn struct_sizes_match_kernel_abi() {
-        // linux/blkpg.h: blkpg_partition is 152 bytes on a 64-bit
-        // target (natural C alignment); blkpg_ioctl_arg is 24 bytes. A
-        // mismatch here means the ioctl reads/writes past what the
-        // kernel expects.
         assert_eq!(std::mem::size_of::<BlkpgPartition>(), 152);
         assert_eq!(std::mem::size_of::<BlkpgIoctlArg>(), 24);
     }

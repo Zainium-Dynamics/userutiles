@@ -1,13 +1,4 @@
-//! MBR (DOS) and GPT partition table reading/writing — a from-scratch
-//! stand-in for `libfdisk`, since this workspace doesn't vendor or link
-//! it. Layouts match the real on-disk structures (`linux/msdos_fs.h`-style
-//! MBR partition entries; the UEFI spec's GPT header/entry array), not a
-//! simplified stub — `fdisk -l`/`sfdisk -d` on a table this module wrote
-//! reads it back correctly (see `checklist/`).
-//!
-//! Only a primary (non-extended/logical) MBR layout is supported — the
-//! 4 primary entry slots, no extended-partition chain. GPT support
-//! covers the header + entry array on both the primary and backup copy.
+//! MBR (DOS) and GPT partition table reading/writing: a from-scratch
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -16,7 +7,7 @@ pub const SECTOR_SIZE: u64 = 512;
 const GPT_ENTRY_SIZE: u64 = 128;
 const GPT_ENTRY_COUNT: u64 = 128;
 /// Bytes occupied by the GPT partition entry array (128 entries × 128
-/// bytes = 16 sectors at 512 bytes/sector — the value every real GPT
+/// bytes = 16 sectors at 512 bytes/sector: the value every real GPT
 /// implementation uses).
 const GPT_ENTRY_ARRAY_SECTORS: u64 = (GPT_ENTRY_COUNT * GPT_ENTRY_SIZE) / SECTOR_SIZE;
 
@@ -37,7 +28,7 @@ pub struct Partition {
     /// canonical hyphenated type GUID.
     pub part_type: String,
     pub bootable: bool,
-    /// GPT only — the UTF-16 partition name; always `None` for MBR.
+    /// GPT only: the UTF-16 partition name; always `None` for MBR.
     pub name: Option<String>,
 }
 
@@ -67,8 +58,6 @@ pub fn device_size_sectors(f: &mut File) -> io::Result<u64> {
     Ok(size / SECTOR_SIZE)
 }
 
-// --- MBR ---
-
 fn parse_mbr(boot: &[u8]) -> Vec<Partition> {
     let mut out = Vec::new();
     for slot in 0..4 {
@@ -94,7 +83,7 @@ fn parse_mbr(boot: &[u8]) -> Vec<Partition> {
 
 /// Write a primary MBR table. Preserves the existing bootstrap code
 /// (bytes 0..446) if the target already has a valid-looking sector
-/// there — matches `sfdisk`'s own behavior of never touching boot code
+/// there: matches `sfdisk`'s own behavior of never touching boot code
 /// it didn't write.
 pub fn write_mbr(path: &Path, partitions: &[Partition]) -> io::Result<()> {
     if partitions.len() > 4 {
@@ -125,10 +114,8 @@ pub fn write_mbr(path: &Path, partitions: &[Partition]) -> io::Result<()> {
     f.flush()
 }
 
-// --- GPT ---
-
 /// GPT GUIDs are mixed-endian: the first three fields are little-endian,
-/// the last two are stored (and printed) big-endian/network order — per
+/// the last two are stored (and printed) big-endian/network order: per
 /// the UEFI spec (and matching every real GPT tool's canonical display).
 fn format_guid(raw: &[u8; 16]) -> String {
     format!(
@@ -165,7 +152,7 @@ fn parse_guid(s: &str) -> Option<[u8; 16]> {
 }
 
 /// Common short type aliases `sfdisk` itself accepts, resolved to the
-/// GPT type GUID (or MBR type byte — see [`resolve_mbr_type`]).
+/// GPT type GUID (or MBR type byte: see [`resolve_mbr_type`]).
 pub fn resolve_gpt_type(alias: &str) -> Option<String> {
     match alias {
         "L" | "linux" => Some("0FC63DAF-8483-4772-8E79-3D69D8477DE4".to_string()),
@@ -240,10 +227,8 @@ fn gpt_header_bytes(
 ) -> [u8; 92] {
     let mut h = [0u8; 92];
     h[0..8].copy_from_slice(b"EFI PART");
-    h[8..12].copy_from_slice(&1u32.to_le_bytes()); // revision 1.0
-    h[12..16].copy_from_slice(&92u32.to_le_bytes()); // header_size
-                                                     // header_crc32 (16..20) left 0 — filled in by the caller after this
-                                                     // buffer is otherwise complete, then re-embedded.
+    h[8..12].copy_from_slice(&1u32.to_le_bytes());
+    h[12..16].copy_from_slice(&92u32.to_le_bytes());
     h[24..32].copy_from_slice(&current_lba.to_le_bytes());
     h[32..40].copy_from_slice(&backup_lba.to_le_bytes());
     h[40..48].copy_from_slice(&first_usable.to_le_bytes());
@@ -269,7 +254,6 @@ fn build_entry_array(partitions: &[Partition]) -> io::Result<Vec<u8>> {
         let type_guid = parse_guid(&p.part_type)
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "bad GPT type GUID"))?;
         arr[off..off + 16].copy_from_slice(&type_guid);
-        // unique_partition_guid: random per partition, like real tools.
         let mut unique = [0u8; 16];
         if let Ok(mut urandom) = File::open("/dev/urandom") {
             let _ = urandom.read_exact(&mut unique);
@@ -300,8 +284,6 @@ pub fn write_gpt(path: &Path, partitions: &[Partition]) -> io::Result<()> {
         ));
     }
 
-    // Protective MBR: one partition, type 0xEE, covering the whole disk
-    // (or as much as a 32-bit LBA can address).
     let mut mbr = vec![0u8; 512];
     mbr[446 + 4] = 0xEE;
     mbr[446 + 8..446 + 12].copy_from_slice(&1u32.to_le_bytes());
@@ -322,7 +304,6 @@ pub fn write_gpt(path: &Path, partitions: &[Partition]) -> io::Result<()> {
         let _ = urandom.read_exact(&mut disk_guid);
     }
 
-    // Primary: header at LBA1, entries at LBA2.
     let mut primary_header = gpt_header_bytes(
         1,
         backup_lba,
@@ -337,8 +318,6 @@ pub fn write_gpt(path: &Path, partitions: &[Partition]) -> io::Result<()> {
     write_at(&mut f, SECTOR_SIZE, &primary_header)?;
     write_at(&mut f, 2 * SECTOR_SIZE, &entries)?;
 
-    // Backup: entries just before the backup header, header as the
-    // disk's very last sector.
     let backup_entries_lba = backup_lba - GPT_ENTRY_ARRAY_SECTORS;
     let mut backup_header = gpt_header_bytes(
         backup_lba,
@@ -359,7 +338,7 @@ pub fn write_gpt(path: &Path, partitions: &[Partition]) -> io::Result<()> {
 
 /// Read whichever partition table `path` has (GPT preferred when a
 /// protective-MBR + valid GPT header is present, else plain MBR).
-/// `Ok(None)` means no recognizable signature — not an error.
+/// `Ok(None)` means no recognizable signature: not an error.
 pub fn read_table(path: &Path) -> io::Result<Option<PartitionTable>> {
     let mut f = File::open(path)?;
     let boot = match read_at(&mut f, 0, 512) {
@@ -398,8 +377,6 @@ mod tests {
 
     #[test]
     fn format_guid_matches_canonical_mixed_endian_layout() {
-        // 0FC63DAF-8483-4772-8E79-3D69D8477DE4 — the well-known "Linux
-        // filesystem data" GPT type GUID, round-tripped.
         let raw = parse_guid("0FC63DAF-8483-4772-8E79-3D69D8477DE4").unwrap();
         assert_eq!(format_guid(&raw), "0FC63DAF-8483-4772-8E79-3D69D8477DE4");
     }

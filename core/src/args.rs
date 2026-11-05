@@ -16,7 +16,6 @@ pub fn expand_short<I: IntoIterator<Item = String>>(args: I, flags: &str, with_v
             continue;
         }
         let body = &a[1..];
-        // where the first value-taking letter is, if every letter before it is a known flag
         let mut split = None;
         let mut known = true;
         for (i, c) in body.char_indices() {

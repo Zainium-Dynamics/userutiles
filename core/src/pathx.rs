@@ -20,7 +20,6 @@ pub fn safe_join(base: &Path, relative: &Path) -> PathBuf {
     for c in relative.components() {
         match c {
             Component::Prefix(_) | Component::RootDir => {
-                // Absolute component — reset to that path.
                 out = PathBuf::from(c.as_os_str());
             }
             Component::CurDir => {}

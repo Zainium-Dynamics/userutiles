@@ -1,5 +1,4 @@
 //! The shared front end of `md5sum`, `sha*sum`, `b2sum` and `cksum -a`: GNU's options,
-//! output lines (`HASH  FILE`, `HASH *FILE`, `ALGO (FILE) = HASH`) and `--check`.
 
 use std::io::{self, BufRead, BufReader, Write};
 

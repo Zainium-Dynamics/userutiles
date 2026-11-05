@@ -75,7 +75,6 @@ impl fmt::Display for ZexError {
                     write!(f, "{message}")?;
                 }
                 if let Some(src) = source {
-                    // Avoid duplicating if message already holds the io text.
                     let s = src.to_string();
                     if !message.contains(&s) {
                         write!(f, ": {s}")?;

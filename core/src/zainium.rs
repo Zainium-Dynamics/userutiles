@@ -1,13 +1,4 @@
-//! Zainium OS filesystem layout — overlayer, not FHS `/usr`.
-//!
-//! Reference (read-only): zairoot `overlayer/syshub/etc/profile`
-//!
-//! ```text
-//! PATH="/overlayer/syshub/bin:/overlayer/syshub/sbin"
-//! LD_LIBRARY_PATH="/overlayer/syshub/lib"
-//! ```
-//!
-//! Do **not** assume `/usr/bin`, `/bin`, or `/usr`.
+//! Zainium OS filesystem layout: overlayer, not FHS `/usr`.
 
 /// Primary executable directory.
 pub const SYSHUB_BIN: &str = "/overlayer/syshub/bin";
@@ -27,12 +18,12 @@ pub const SYSHUB_DRIVERS: &str = "/overlayer/syshub/drivers";
 /// Engine / services.
 pub const SYSHUB_ENGINE: &str = "/overlayer/syshub/engine";
 
-/// Config tree — Zainium has no top-level `/etc`; `elevate-umbra` (the
+/// Config tree: Zainium has no top-level `/etc`; `elevate-umbra` (the
 /// `/etc/passwd`+`/etc/shadow` replacement) reads and writes here.
 pub const SYSHUB_ETC: &str = "/overlayer/syshub/etc";
 
 /// Default `PATH` when the environment variable is unset or empty.
-/// Matches ZainiumOS profile — never falls back to `/usr/bin`.
+/// Matches ZainiumOS profile: never falls back to `/usr/bin`.
 pub const DEFAULT_PATH: &str = "/overlayer/syshub/bin:/overlayer/syshub/sbin";
 
 /// Default `LD_LIBRARY_PATH` fallback.
@@ -57,7 +48,6 @@ pub fn effective_prefix() -> std::path::PathBuf {
 /// Order: `LOCATE_PATH` → `ZEX_LOCATEDB` → `$ZEX_PREFIX/var/lib/misc/locatedb`.
 pub fn default_locate_db() -> std::path::PathBuf {
     if let Some(p) = std::env::var_os("LOCATE_PATH") {
-        // LOCATE_PATH may be colon-separated; first entry is primary db
         let s = p.to_string_lossy();
         if let Some(first) = s.split(':').next() {
             if !first.is_empty() {
@@ -99,7 +89,7 @@ pub fn util_name_from_argv0(argv0: &std::ffi::OsStr) -> String {
 
 /// Resolve a config file: `$ZEX_PREFIX/etc/<name>` (real Zainium, and
 /// this is the same directory `elevate-umbra` reads/writes) if it
-/// exists, else `/etc/<name>` — so tools built and tested on an
+/// exists, else `/etc/<name>`: so tools built and tested on an
 /// ordinary Linux host (no `/overlayer` tree) still find a real
 /// `/etc/passwd`. Existence-checked rather than unconditional, since
 /// unlike `PATH`/install-prefix this has no environment-variable
@@ -113,12 +103,12 @@ pub fn etc_path(name: &str) -> std::path::PathBuf {
     }
 }
 
-/// `passwd`-format user database — `etc_path("passwd")`.
+/// `passwd`-format user database: `etc_path("passwd")`.
 pub fn passwd_path() -> std::path::PathBuf {
     etc_path("passwd")
 }
 
-/// `shadow`-format password database — `etc_path("shadow")` (on
+/// `shadow`-format password database: `etc_path("shadow")` (on
 /// Zainium, this is what `elevate-umbra` reads and writes instead of a
 /// real `/etc/shadow`, but the on-disk format is unchanged).
 pub fn shadow_path() -> std::path::PathBuf {
@@ -129,8 +119,6 @@ pub fn shadow_path() -> std::path::PathBuf {
 mod tests {
     use super::*;
 
-    // ZEX_PREFIX is a process-wide env var; serialize the two tests
-    // that mutate it so they can't race each other.
     static PREFIX_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
@@ -143,7 +131,6 @@ mod tests {
         std::fs::create_dir_all(dir.join("etc")).unwrap();
         std::fs::write(dir.join("etc/passwd"), b"root:x:0:0::/root:/bin/sh\n").unwrap();
         // SAFETY: test-only; this test process does not spawn threads
-        // that read the environment concurrently with this mutation.
         unsafe {
             std::env::set_var("ZEX_PREFIX", &dir);
         }
@@ -165,7 +152,6 @@ mod tests {
             std::process::id()
         ));
         // SAFETY: test-only; this test process does not spawn threads
-        // that read the environment concurrently with this mutation.
         unsafe {
             std::env::set_var("ZEX_PREFIX", &dir);
         }

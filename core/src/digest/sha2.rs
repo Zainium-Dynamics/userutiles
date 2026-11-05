@@ -132,15 +132,12 @@ impl Sha256 {
     }
 }
 
-// ─── SHA-224 (SHA-256 with different IV, 28-byte output) ─────────────────────
-
 pub struct Sha224 {
     inner: Sha256,
 }
 
 impl Sha224 {
     pub fn new() -> Self {
-        // Re-use compress by cloning logic via specialized IV through raw construction
         Self {
             inner: Sha256::with_iv([
                 0xc1059ed8, 0x367cd507, 0x3070dd17, 0xf70e5939, 0xffc00b31, 0x68581511, 0x64f98fa7,
@@ -181,8 +178,6 @@ impl Default for Sha256 {
         Self::new()
     }
 }
-
-// ─── SHA-512 ─────────────────────────────────────────────────────────────────
 
 const K512: [u64; 80] = [
     0x428a2f98d728ae22,

@@ -1,7 +1,4 @@
 //! Zainium cyber-tech terminal UI helpers.
-//!
-//! Data tools (cat, head, …) keep stdout clean. Status/errors go to stderr
-//! with this palette so shells and pipelines stay correct.
 
 use std::io::{self, IsTerminal, Write};
 
