@@ -1,4 +1,4 @@
-//! user stat — display file or filesystem status.
+//! user stat: display file or filesystem status.
 use colored::Colorize;
 use std::fs;
 use std::io;
@@ -70,7 +70,6 @@ pub fn run() -> i32 {
         let result = match (&format, filesystem) {
             (Some((fmt, printf)), true) => format_fs(f, fmt, *printf),
             (Some((fmt, printf)), false) => format_file(f, fmt, *printf, deref),
-            // GNU's terse layouts (no SELinux context field: Zainium has no SELinux)
             (None, true) if terse => format_fs(f, "%n %i %l %t %s %S %b %f %a %c %d", false),
             (None, false) if terse => format_file(f, "%n %s %b %f %u %g %D %i %h %t %T %X %Y %Z %W %o", false, deref),
             (None, true) => print_fs(f),
@@ -395,19 +394,11 @@ fn print_fs(path: &str) -> io::Result<()> {
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "path contains NUL"))?;
     let mut st = MaybeUninit::<libc::statvfs>::uninit();
     // SAFETY: `c` is a valid, NUL-terminated `CString` derived from
-    // `path` and kept alive for the duration of this call, so `c.as_ptr()`
-    // is a valid C string pointer. `st.as_mut_ptr()` points to a
-    // correctly-sized, properly-aligned (but possibly-uninitialized)
-    // `libc::statvfs` buffer that `statvfs(2)` is documented to fully
-    // populate on success — matching the `MaybeUninit` contract.
     let rc = unsafe { libc::statvfs(c.as_ptr(), st.as_mut_ptr()) };
     if rc != 0 {
         return Err(io::Error::last_os_error());
     }
     // SAFETY: `rc == 0` above confirms `statvfs` returned success, which
-    // per POSIX means it fully initialized `st`, so `assume_init` is
-    // sound only on this success path (the early `return` above prevents
-    // reaching here on failure).
     let st = unsafe { st.assume_init() };
     // SAFETY: c is a valid C string and sf a zeroed out-buffer; on failure the ID stays 0.
     let mut sf: libc::statfs = unsafe { std::mem::zeroed() };
@@ -496,7 +487,7 @@ mod tests {
     #[test]
     fn print_file_missing_path_errors() {
         let missing = tmp("does_not_exist");
-        assert!(print_file(missing.to_str().unwrap(), false, false).is_err());
+        assert!(print_file(missing.to_str().unwrap(), false).is_err());
     }
 
     #[test]
