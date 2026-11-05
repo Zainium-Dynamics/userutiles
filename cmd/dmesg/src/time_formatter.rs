@@ -1,11 +1,4 @@
 //! Timestamp formatting for `dmesg` records. Every kmsg record carries a
-//! monotonic microsecond timestamp *since boot*; these helpers convert
-//! that into the handful of display formats `dmesg --time-format` offers.
-//!
-//! Every formatter that needs wall-clock time takes the system boot time
-//! as an explicit parameter rather than reading it globally, so the
-//! formatting logic itself is fully unit-testable without touching
-//! `/proc/stat`.
 use chrono::{DateTime, FixedOffset, TimeDelta};
 
 /// `[   12.345678]`-style raw seconds-since-boot, right-aligned to match

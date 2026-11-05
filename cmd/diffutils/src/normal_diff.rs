@@ -1,8 +1,3 @@
-// This file is part of the uutils diffutils package.
-//
-// For the full copyright and license information, please view the LICENSE-*
-// files that was distributed with this source code.
-
 use std::io::Write;
 
 use crate::params::Params;
@@ -31,7 +26,6 @@ impl Mismatch {
     }
 }
 
-// Produces a diff between the expected output and actual output.
 fn make_diff(expected: &[u8], actual: &[u8], stop_early: bool) -> Vec<Mismatch> {
     let mut line_number_expected = 1;
     let mut line_number_actual = 1;
@@ -42,7 +36,6 @@ fn make_diff(expected: &[u8], actual: &[u8], stop_early: bool) -> Vec<Mismatch> 
     let mut actual_lines: Vec<&[u8]> = actual.split(|&c| c == b'\n').collect();
 
     debug_assert_eq!(b"".split(|&c| c == b'\n').count(), 1);
-    // ^ means that underflow here is impossible
     let expected_lines_count = expected_lines.len() - 1;
     let actual_lines_count = actual_lines.len() - 1;
 
@@ -104,7 +97,6 @@ fn make_diff(expected: &[u8], actual: &[u8], stop_early: bool) -> Vec<Mismatch> 
             }
         }
         if stop_early && !results.is_empty() {
-            // Optimization: stop analyzing the files as soon as there are any differences
             return results;
         }
     }
@@ -118,8 +110,6 @@ fn make_diff(expected: &[u8], actual: &[u8], stop_early: bool) -> Vec<Mismatch> 
 
 #[must_use]
 pub fn diff(expected: &[u8], actual: &[u8], params: &Params) -> Vec<u8> {
-    // See https://www.gnu.org/software/diffutils/manual/html_node/Detailed-Normal.html
-    // for details on the syntax of the normal format.
     let mut output = Vec::new();
     let diff_results = make_diff(expected, actual, params.brief);
     if params.brief && !diff_results.is_empty() {
@@ -134,7 +124,6 @@ pub fn diff(expected: &[u8], actual: &[u8], params: &Params) -> Vec<u8> {
         match (expected_count, actual_count) {
             (0, 0) => unreachable!(),
             (0, _) => writeln!(
-                // 'a' stands for "Add lines"
                 &mut output,
                 "{}a{},{}",
                 line_number_expected - 1,
@@ -143,7 +132,6 @@ pub fn diff(expected: &[u8], actual: &[u8], params: &Params) -> Vec<u8> {
             )
             .unwrap(),
             (_, 0) => writeln!(
-                // 'd' stands for "Delete lines"
                 &mut output,
                 "{},{}d{}",
                 line_number_expected,
@@ -152,14 +140,11 @@ pub fn diff(expected: &[u8], actual: &[u8], params: &Params) -> Vec<u8> {
             )
             .unwrap(),
             (1, 1) => writeln!(
-                // 'c' stands for "Change lines"
-                // exactly one line replaced by one line
                 &mut output,
                 "{line_number_expected}c{line_number_actual}"
             )
             .unwrap(),
             (1, _) => writeln!(
-                // one line replaced by multiple lines
                 &mut output,
                 "{}c{},{}",
                 line_number_expected,
@@ -168,7 +153,6 @@ pub fn diff(expected: &[u8], actual: &[u8], params: &Params) -> Vec<u8> {
             )
             .unwrap(),
             (_, 1) => writeln!(
-                // multiple lines replaced by one line
                 &mut output,
                 "{},{}c{}",
                 line_number_expected,
@@ -177,7 +161,6 @@ pub fn diff(expected: &[u8], actual: &[u8], params: &Params) -> Vec<u8> {
             )
             .unwrap(),
             _ => writeln!(
-                // general case: multiple lines replaced by multiple lines
                 &mut output,
                 "{},{}c{},{}",
                 line_number_expected,
@@ -229,7 +212,6 @@ mod tests {
     #[test]
     fn test_permutations() {
         let target = "target/normal-diff/";
-        // test all possible six-line files.
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
@@ -272,8 +254,6 @@ mod tests {
                                 if f != 2 {
                                     bet.write_all(b"l\n").unwrap();
                                 }
-                                // This test diff is intentionally reversed.
-                                // We want it to turn the alef into bet.
                                 let diff = diff(&alef, &bet, &Params::default());
                                 File::create(format!("{target}/ab.diff"))
                                     .unwrap()
@@ -292,8 +272,6 @@ mod tests {
                                     .output()
                                     .unwrap();
                                 assert!(output.status.success(), "{output:?}");
-                                //println!("{}", String::from_utf8_lossy(&output.stdout));
-                                //println!("{}", String::from_utf8_lossy(&output.stderr));
                                 let alef = fs::read(format!("{target}/alef")).unwrap();
                                 assert_eq!(alef, bet);
                             }
@@ -307,7 +285,6 @@ mod tests {
     #[test]
     fn test_permutations_missing_line_ending() {
         let target = "target/normal-diff/";
-        // test all possible six-line files with missing newlines.
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
@@ -364,8 +341,6 @@ mod tests {
                                         }
                                         _ => unreachable!(),
                                     }
-                                    // This test diff is intentionally reversed.
-                                    // We want it to turn the alef into bet.
                                     let diff = diff(&alef, &bet, &Params::default());
                                     File::create(format!("{target}/abn.diff"))
                                         .unwrap()
@@ -385,8 +360,6 @@ mod tests {
                                         .output()
                                         .unwrap();
                                     assert!(output.status.success(), "{output:?}");
-                                    //println!("{}", String::from_utf8_lossy(&output.stdout));
-                                    //println!("{}", String::from_utf8_lossy(&output.stderr));
                                     let alef = fs::read(format!("{target}/alefn")).unwrap();
                                     assert_eq!(alef, bet);
                                 }
@@ -401,7 +374,6 @@ mod tests {
     #[test]
     fn test_permutations_empty_lines() {
         let target = "target/normal-diff/";
-        // test all possible six-line files with missing newlines.
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
@@ -438,8 +410,6 @@ mod tests {
                                 if f != 2 {
                                     bet.write_all(b"l\n").unwrap();
                                 }
-                                // This test diff is intentionally reversed.
-                                // We want it to turn the alef into bet.
                                 let diff = diff(&alef, &bet, &Params::default());
                                 File::create(format!("{target}/ab_.diff"))
                                     .unwrap()
@@ -458,8 +428,6 @@ mod tests {
                                     .output()
                                     .unwrap();
                                 assert!(output.status.success(), "{output:?}");
-                                //println!("{}", String::from_utf8_lossy(&output.stdout));
-                                //println!("{}", String::from_utf8_lossy(&output.stderr));
                                 let alef = fs::read(format!("{target}/alef_")).unwrap();
                                 assert_eq!(alef, bet);
                             }
@@ -473,7 +441,6 @@ mod tests {
     #[test]
     fn test_permutations_reverse() {
         let target = "target/normal-diff/";
-        // test all possible six-line files.
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
@@ -516,8 +483,6 @@ mod tests {
                                 if f != 2 {
                                     bet.write_all(b"f\n").unwrap();
                                 }
-                                // This test diff is intentionally reversed.
-                                // We want it to turn the alef into bet.
                                 let diff = diff(&alef, &bet, &Params::default());
                                 File::create(format!("{target}/abr.diff"))
                                     .unwrap()
@@ -536,8 +501,6 @@ mod tests {
                                     .output()
                                     .unwrap();
                                 assert!(output.status.success(), "{output:?}");
-                                //println!("{}", String::from_utf8_lossy(&output.stdout));
-                                //println!("{}", String::from_utf8_lossy(&output.stderr));
                                 let alef = fs::read(format!("{target}/alefr")).unwrap();
                                 assert_eq!(alef, bet);
                             }

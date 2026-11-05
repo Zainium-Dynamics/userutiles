@@ -1,8 +1,3 @@
-// This file is part of the uutils diffutils package.
-//
-// For the full copyright and license information, please view the LICENSE-*
-// files that was distributed with this source code.
-
 use std::collections::VecDeque;
 use std::io::Write;
 
@@ -35,7 +30,6 @@ impl Mismatch {
     }
 }
 
-// Produces a diff between the expected output and actual output.
 fn make_diff(
     expected: &[u8],
     actual: &[u8],
@@ -53,7 +47,6 @@ fn make_diff(
     let mut actual_lines: Vec<&[u8]> = actual.split(|&c| c == b'\n').collect();
 
     debug_assert_eq!(b"".split(|&c| c == b'\n').count(), 1);
-    // ^ means that underflow here is impossible
     let expected_lines_count = expected_lines.len() as u32 - 1;
     let actual_lines_count = actual_lines.len() as u32 - 1;
 
@@ -84,8 +77,6 @@ fn make_diff(
                     mismatch.lines.pop();
                     match mismatch.lines.pop() {
  Some(DiffLine::Actual(res)) => {
- // We have to make sure that Actual (the + lines)
- // always come after Expected (the - lines)
  mismatch.lines.push(DiffLine::Expected(str.to_vec()));
  if line_number_expected > expected_lines_count {
  mismatch.lines.push(DiffLine::MissingNL);
@@ -126,7 +117,6 @@ fn make_diff(
                 lines_since_mismatch = 0;
             }
             diff::Result::Both(str, _) => {
-                // if one of them is missing a newline and the other isn't, then they don't actually match
                 if (line_number_actual > actual_lines_count)
                     && (line_number_expected > expected_lines_count)
                 {
@@ -190,7 +180,6 @@ fn make_diff(
             }
         }
         if stop_early && !results.is_empty() {
-            // Optimization: stop analyzing the files as soon as there are any differences
             return results;
         }
     }
@@ -200,7 +189,6 @@ fn make_diff(
 
     if results.is_empty() && expected_lines_count != actual_lines_count {
         let mut mismatch = Mismatch::new(expected_lines.len() as u32, actual_lines.len() as u32);
-        // empty diff and only expected lines has a missing line at end
         if expected_lines_count != expected_lines.len() as u32 {
             mismatch.lines.push(DiffLine::Expected(
                 expected_lines
@@ -276,82 +264,6 @@ pub fn diff(expected: &[u8], actual: &[u8], params: &Params) -> Vec<u8> {
                 DiffLine::MissingNL => {}
             }
         }
-        // Let's imagine this diff file
-        //
-        // --- a/something
-        // +++ b/something
-        // @@ -2,0 +3,1 @@
-        // + x
-        //
-        // In the unified diff format as implemented by GNU diff and patch,
-        // this is an instruction to insert the x *after* the preexisting line 2,
-        // not before. You can demonstrate it this way:
-        //
-        // $ echo -ne '--- a/something\t\n+++ b/something\t\n@@ -2,0 +3,1 @@\n+ x\n' > diff
-        // $ echo -ne 'a\nb\nc\nd\n' > something
-        // $ patch -p1 < diff
-        // patching file something
-        // $ cat something
-        // a
-        // b
-        // x
-        // c
-        // d
-        //
-        // Notice how the x winds up at line 3, not line 2. This requires contortions to
-        // work with our diffing algorithm, which keeps track of the "intended destination line",
-        // not a line that things are supposed to be placed after. It's changing the first number,
-        // not the second, that actually affects where the x goes.
-        //
-        // # change the first number from 2 to 3, and now the x is on line 4 (it's placed after line 3)
-        // $ echo -ne '--- a/something\t\n+++ b/something\t\n@@ -3,0 +3,1 @@\n+ x\n' > diff
-        // $ echo -ne 'a\nb\nc\nd\n' > something
-        // $ patch -p1 < diff
-        // patching file something
-        // $ cat something
-        // a
-        // b
-        // c
-        // x
-        // d
-        // # change the third number from 3 to 1000, and it's obvious that it's the first number that's
-        // # actually being read
-        // $ echo -ne '--- a/something\t\n+++ b/something\t\n@@ -2,0 +1000,1 @@\n+ x\n' > diff
-        // $ echo -ne 'a\nb\nc\nd\n' > something
-        // $ patch -p1 < diff
-        // patching file something
-        // $ cat something
-        // a
-        // b
-        // x
-        // c
-        // d
-        //
-        // Now watch what happens if I add a context line:
-        //
-        // $ echo -ne '--- a/something\t\n+++ b/something\t\n@@ -2,1 +3,2 @@\n+ x\n c\n' > diff
-        // $ echo -ne 'a\nb\nc\nd\n' > something
-        // $ patch -p1 < diff
-        // patching file something
-        // Hunk #1 succeeded at 3 (offset 1 line).
-        //
-        // It technically "succeeded", but this is a warning. We want to produce clean diffs.
-        // Now that I have a context line, I'm supposed to say what line it's actually on, which is the
-        // line that the x will wind up on, and not the line immediately before.
-        //
-        // $ echo -ne '--- a/something\t\n+++ b/something\t\n@@ -3,1 +3,2 @@\n+ x\n c\n' > diff
-        // $ echo -ne 'a\nb\nc\nd\n' > something
-        // $ patch -p1 < diff
-        // patching file something
-        // $ cat something
-        // a
-        // b
-        // x
-        // c
-        // d
-        //
-        // I made this comment because this stuff is not obvious from GNU's
-        // documentation on the format at all.
         if expected_count == 0 {
             line_number_expected -= 1;
         }
@@ -411,7 +323,6 @@ mod tests {
     #[test]
     fn test_permutations() {
         let target = "target/unified-diff/";
-        // test all possible six-line files.
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
@@ -454,8 +365,6 @@ mod tests {
                                 if f != 2 {
                                     bet.write_all(b"l\n").unwrap();
                                 }
-                                // This test diff is intentionally reversed.
-                                // We want it to turn the alef into bet.
                                 let diff = diff(
                                     &alef,
                                     &bet,
@@ -513,7 +422,6 @@ mod tests {
     #[test]
     fn test_permutations_missing_line_ending() {
         let target = "target/unified-diff/";
-        // test all possible six-line files with missing newlines.
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
@@ -570,8 +478,6 @@ mod tests {
                                         }
                                         _ => unreachable!(),
                                     }
-                                    // This test diff is intentionally reversed.
-                                    // We want it to turn the alef into bet.
                                     let diff = diff(
                                         &alef,
                                         &bet,
@@ -598,8 +504,6 @@ mod tests {
                                         .output()
                                         .unwrap();
                                     assert!(output.status.success(), "{output:?}");
-                                    //println!("{}", String::from_utf8_lossy(&output.stdout));
-                                    //println!("{}", String::from_utf8_lossy(&output.stderr));
                                     let alef = fs::read(format!("{target}/alefn")).unwrap();
                                     assert_eq!(alef, bet);
                                 }
@@ -614,7 +518,6 @@ mod tests {
     #[test]
     fn test_permutations_empty_lines() {
         let target = "target/unified-diff/";
-        // test all possible six-line files with missing newlines.
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
@@ -666,8 +569,6 @@ mod tests {
                                         3 => {}
                                         _ => unreachable!(),
                                     }
-                                    // This test diff is intentionally reversed.
-                                    // We want it to turn the alef into bet.
                                     let diff = diff(
                                         &alef,
                                         &bet,
@@ -694,8 +595,6 @@ mod tests {
                                         .output()
                                         .unwrap();
                                     assert!(output.status.success(), "{output:?}");
-                                    //println!("{}", String::from_utf8_lossy(&output.stdout));
-                                    //println!("{}", String::from_utf8_lossy(&output.stderr));
                                     let alef = fs::read(format!("{target}/alef_")).unwrap();
                                     assert_eq!(alef, bet);
                                 }
@@ -710,7 +609,6 @@ mod tests {
     #[test]
     fn test_permutations_missing_lines() {
         let target = "target/unified-diff/";
-        // test all possible six-line files.
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
@@ -747,8 +645,6 @@ mod tests {
                                 if f != 2 {
                                     bet.write_all(b"l\n").unwrap();
                                 }
-                                // This test diff is intentionally reversed.
-                                // We want it to turn the alef into bet.
                                 let diff = diff(
                                     &alef,
                                     &bet,
@@ -775,8 +671,6 @@ mod tests {
                                     .output()
                                     .unwrap();
                                 assert!(output.status.success(), "{output:?}");
-                                //println!("{}", String::from_utf8_lossy(&output.stdout));
-                                //println!("{}", String::from_utf8_lossy(&output.stderr));
                                 let alef = fs::read(format!("{target}/alefx")).unwrap();
                                 assert_eq!(alef, bet);
                             }
@@ -790,7 +684,6 @@ mod tests {
     #[test]
     fn test_permutations_reverse() {
         let target = "target/unified-diff/";
-        // test all possible six-line files.
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
@@ -833,8 +726,6 @@ mod tests {
                                 if f != 2 {
                                     bet.write_all(b"f\n").unwrap();
                                 }
-                                // This test diff is intentionally reversed.
-                                // We want it to turn the alef into bet.
                                 let diff = diff(
                                     &alef,
                                     &bet,
@@ -861,8 +752,6 @@ mod tests {
                                     .output()
                                     .unwrap();
                                 assert!(output.status.success(), "{output:?}");
-                                //println!("{}", String::from_utf8_lossy(&output.stdout));
-                                //println!("{}", String::from_utf8_lossy(&output.stderr));
                                 let alef = fs::read(format!("{target}/alefr")).unwrap();
                                 assert_eq!(alef, bet);
                             }

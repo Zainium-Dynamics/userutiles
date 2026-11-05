@@ -1,11 +1,4 @@
-//! user date — print or set the system date and time.
-//!
-//! FORMAT goes through the C library's strftime, with GNU's additions (`%N`, `%:z`,
-//! `%::z`, `%q`, `%P`, and the `-` `_` `0` `^` `#` flags and widths). `-d STRING` takes
-//! what scripts give GNU date: `@SECONDS`, ISO 8601 dates and times (with `T`, a zone
-//! and fractions), `MM/DD/YYYY`, month names, `HH:MM[:SS]` with am/pm, `now`, `today`,
-//! `yesterday`, `tomorrow`, `noon`, `midnight`, weekday names, and relative items
-//! (`+1 day`, `2 weeks ago`, `next month`, `last year`).
+//! user date: print or set the system date and time.
 use std::ffi::CString;
 use std::io::{self, BufRead, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -94,7 +87,6 @@ pub fn run() -> i32 {
             }
             s if s.starts_with('+') => format = Some(s[1..].to_string()),
             s if s.starts_with('-') && s.len() > 1 => {
-                // bundled short options: -ud, -Ru
                 let mut ok = true;
                 for c in s[1..].chars() {
                     match c {
@@ -108,7 +100,6 @@ pub fn run() -> i32 {
                     return 1;
                 }
             }
-            // MMDDhhmm[[CC]YY][.ss]: set the clock
             other => set = Some(other.to_string()),
         }
         i += 1;
@@ -290,7 +281,6 @@ fn format_time_ns(secs: i64, nsec: u32, fmt: &str, utc: bool) -> String {
             't' => "\t".into(),
             other => c_strftime(&format!("%{other}"), &tm),
         };
-        // GNU flags and widths on top of what strftime gave
         let numeric = val.chars().all(|ch| ch.is_ascii_digit() || ch == ' ' || ch == '-' || ch == '+');
         match flag {
             Some('-') if numeric => {
@@ -422,11 +412,9 @@ pub fn parse_date(input: &str, now: i64, now_ns: u32, utc: bool) -> Option<(i64,
     let mut rel_secs = 0i64;
     let mut weekday: Option<(i32, i64)> = None;
 
-    // ISO 8601 "T" between date and time, and "," / "Z" glued on
     let s = s.replace(',', " ");
     let mut tokens: Vec<String> = Vec::new();
     for w in s.split_whitespace() {
-        // 2020-01-01t10:00:00+02:00 → date, time
         if let Some(pos) = w.find('t').filter(|p| *p == 10 && w.as_bytes()[4] == b'-') {
             tokens.push(w[..pos].to_string());
             tokens.push(w[pos + 1..].to_string());
@@ -447,7 +435,6 @@ pub fn parse_date(input: &str, now: i64, now_ns: u32, utc: bool) -> Option<(i64,
         let next = tokens.get(i + 1).cloned();
         i += 1;
         let num = w.parse::<i64>().ok();
-        // YYYY-MM-DD
         let dash: Vec<&str> = w.split('-').collect();
         if dash.len() == 3 && dash.iter().all(|p| !p.is_empty() && p.bytes().all(|c| c.is_ascii_digit())) {
             tm.tm_year = dash[0].parse::<i32>().ok()? - 1900;
@@ -456,7 +443,6 @@ pub fn parse_date(input: &str, now: i64, now_ns: u32, utc: bool) -> Option<(i64,
             have_date = true;
             continue;
         }
-        // MM/DD/YYYY, MM/DD
         let slash: Vec<&str> = w.split('/').collect();
         if (slash.len() == 2 || slash.len() == 3) && slash.iter().all(|p| !p.is_empty() && p.bytes().all(|c| c.is_ascii_digit())) {
             tm.tm_mon = slash[0].parse::<i32>().ok()? - 1;
@@ -468,7 +454,6 @@ pub fn parse_date(input: &str, now: i64, now_ns: u32, utc: bool) -> Option<(i64,
             have_date = true;
             continue;
         }
-        // HH:MM[:SS[.frac]][zone][am|pm]
         if w.contains(':') && w.as_bytes()[0].is_ascii_digit() {
             let mut t = w.as_str();
             let mut ampm: Option<bool> = None;
@@ -516,7 +501,6 @@ pub fn parse_date(input: &str, now: i64, now_ns: u32, utc: bool) -> Option<(i64,
             }
             continue;
         }
-        // 3pm, 11am
         if let Some(h) = w.strip_suffix("pm").or_else(|| w.strip_suffix("am")).and_then(|h| h.parse::<i32>().ok()) {
             let pm = w.ends_with("pm");
             set_time(&mut tm, if pm && h < 12 { h + 12 } else if !pm && h == 12 { 0 } else { h }, 0, 0);
@@ -580,7 +564,6 @@ pub fn parse_date(input: &str, now: i64, now_ns: u32, utc: bool) -> Option<(i64,
             _ => {}
         }
         if w.starts_with(['+', '-']) && w.len() > 1 && w[1..].bytes().all(|c| c.is_ascii_digit()) && !have_time && offset.is_none() && next.as_deref().and_then(unit_of).is_none() && w.len() == 5 {
-            // +0200 zone
             offset = Some(parse_offset(&w)?);
             continue;
         }
@@ -594,7 +577,6 @@ pub fn parse_date(input: &str, now: i64, now_ns: u32, utc: bool) -> Option<(i64,
                     i += 1;
                 }
                 None if w.len() == 8 && !have_date && n > 0 => {
-                    // YYYYMMDD
                     tm.tm_year = (n / 10000) as i32 - 1900;
                     tm.tm_mon = (n / 100 % 100) as i32 - 1;
                     tm.tm_mday = (n % 100) as i32;
@@ -617,7 +599,6 @@ pub fn parse_date(input: &str, now: i64, now_ns: u32, utc: bool) -> Option<(i64,
             continue;
         }
         if let Some((months, size)) = unit_of(&w) {
-            // "day" alone is "1 day"
             if months { rel_months += size } else { rel_secs += size }
             continue;
         }
@@ -674,7 +655,6 @@ mod tests {
 
     #[test]
     fn known_timestamp_formats_correctly_utc() {
-        // 2024-01-15 12:34:56 UTC
         let secs = 1_705_322_096;
         assert_eq!(format_time(secs, "%F %T", true), "2024-01-15 12:34:56");
         assert_eq!(format_time(secs, "%Y", true), "2024");
@@ -712,7 +692,6 @@ mod tests {
 
     #[test]
     fn weekday_and_month_names() {
-        // 1970-01-01 was a Thursday.
         assert_eq!(format_time(0, "%a %b", true), "Thu Jan");
         assert_eq!(format_time(0, "%A %B", true), "Thursday January");
     }

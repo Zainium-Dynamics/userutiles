@@ -1,4 +1,4 @@
-//! user delpart — tell the kernel a partition was removed.
+//! user delpart: tell the kernel a partition was removed.
 use std::path::Path;
 
 use usercore::blkpg::{self, BLKPG_DEL_PARTITION};

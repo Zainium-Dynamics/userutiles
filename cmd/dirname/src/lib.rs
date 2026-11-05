@@ -1,4 +1,4 @@
-//! user dirname — strip last component from file name.
+//! user dirname: strip last component from file name.
 use std::path::Path;
 
 use usercore::Ui;

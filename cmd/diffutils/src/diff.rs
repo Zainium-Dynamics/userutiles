@@ -1,8 +1,3 @@
-// This file is part of the uutils diffutils package.
-//
-// For the full copyright and license information, please view the LICENSE-*
-// files that was distributed with this source code.
-
 use crate::params::{parse_params, Format};
 use crate::utils::report_failure_to_read_input_file;
 use crate::{context_diff, ed_diff, normal_diff, side_diff, unified_diff};
@@ -13,17 +8,11 @@ use std::io::{self, stdout, Read, Write};
 use std::iter::Peekable;
 use std::process::exit;
 
-// Exit codes are documented at
-// https://www.gnu.org/software/diffutils/manual/html_node/Invoking-diff.html.
-// An exit status of 0 means no differences were found,
-// 1 means some differences were found,
-// and 2 means trouble.
 pub fn main(opts: Peekable<ArgsOs>) -> i32 {
     let params = parse_params(opts).unwrap_or_else(|error| {
         eprintln!("{error}");
         exit(2);
     });
-    // if from and to are the same file, no need to perform any comparison
     let maybe_report_identical_files = || {
         if params.report_identical_files {
             println!(
@@ -40,7 +29,6 @@ pub fn main(opts: Peekable<ArgsOs>) -> i32 {
         return 0;
     }
 
-    // read files
     fn read_file_contents(filepath: &OsString) -> io::Result<Vec<u8>> {
         if filepath == "-" {
             let mut content = Vec::new();
@@ -70,7 +58,6 @@ pub fn main(opts: Peekable<ArgsOs>) -> i32 {
         return 2;
     }
 
-    // run diff
     let result: Vec<u8> = match params.format {
         Format::Normal => normal_diff::diff(&from_content, &to_content, &params),
         Format::Unified => unified_diff::diff(&from_content, &to_content, &params),

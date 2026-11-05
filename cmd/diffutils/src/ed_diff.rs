@@ -1,8 +1,3 @@
-// This file is part of the uutils diffutils package.
-//
-// For the full copyright and license information, please view the LICENSE-*
-// files that was distributed with this source code.
-
 use std::io::Write;
 
 use crate::params::Params;
@@ -44,7 +39,6 @@ impl Mismatch {
     }
 }
 
-// Produces a diff between the expected output and actual output.
 fn make_diff(expected: &[u8], actual: &[u8], stop_early: bool) -> Result<Vec<Mismatch>, DiffError> {
     let mut line_number_expected = 1;
     let mut line_number_actual = 1;
@@ -55,7 +49,6 @@ fn make_diff(expected: &[u8], actual: &[u8], stop_early: bool) -> Result<Vec<Mis
     let mut actual_lines: Vec<&[u8]> = actual.split(|&c| c == b'\n').collect();
 
     debug_assert_eq!(b"".split(|&c| c == b'\n').count(), 1);
-    // ^ means that underflow here is impossible
     let _expected_lines_count = expected_lines.len() - 1;
     let _actual_lines_count = actual_lines.len() - 1;
 
@@ -98,7 +91,6 @@ fn make_diff(expected: &[u8], actual: &[u8], stop_early: bool) -> Result<Vec<Mis
             }
         }
         if stop_early && !results.is_empty() {
-            // Optimization: stop analyzing the files as soon as there are any differences
             return Ok(results);
         }
     }
@@ -180,7 +172,6 @@ mod tests {
     #[test]
     fn test_permutations() {
         let target = "target/ed-diff/";
-        // test all possible six-line files.
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
@@ -222,8 +213,6 @@ mod tests {
                                 if f != 2 {
                                     bet.write_all(b"l\n").unwrap();
                                 }
-                                // This test diff is intentionally reversed.
-                                // We want it to turn the alef into bet.
                                 let diff = diff_w(&alef, &bet, &format!("{target}/alef")).unwrap();
                                 File::create(format!("{target}/ab.ed"))
                                     .unwrap()
@@ -235,7 +224,7 @@ mod tests {
                                 fb.write_all(&bet[..]).unwrap();
                                 let _ = fa;
                                 let _ = fb;
-                                #[cfg(not(windows))] // there's no ed on windows
+                                #[cfg(not(windows))]
                                 {
                                     use std::process::Command;
                                     let output = Command::new("ed")
@@ -244,8 +233,6 @@ mod tests {
                                         .output()
                                         .unwrap();
                                     assert!(output.status.success(), "{output:?}");
-                                    //println!("{}", String::from_utf8_lossy(&output.stdout));
-                                    //println!("{}", String::from_utf8_lossy(&output.stderr));
                                     let alef = std::fs::read(format!("{target}/alef")).unwrap();
                                     assert_eq!(alef, bet);
                                 }
@@ -260,7 +247,6 @@ mod tests {
     #[test]
     fn test_permutations_empty_lines() {
         let target = "target/ed-diff/";
-        // test all possible six-line files with missing newlines.
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
@@ -296,8 +282,6 @@ mod tests {
                                 if f != 2 {
                                     bet.write_all(b"l\n").unwrap();
                                 }
-                                // This test diff is intentionally reversed.
-                                // We want it to turn the alef into bet.
                                 let diff = diff_w(&alef, &bet, &format!("{target}/alef_")).unwrap();
                                 File::create(format!("{target}/ab_.ed"))
                                     .unwrap()
@@ -309,7 +293,7 @@ mod tests {
                                 fb.write_all(&bet[..]).unwrap();
                                 let _ = fa;
                                 let _ = fb;
-                                #[cfg(not(windows))] // there's no ed on windows
+                                #[cfg(not(windows))]
                                 {
                                     use std::process::Command;
                                     let output = Command::new("ed")
@@ -318,8 +302,6 @@ mod tests {
                                         .output()
                                         .unwrap();
                                     assert!(output.status.success(), "{output:?}");
-                                    //println!("{}", String::from_utf8_lossy(&output.stdout));
-                                    //println!("{}", String::from_utf8_lossy(&output.stderr));
                                     let alef = std::fs::read(format!("{target}/alef_")).unwrap();
                                     assert_eq!(alef, bet);
                                 }
@@ -334,7 +316,6 @@ mod tests {
     #[test]
     fn test_permutations_reverse() {
         let target = "target/ed-diff/";
-        // test all possible six-line files.
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
@@ -376,8 +357,6 @@ mod tests {
                                 if f != 2 {
                                     bet.write_all(b"f\n").unwrap();
                                 }
-                                // This test diff is intentionally reversed.
-                                // We want it to turn the alef into bet.
                                 let diff = diff_w(&alef, &bet, &format!("{target}/alefr")).unwrap();
                                 File::create(format!("{target}/abr.ed"))
                                     .unwrap()
@@ -389,7 +368,7 @@ mod tests {
                                 fb.write_all(&bet[..]).unwrap();
                                 let _ = fa;
                                 let _ = fb;
-                                #[cfg(not(windows))] // there's no ed on windows
+                                #[cfg(not(windows))]
                                 {
                                     use std::process::Command;
                                     let output = Command::new("ed")
@@ -398,8 +377,6 @@ mod tests {
                                         .output()
                                         .unwrap();
                                     assert!(output.status.success(), "{output:?}");
-                                    //println!("{}", String::from_utf8_lossy(&output.stdout));
-                                    //println!("{}", String::from_utf8_lossy(&output.stderr));
                                     let alef = std::fs::read(format!("{target}/alefr")).unwrap();
                                     assert_eq!(alef, bet);
                                 }

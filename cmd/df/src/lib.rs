@@ -1,4 +1,4 @@
-//! user df — report file system disk space usage.
+//! user df: report file system disk space usage.
 use colored::Colorize;
 use std::ffi::CString;
 use std::io::{self, IsTerminal};
@@ -34,7 +34,7 @@ pub fn run() -> i32 {
             "-h" | "--human-readable" => human = true,
             "-i" | "--inodes" => inodes = true,
             "-l" | "--local" => local = true,
-            "-T" | "--print-type" => {} // always show type-ish via fstype from mount
+            "-T" | "--print-type" => {}
             s if s.starts_with('-') && s.len() > 1 && !s.starts_with("--") => {
                 for c in s.chars().skip(1) {
                     match c {
@@ -133,7 +133,6 @@ fn read_mounts() -> Vec<Mount> {
 /// Undo the octal-escaping (`\040` for a space, etc.) that the kernel
 /// applies to whitespace and backslashes in `/proc/self/mounts` fields.
 fn unescape_mount(s: &str) -> String {
-    // \040 etc.
     let mut out = String::new();
     let b = s.as_bytes();
     let mut i = 0;
@@ -168,17 +167,11 @@ fn statvfs(path: &str) -> io::Result<StatVfs> {
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "path contains NUL"))?;
     let mut st = MaybeUninit::<libc::statvfs>::uninit();
     // SAFETY: `c` is a valid, NUL-terminated `CString` kept alive for the
-    // duration of this call, so `c.as_ptr()` is a sound path argument.
-    // `st.as_mut_ptr()` points to a stack-allocated, properly aligned
-    // `libc::statvfs` with room for the full struct (via `MaybeUninit`);
-    // `statvfs(3)` only writes into it and never reads from it, so
-    // passing uninitialized memory of the right size/alignment is sound.
     let rc = unsafe { libc::statvfs(c.as_ptr(), st.as_mut_ptr()) };
     if rc != 0 {
         return Err(io::Error::last_os_error());
     }
     // SAFETY: `statvfs` returned 0 above, meaning it succeeded and fully
-    // populated every field of `st`, so `assume_init` is sound.
     let st = unsafe { st.assume_init() };
     Ok(StatVfs {
         blocks: st.f_blocks,
@@ -212,7 +205,7 @@ fn find_mount_for<'a>(path: &str, mounts: &'a [Mount]) -> Option<&'a Mount> {
 ///
 /// `find_mount_for` falls back to matching `/` for *any* path (its filter
 /// has an unconditional `m.target == "/"` clause), so it returns `Some`
-/// for effectively every input — including a path that doesn't exist.
+/// for effectively every input: including a path that doesn't exist.
 /// Because of that, resolving a mount and calling `statvfs` are two
 /// independent steps that can each fail, and both must be checked:
 /// mount-resolution failure falls back to reporting the path verbatim
@@ -407,7 +400,6 @@ mod tests {
 
     #[test]
     fn statvfs_root_succeeds() {
-        // "/" always exists on a Linux test runner.
         let st = statvfs("/").expect("statvfs(\"/\") should succeed");
         assert!(st.blocks > 0);
         assert!(st.bsize > 0);
@@ -434,10 +426,6 @@ mod tests {
 
     #[test]
     fn resolve_row_errors_for_nonexistent_path_even_with_a_matching_mount() {
-        // Regression: find_mount_for's unconditional "/" fallback means it
-        // returns Some(mount) for a nonexistent path too, so the mount
-        // match alone must not be treated as success — resolve_row must
-        // still surface the statvfs failure.
         let mounts = vec![Mount {
             source: "root".into(),
             target: "/".into(),

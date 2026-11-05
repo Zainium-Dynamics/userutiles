@@ -1,4 +1,4 @@
-//! user dd — convert and copy a file (GNU-compatible core operands).
+//! user dd: convert and copy a file (GNU-compatible core operands).
 use std::fs::OpenOptions;
 use std::io::{self, Read, Seek, SeekFrom, Write};
 
@@ -23,7 +23,7 @@ pub fn run() -> i32 {
     let mut seek: u64 = 0;
     let mut conv_notrunc = false;
     let mut conv_sync = false;
-    let mut status_level = 1; // 0 none, 1 default, 2 noxfer
+    let mut status_level = 1;
 
     for arg in std::env::args().skip(1) {
         if arg == "--help" || arg == "-h" {
@@ -109,7 +109,6 @@ pub fn run() -> i32 {
 
     if skip > 0 {
         let skip_bytes = skip.saturating_mul(ibs);
-        // try seek, else read-discard
         let mut discarded = 0u64;
         let mut buf = vec![0u8; ibs as usize];
         while discarded < skip_bytes {
@@ -181,7 +180,6 @@ pub fn run() -> i32 {
                     chunk.resize(ibs as usize, 0);
                 }
                 pending.extend_from_slice(&chunk);
-                // flush obs-sized chunks
                 while pending.len() as u64 >= obs {
                     let out = &pending[..obs as usize];
                     if let Err(e) = writer.write_all(out) {
@@ -228,7 +226,6 @@ fn parse_bytes(s: &str) -> Option<u64> {
     }
     let mut mult = 1u64;
     let mut num = s;
-    // suffixes: c w b kB K MB M GB G ...
     if let Some(rest) = s.strip_suffix("GB").or_else(|| s.strip_suffix("G")) {
         num = rest;
         mult = 1024 * 1024 * 1024;
@@ -258,7 +255,6 @@ fn parse_bytes(s: &str) -> Option<u64> {
         num = rest;
         mult = 1;
     }
-    // xM form like 2x512
     if let Some((a, b)) = num.split_once('x') {
         let av: u64 = a.parse().ok()?;
         let bv: u64 = b.parse().ok()?;

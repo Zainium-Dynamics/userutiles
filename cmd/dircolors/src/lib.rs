@@ -1,4 +1,4 @@
-//! user dircolors — output commands to set LS_COLORS.
+//! user dircolors: output commands to set LS_COLORS.
 use std::fs;
 use std::io::{self, Write};
 
@@ -141,8 +141,6 @@ mod tests {
 
     #[test]
     fn parse_db_passes_through_glob_entries() {
-        // Input db lines are whitespace-separated (pattern, then SGR
-        // code); the joined LS_COLORS value re-quotes them with '='.
         let db = "*tar 01;31\n*jpg 01;35\n";
         assert_eq!(parse_db(db), "*tar=01;31:*jpg=01;35");
     }

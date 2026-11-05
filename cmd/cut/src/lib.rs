@@ -1,4 +1,4 @@
-//! user cut — remove sections from each line of files.
+//! user cut: remove sections from each line of files.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 
@@ -35,7 +35,6 @@ pub fn run() -> i32 {
     let mut extra = Extra { complement: false, out_delim: None, term: b'\n' };
     let mut files: Vec<String> = Vec::new();
 
-    // --opt=VALUE as two arguments
     let args: Vec<String> = std::env::args()
         .skip(1)
         .flat_map(|a| match a.split_once('=') {
@@ -187,7 +186,6 @@ pub fn run() -> i32 {
         i += 1;
     }
 
-    // refresh only_delimited into Fields mode
     if let Some(Mode::Fields {
         ranges, delim: d, ..
     }) = mode
@@ -299,8 +297,6 @@ fn process_file(path: &str, mode: &Mode, x: &Extra, out: &mut impl Write) -> io:
         let line = String::from_utf8_lossy(&raw).into_owned();
         match mode {
             Mode::Bytes(ranges) | Mode::Chars(ranges) => {
-                // characters as UTF-8 for -c, raw bytes for -b; --output-delimiter goes
-                // between selected runs that aren't adjacent
                 let units: Vec<Vec<u8>> = if matches!(mode, Mode::Bytes(_)) {
                     raw.iter().map(|b| vec![*b]).collect()
                 } else {

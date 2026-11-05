@@ -1,5 +1,4 @@
-//! user ctrlaltdel — get or set the kernel's handling of the
-//! Ctrl-Alt-Del key combination, via `/proc/sys/kernel/ctrl-alt-del`.
+//! user ctrlaltdel: get or set the kernel's handling of the
 use std::path::Path;
 
 use usercore::Ui;
@@ -206,9 +205,6 @@ mod tests {
 
     #[test]
     fn set_ctrlaltdel_on_unwritable_path_reports_must_be_root() {
-        // A path inside a directory that doesn't exist can never be
-        // written, which stands in for the real permission-denied case
-        // this sandbox hits against the actual /proc sysctl.
         let path = std::path::Path::new("/nonexistent/user-ctrlaltdel/ctrl-alt-del");
         let err = set_ctrlaltdel(path, CtrlAltDel::Soft).unwrap_err();
         assert!(err.contains("must be root"));
@@ -216,8 +212,6 @@ mod tests {
 
     #[test]
     fn real_proc_sysctl_is_readable_in_this_sandbox() {
-        // /proc/sys/kernel/ctrl-alt-del is world-readable on a normal
-        // Linux system; exercise the real path read-only.
         let path = Path::new(CTRL_ALT_DEL_PATH);
         if !path.exists() {
             eprintln!("skipping: {CTRL_ALT_DEL_PATH} not present in this sandbox");
@@ -234,11 +228,6 @@ mod tests {
             eprintln!("skipping: {CTRL_ALT_DEL_PATH} not present in this sandbox");
             return;
         }
-        // Never actually call `set_ctrlaltdel` (i.e. write) against the
-        // real sysctl, even under an unexpectedly privileged test runner:
-        // opening for write without `truncate`/`write_all` cannot mutate
-        // the file's contents, but still exercises the same permission
-        // check the real write path relies on.
         use std::fs::OpenOptions;
         let result = OpenOptions::new().write(true).open(path);
         match result {

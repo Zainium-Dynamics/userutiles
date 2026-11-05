@@ -1,8 +1,3 @@
-// This file is part of the uutils diffutils package.
-//
-// For the full copyright and license information, please view the LICENSE-*
-// files that was distributed with this source code.
-
 use regex::Regex;
 use std::{ffi::OsString, io::Write};
 use unicode_width::UnicodeWidthStr;
@@ -76,8 +71,6 @@ pub fn format_failure_to_read_input_file(
     filepath: &OsString,
     error: &std::io::Error,
 ) -> String {
-    // std::io::Error's display trait outputs "{detail} (os error {code})"
-    // but we want only the {detail} (error string) part
     let error_code_re = Regex::new(r"\ \(os\ error\ \d+\)$").unwrap();
     format!(
         "{}: {}: {}",
@@ -126,12 +119,6 @@ mod tests {
             assert_tab_expansion("foo\tépée\tbaz", 8, "foo     épée    baz");
             assert_tab_expansion("foo\t\tbaz", 5, "foo       baz");
 
-            // Note: U+1F469 U+200D U+1F52C is a ZWJ sequence combining the
-            // "woman" and "microscope" emoji into one "woman scientist"
-            // glyph on supported platforms, with a print size of 2 columns.
-            // Terminal emulators tend to not support this, and display the two emojis
-            // side by side, thus accounting for a print size of 4 columns, but the
-            // unicode_width crate reports a correct size of 2.
             assert_tab_expansion(
                 "foo\t\u{1F469}\u{200d}\u{1F52C}\tbaz",
                 6,
@@ -141,7 +128,6 @@ mod tests {
 
         #[test]
         fn invalid_utf8() {
-            // [240, 240, 152, 137] is an invalid UTF-8 sequence, so it is handled as 4 bytes
             assert_eq!(
                 do_expand_tabs(&[240, 240, 152, 137, 9, 102, 111, 111], 8),
                 &[240, 240, 152, 137, 32, 32, 32, 32, 102, 111, 111]
@@ -177,15 +163,12 @@ mod tests {
             use tempfile::NamedTempFile;
 
             let temp = NamedTempFile::new().unwrap();
-            // set file modification time equal to current time
             let current = SystemTime::now();
             let _ = temp.as_file().set_modified(current);
 
-            // format current time
             let current: DateTime<Local> = current.into();
             let current: String = current.format("%Y-%m-%d %H:%M:%S%.9f %z").to_string();
 
-            // verify
             assert_eq!(
                 current,
                 get_modification_time(&temp.path().to_string_lossy())
@@ -199,9 +182,6 @@ mod tests {
 
             let invalid_file = "target/utils/invalid-file";
 
-            // store current time before calling `get_modification_time`
-            // Because the file is invalid, it will return SystemTime::now()
-            // which will be greater than previously saved time
             let current_time: DateTime<Local> = SystemTime::now().into();
             let m_time: DateTime<Local> = get_modification_time(invalid_file).parse().unwrap();
 

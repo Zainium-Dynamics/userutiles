@@ -1,8 +1,3 @@
-// This file is part of the uutils diffutils package.
-//
-// For the full copyright and license information, please view the LICENSE-*
-// files that was distributed with this source code.
-
 use core::cmp::{max, min};
 use diff::Result;
 use std::{io::Write, vec};
@@ -31,18 +26,15 @@ impl<'a> From<&'a [u8]> for CharIter<'a> {
 }
 
 impl<'a> Iterator for CharIter<'a> {
-    // (bytes for the next char, visible width)
     type Item = (&'a [u8], usize);
 
     fn next(&mut self) -> Option<Self::Item> {
         let max = self.current.len().min(4);
 
-        // We reached the end.
         if max == 0 {
             return None;
         }
 
-        // Try to find the next utf-8 character, if present in the next 4 bytes.
         let mut index = 1;
         let mut view = &self.current[..index];
         let mut char = str::from_utf8(view);
@@ -64,7 +56,6 @@ impl<'a> Iterator for CharIter<'a> {
                 Some((view, UnicodeWidthStr::width(c)))
             }
             Err(_) => {
-                // We did not find an utf-8 char within the next 4 bytes, return the single byte.
                 self.current = &self.current[1..];
                 Some((&view[..1], 1))
             }
@@ -74,12 +65,6 @@ impl<'a> Iterator for CharIter<'a> {
 
 impl Config {
     pub fn new(full_width: usize, tab_size: usize, expanded: bool) -> Self {
-        // diff uses this calculation to calculate the size of a half line
-        // based on the options passed (like -w, -t, etc.). It's actually
-        // pretty useless, because we (actually) don't have any size modifiers
-        // that can change this, however I just want to leave the calculate
-        // here, since it's not very clear and may cause some confusion
-
         let w = full_width as isize;
         let t = tab_size as isize;
         let t_plus_g = t + GUTTER_WIDTH_MIN as isize;
@@ -174,15 +159,6 @@ fn process_half_line<T: Write>(
     let mut current_width = 0;
     let iter = CharIter::from(s);
 
-    // the encoding will probably be compatible with utf8, so we can take advantage
-    // of that to get the size of the columns and iterate without breaking the encoding of anything.
-    // It seems like a good trade, since there is still a fallback in case it is not utf8.
-    // But I think it would be better if we used some lib that would allow us to handle this
-    // in the best way possible, in order to avoid overhead (currently 2 for loops are needed).
-    // There is a library called mcel (mcel.h) that is used in GNU diff, but the documentation
-    // about it is very scarce, nor is its use documented on the internet. In fact, from my
-    // research I didn't even find any information about it in the GNU lib's own documentation.
-
     for c in iter {
         let (char, c_width) = c;
 
@@ -223,12 +199,7 @@ fn process_half_line<T: Write>(
         }
     }
 
-    // gnu sdiff do not tabulate the hole empty right line, instead, just keep the line empty
     if !is_right {
-        // we always sum + 1 or + GUTTER_WIDTH_MIN cause we want to expand
-        // up to the third column of the gutter column if the gutter is gutter white space,
-        // otherwise we can expand to only the first column of the gutter middle column, cause
-        // the next is the sep char
         format_tabs_and_spaces(
             current_width,
             max_width
@@ -261,17 +232,7 @@ fn push_output<T: Write>(
     let half_width = config.sdiff_half_width;
     let column_two_offset = config.sdiff_column_two_offset;
     let separator_pos = config.separator_pos;
-    let put_new_line = true; // should be false when | is allowed
-
-    // this involves a lot of the '|' mark, however, as it is not active,
-    // it is better to deactivate it as it introduces visual bug if
-    // the line is empty.
-    // if !left_ln.is_empty() {
-    // put_new_line = put_new_line || (left_ln.last() == Some(&b'\n'));
-    // }
-    // if !right_ln.is_empty() {
-    // put_new_line = put_new_line || (right_ln.last() == Some(&b'\n'));
-    // }
+    let put_new_line = true;
 
     process_half_line(
         left_ln,
@@ -282,9 +243,6 @@ fn push_output<T: Write>(
         output,
     )?;
     if symbol != b' ' {
-        // the diff always want to put all tabs possible in the usable are,
-        // even in the middle space between the gutters if possible.
-
         output.write_all(&[symbol])?;
         if !right_ln.is_empty() {
             format_tabs_and_spaces(separator_pos + 1, column_two_offset, config, output)?;
@@ -312,8 +270,6 @@ pub fn diff<T: Write>(
     output: &mut T,
     params: &Params,
 ) -> Vec<u8> {
-    // ^ The left file ^ The right file
-
     let mut left_lines: Vec<&[u8]> = from_file.split_inclusive(|&c| c == b'\n').collect();
     let mut right_lines: Vec<&[u8]> = to_file.split_inclusive(|&c| c == b'\n').collect();
     let config = Config::new(params.width, params.tabsize, params.expand_tabs);
@@ -537,7 +493,6 @@ mod tests {
         fn test_non_utf8_bytes() {
             let config = create_test_config(false, DEF_TAB_SIZE);
             let mut buf = vec![];
-            // ISO-8859-1
             process_half_line(
                 &[0x63, 0x61, 0x66, 0xE9],
                 5,
@@ -557,12 +512,11 @@ mod tests {
             let mut buf = vec![];
 
             let utf32le_bytes = [
-                0x63, 0x00, 0x00, 0x00, // 'c'
-                0x61, 0x00, 0x00, 0x00, // 'a'
-                0x66, 0x00, 0x00, 0x00, // 'f'
-                0xE9, 0x00, 0x00, 0x00, // 'é'
+                0x63, 0x00, 0x00, 0x00,
+                0x61, 0x00, 0x00, 0x00,
+                0x66, 0x00, 0x00, 0x00,
+                0xE9, 0x00, 0x00, 0x00,
             ];
-            // utf8 little endiand 32 bits (or 4 bytes per char)
             process_half_line(&utf32le_bytes, 6, false, false, &config, &mut buf).unwrap();
             let mut r = utf32le_bytes.to_vec();
             r.extend(vec![b' '; 3]);
@@ -574,10 +528,9 @@ mod tests {
             let config = create_test_config(false, DEF_TAB_SIZE);
             let mut buf = vec![];
 
-            let gb18030 = b"\x63\x61\x66\xA8\x80"; // some random chinese encoding
-                                                   // ^ é char, start multi byte
+            let gb18030 = b"\x63\x61\x66\xA8\x80";
             process_half_line(gb18030, 4, false, false, &config, &mut buf).unwrap();
-            assert_eq!(buf, b"\x63\x61\x66\xA8 "); // break the encoding of 'é' letter
+            assert_eq!(buf, b"\x63\x61\x66\xA8 ");
         }
 
         #[test]
@@ -817,8 +770,6 @@ mod tests {
     }
 
     mod push_output {
-        // almost all behavior of the push_output was tested with tests on process_half_line
-
         use super::*;
 
         impl Default for Config {
@@ -898,7 +849,7 @@ mod tests {
             let config = create_test_config_def();
             let left_ln = b"data";
             let right_ln = b"";
-            let symbol = b'<'; // impossible case, just to use different symbol
+            let symbol = b'<';
             let mut buf = vec![];
             push_output(left_ln, right_ln, symbol, &mut buf, &config).unwrap();
             assert_eq!(buf, "data\t\t\t\t\t\t\t      <\n".as_bytes());
@@ -1214,7 +1165,7 @@ mod tests {
             let config = create_config(40, 8, true);
             assert_eq!(config.sdiff_half_width, 16);
             assert_eq!(config.sdiff_column_two_offset, 24);
-            assert_eq!(config.separator_pos, 19); // (16 +24 -1) /2 = 19.5
+            assert_eq!(config.separator_pos, 19);
         }
 
         #[test]

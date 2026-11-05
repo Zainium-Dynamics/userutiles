@@ -1,11 +1,4 @@
 //! Hand-rolled JSON output for `dmesg --json`.
-//!
-//! util-linux's `dmesg --json` uses a bespoke pretty-printer (3-space
-//! indentation, no space before a record's opening `{`, `time` rendered
-//! as `seconds.micros` rather than a plain integer). Reproducing that
-//! exactly with a general-purpose JSON library needs a custom
-//! `Formatter` anyway, so this port just builds the string directly —
-//! no `serde`/`serde_json` dependency required.
 use crate::Record;
 
 /// Serialize `records` to `dmesg --json`'s exact output format,
@@ -29,8 +22,6 @@ pub fn serialize_records(records: &[Record]) -> String {
         out.push_str("\n      }");
     }
     if records.is_empty() {
-        // Match serde_json's array formatter: an empty array still gets
-        // its own indented brackets, e.g. `"dmesg": [\n\n   ]`.
         out.push('\n');
     } else {
         out.push('\n');
@@ -93,7 +84,7 @@ mod tests {
     #[test]
     fn multiple_records_join_without_newline_before_comma() {
         let out = serialize_records(&[rec(32, 0, "a"), rec(80, 1_000_000_000, "b")]);
-        assert!(!out.contains("      }\n      },{\n")); // sanity: no double-newline glitch
+        assert!(!out.contains("      }\n      },{\n"));
         assert!(out.contains("      },{\n         \"pri\": 80"));
     }
 
@@ -105,8 +96,6 @@ mod tests {
 
     #[test]
     fn full_fixture_first_and_last_record() {
-        // Matches tests/fixtures/dmesg/test_kmsg_json.expected from the
-        // upstream uutils util-linux port (kmsg.input, first record).
         let out = serialize_records(&[rec(32, 0, "LOG_EMERG LOG_AUTH")]);
         assert!(out.starts_with("{\n   \"dmesg\": [\n      {\n         \"pri\": 32,\n         \"time\":     0.000000,\n         \"msg\": \"LOG_EMERG LOG_AUTH\"\n      }\n   ]\n}"));
     }

@@ -1,8 +1,3 @@
-// This file is part of the uutils diffutils package.
-//
-// For the full copyright and license information, please view the LICENSE-*
-// files that was distributed with this source code.
-
 use std::collections::VecDeque;
 use std::io::Write;
 
@@ -44,7 +39,6 @@ impl Mismatch {
     }
 }
 
-// Produces a diff between the expected output and actual output.
 fn make_diff(
     expected: &[u8],
     actual: &[u8],
@@ -62,7 +56,6 @@ fn make_diff(
     let mut actual_lines: Vec<&[u8]> = actual.split(|&c| c == b'\n').collect();
 
     debug_assert_eq!(b"".split(|&c| c == b'\n').count(), 1);
-    // ^ means that underflow here is impossible
     let expected_lines_count = expected_lines.len() - 1;
     let actual_lines_count = actual_lines.len() - 1;
 
@@ -74,7 +67,6 @@ fn make_diff(
         actual_lines.pop();
     }
 
-    // Rust only allows allocations to grow to isize::MAX, and this is bigger than that.
     let mut expected_lines_change_idx: usize = !0;
 
     for result in diff::slice(&expected_lines, &actual_lines) {
@@ -121,7 +113,7 @@ fn make_diff(
                 {
                     let content = std::mem::take(content);
                     mismatch.expected[expected_lines_change_idx] = DiffLine::Change(content);
-                    expected_lines_change_idx = expected_lines_change_idx.wrapping_sub(1); // if 0, becomes !0
+                    expected_lines_change_idx = expected_lines_change_idx.wrapping_sub(1);
                     mismatch.actual.push(DiffLine::Change(str.to_vec()));
                 } else {
                     mismatch.actual.push(DiffLine::Add(str.to_vec()));
@@ -134,7 +126,6 @@ fn make_diff(
             }
             diff::Result::Both(str, _) => {
                 expected_lines_change_idx = !0;
-                // if one of them is missing a newline and the other isn't, then they don't actually match
                 if (line_number_actual > actual_lines_count)
                     && (line_number_expected > expected_lines_count)
                 {
@@ -201,7 +192,6 @@ fn make_diff(
             }
         }
         if stop_early && !results.is_empty() {
-            // Optimization: stop analyzing the files as soon as there are any differences
             return results;
         }
     }
@@ -211,7 +201,6 @@ fn make_diff(
 
     if results.is_empty() && expected_lines_count != actual_lines_count {
         let mut mismatch = Mismatch::new(expected_lines.len(), actual_lines.len());
-        // empty diff and only expected lines has a missing line at end
         if expected_lines_count != expected_lines.len() {
             mismatch.expected.push(DiffLine::Change(
                 expected_lines
@@ -245,7 +234,6 @@ fn make_diff(
         }
     }
 
-    // hunks with pure context lines get truncated to empty
     for mismatch in &mut results {
         if !mismatch
             .expected
@@ -383,7 +371,6 @@ mod tests {
     use pretty_assertions::assert_eq;
     #[test]
     fn test_permutations() {
-        // test all possible six-line files.
         let target = "target/context-diff/";
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
@@ -427,8 +414,6 @@ mod tests {
                                 if f != 2 {
                                     bet.write_all(b"l\n").unwrap();
                                 }
-                                // This test diff is intentionally reversed.
-                                // We want it to turn the alef into bet.
                                 let diff = diff(
                                     &alef,
                                     &bet,
@@ -456,8 +441,6 @@ mod tests {
                                     .output()
                                     .unwrap();
                                 assert!(output.status.success(), "{output:?}");
-                                //println!("{}", String::from_utf8_lossy(&output.stdout));
-                                //println!("{}", String::from_utf8_lossy(&output.stderr));
                                 let alef = fs::read(format!("{target}/alef")).unwrap();
                                 assert_eq!(alef, bet);
                             }
@@ -471,7 +454,6 @@ mod tests {
     #[test]
     fn test_permutations_empty_lines() {
         let target = "target/context-diff/";
-        // test all possible six-line files with missing newlines.
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
@@ -508,8 +490,6 @@ mod tests {
                                 if f != 2 {
                                     bet.write_all(b"l\n").unwrap();
                                 }
-                                // This test diff is intentionally reversed.
-                                // We want it to turn the alef into bet.
                                 let diff = diff(
                                     &alef,
                                     &bet,
@@ -537,8 +517,6 @@ mod tests {
                                     .output()
                                     .unwrap();
                                 assert!(output.status.success(), "{output:?}");
-                                //println!("{}", String::from_utf8_lossy(&output.stdout));
-                                //println!("{}", String::from_utf8_lossy(&output.stderr));
                                 let alef = fs::read(format!("{target}/alef_")).unwrap();
                                 assert_eq!(alef, bet);
                             }
@@ -552,7 +530,6 @@ mod tests {
     #[test]
     fn test_permutations_missing_lines() {
         let target = "target/context-diff/";
-        // test all possible six-line files.
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
@@ -592,8 +569,6 @@ mod tests {
                                 if alef.is_empty() && bet.is_empty() {
                                     continue;
                                 };
-                                // This test diff is intentionally reversed.
-                                // We want it to turn the alef into bet.
                                 let diff = diff(
                                     &alef,
                                     &bet,
@@ -621,8 +596,6 @@ mod tests {
                                     .output()
                                     .unwrap();
                                 assert!(output.status.success(), "{output:?}");
-                                //println!("{}", String::from_utf8_lossy(&output.stdout));
-                                //println!("{}", String::from_utf8_lossy(&output.stderr));
                                 let alef = fs::read(format!("{target}/alefx")).unwrap();
                                 assert_eq!(alef, bet);
                             }
@@ -636,7 +609,6 @@ mod tests {
     #[test]
     fn test_permutations_reverse() {
         let target = "target/context-diff/";
-        // test all possible six-line files.
         let _ = std::fs::create_dir_all(target);
         for &a in &[0, 1, 2] {
             for &b in &[0, 1, 2] {
@@ -679,8 +651,6 @@ mod tests {
                                 if f != 2 {
                                     bet.write_all(b"f\n").unwrap();
                                 }
-                                // This test diff is intentionally reversed.
-                                // We want it to turn the alef into bet.
                                 let diff = diff(
                                     &alef,
                                     &bet,
@@ -708,8 +678,6 @@ mod tests {
                                     .output()
                                     .unwrap();
                                 assert!(output.status.success(), "{output:?}");
-                                //println!("{}", String::from_utf8_lossy(&output.stdout));
-                                //println!("{}", String::from_utf8_lossy(&output.stderr));
                                 let alef = fs::read(format!("{target}/alefr")).unwrap();
                                 assert_eq!(alef, bet);
                             }

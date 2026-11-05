@@ -46,8 +46,6 @@ impl Default for Params {
 }
 
 pub fn parse_params<I: Iterator<Item = OsString>>(mut opts: Peekable<I>) -> Result<Params, String> {
-    // parse CLI
-
     let Some(executable) = opts.next() else {
         return Err("Usage: <exe> <from> <to>".to_string());
     };
@@ -134,8 +132,6 @@ pub fn parse_params<I: Iterator<Item = OsString>>(mut opts: Peekable<I>) -> Resu
             continue;
         }
         if tabsize_re.is_match(param.to_string_lossy().as_ref()) {
-            // Because param matches the regular expression,
-            // it is safe to assume it is valid UTF-8.
             let param = param.into_string().unwrap();
             let tabsize_str = tabsize_re
                 .captures(param.as_str())
@@ -229,8 +225,6 @@ pub fn parse_params<I: Iterator<Item = OsString>>(mut opts: Peekable<I>) -> Resu
         ));
     };
 
-    // diff DIRECTORY FILE => diff DIRECTORY/FILE FILE
-    // diff FILE DIRECTORY => diff FILE DIRECTORY/FILE
     let mut from_path: PathBuf = PathBuf::from(&params.from);
     let mut to_path: PathBuf = PathBuf::from(&params.to);
 

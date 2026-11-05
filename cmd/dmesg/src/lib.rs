@@ -1,9 +1,4 @@
-//! user dmesg — display or control the kernel ring buffer.
-//!
-//! Reads kernel log records from `/dev/kmsg` (or a `--kmsg-file` fixture,
-//! for testing) in the structured `PRI,SEQ,TIME,FLAGS;MESSAGE` format the
-//! kernel emits, and prints them with an optional timestamp column,
-//! filtered by facility/level/time range.
+//! user dmesg: display or control the kernel ring buffer.
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufRead, BufReader};
@@ -129,7 +124,7 @@ fn real_boot_time() -> Option<DateTime<FixedOffset>> {
 /// (`"now"`, `"today"`, `"yesterday"`, `"N <unit> ago"`). This is a
 /// deliberately narrower substitute for the `parse_datetime` crate (which
 /// this workspace does not depend on, per its "no uutils stack"
-/// convention) — full free-form GNU date grammar (weekday names, "next
+/// convention): full free-form GNU date grammar (weekday names, "next
 /// tuesday", month-day without year, etc.) is out of scope; this covers
 /// the forms dmesg's own docs/tests use plus the relative forms real
 /// dmesg/last users reach for most often.
@@ -385,7 +380,7 @@ impl From<u32> for Level {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Record {
     pub(crate) priority_facility: u32,
-    #[allow(dead_code)] // parsed for fidelity with the kmsg format; not used for filtering/display
+    #[allow(dead_code)]
     pub(crate) sequence: u64,
     pub(crate) timestamp_us: i64,
     pub(crate) message: String,
@@ -546,10 +541,6 @@ fn parse_args(args: &[String]) -> Result<Options, String> {
         Some(set)
     };
 
-    // Matches the upstream tool: passing `--kmsg-file` switches the
-    // record separator from newline (used when streaming from the real
-    // `/dev/kmsg`) to NUL (the boundary the kernel uses internally,
-    // which fixture files replicate byte-for-byte).
     let (kmsg_file, kmsg_record_separator) = match kmsg_file {
         Some(f) => (f, 0u8),
         None => ("/dev/kmsg".to_string(), b'\n'),
@@ -580,10 +571,6 @@ fn read_records(path: &str, separator: u8) -> Result<Vec<Record>, String> {
         .map_err(|e| format!("cannot open {path}: {e}"))?;
 
     // SAFETY: `file` is a valid, open file descriptor for the duration of
-    // this call. SEEK_DATA is advisory positioning (skip to the next
-    // non-hole offset); its return value is intentionally ignored, since
-    // it's a no-op (or harmless error) on `/dev/kmsg` and on the regular
-    // files used by `--kmsg-file` fixtures.
     unsafe {
         use std::os::fd::AsRawFd;
         libc::lseek(file.as_raw_fd(), 0, libc::SEEK_DATA);
@@ -632,7 +619,7 @@ fn parse_record_line(line: &str) -> Option<Record> {
     let pri = fields.next()?;
     let seq = fields.next()?;
     let time = fields.next()?;
-    fields.next()?; // flags (and any further comma-separated fields); required present, contents ignored
+    fields.next()?;
 
     if !is_unsigned_integer(pri) || !is_unsigned_integer(seq) || !is_unsigned_integer(time) {
         return None;
@@ -646,7 +633,7 @@ fn parse_record_line(line: &str) -> Option<Record> {
     })
 }
 
-/// Matches the upstream regex's `0|[1-9][0-9]*` — no sign, no leading
+/// Matches the upstream regex's `0|[1-9][0-9]*`: no sign, no leading
 /// zeroes (except a bare `0`).
 fn is_unsigned_integer(s: &str) -> bool {
     if s == "0" {
@@ -671,8 +658,6 @@ mod tests {
         std::fs::write(&path, contents).unwrap();
         path
     }
-
-    // --- record parsing ---------------------------------------------------
 
     #[test]
     fn parse_record_line_basic() {
@@ -730,11 +715,8 @@ mod tests {
         assert!(!is_unsigned_integer("1a"));
     }
 
-    // --- facility/level -----------------------------------------------
-
     #[test]
     fn facility_from_priority_matches_kernel_encoding() {
-        // kern.emerg = 0, user.emerg = 8, local7 = 23<<3 = 184
         assert_eq!(Facility::from(0), Facility::Kern);
         assert_eq!(Facility::from(8), Facility::User);
         assert_eq!(Facility::from(184), Facility::Local7);
@@ -742,8 +724,8 @@ mod tests {
 
     #[test]
     fn level_from_priority_masks_low_three_bits() {
-        assert_eq!(Level::from(32), Level::Emerg); // 32 = 4<<3 | 0
-        assert_eq!(Level::from(47), Level::Debug); // 47 = 5<<3 | 7
+        assert_eq!(Level::from(32), Level::Emerg);
+        assert_eq!(Level::from(47), Level::Debug);
     }
 
     #[test]
@@ -767,8 +749,6 @@ mod tests {
         }
         assert!(Level::parse("bogus").is_none());
     }
-
-    // --- CLI parsing --------------------------------------------------
 
     fn s(items: &[&str]) -> Vec<String> {
         items.iter().map(|s| s.to_string()).collect()
@@ -855,10 +835,6 @@ mod tests {
 
     #[test]
     fn parse_datetime_accepts_relative_ago_forms() {
-        // Each `parse_datetime` call independently samples `Local::now()`,
-        // so two calls a few milliseconds apart won't be *exactly* one
-        // duration unit apart — assert within a small tolerance instead of
-        // exact equality to avoid flakiness.
         let now = parse_datetime("now").unwrap();
         let hour_ago = parse_datetime("1 hour ago").unwrap();
         assert!(hour_ago < now);
@@ -893,18 +869,11 @@ mod tests {
         assert!(parse_args(&s(&["--kmsg-file"])).is_err());
     }
 
-    // --- end-to-end against fixture files (mirrors upstream test fixtures) --
-
     /// The `tests/fixtures/dmesg/kmsg.input` file from uutils/util-linux:
     /// 20 records, one per (facility, level) combination in the fixture,
-    /// each with a distinct timestamp — used upstream to test facility
+    /// each with a distinct timestamp: used upstream to test facility
     /// and level filtering.
     fn kmsg_input_fixture() -> Vec<u8> {
-        // Byte-for-byte matches the real /dev/kmsg wire format used by the
-        // upstream fixture (verified with `od -c`): each record is
-        // "<PRI,SEQ,TIME,FLAGS;MESSAGE>\n\0" — the kernel-style record
-        // terminator (`\n`) followed by the NUL that `read_until(0, ..)`
-        // treats as the chunk boundary.
         let facilities = [
             (32, "LOG_EMERG LOG_AUTH"),
             (80, "LOG_EMERG LOG_AUTHPRIV"),
@@ -959,9 +928,6 @@ mod tests {
 
     #[test]
     fn real_dev_kmsg_open_is_denied_or_readable_without_crashing() {
-        // In most sandboxes (dmesg_restrict=1, no CAP_SYSLOG) this must
-        // fail cleanly; on a permissive host it may succeed. Either way
-        // it must not panic.
         let result = read_records("/dev/kmsg", b'\n');
         match result {
             Ok(_) => {}

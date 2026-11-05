@@ -1,8 +1,6 @@
-//! ZEX diffutils library — based on uutils/diffutils 0.5.0 (MIT/Apache-2.0).
-//! Provides `diff` and `cmp` implementations without uucore.
+//! ZEX diffutils library: based on uutils/diffutils 0.5.0 (MIT/Apache-2.0).
 
 // Vendored, not hand-maintained for lint cleanliness — see scripts/clippy.sh.
-// cmd/diff and cmd/cmp path-depend on this crate, so it still gets linted.
 #![allow(clippy::incompatible_msrv)]
 
 pub mod cmp;

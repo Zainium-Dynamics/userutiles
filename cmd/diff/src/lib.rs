@@ -1,7 +1,4 @@
-//! user diff — compare files line by line.
-//!
-//! Thin wrapper: all argument parsing and diff logic lives in the vendored
-//! `user_diffutils` crate.
+//! user diff: compare files line by line.
 
 /// Entry point for the `diff` utility. Delegates entirely to
 /// `user_diffutils::run_diff`, which reads `std::env::args()` itself.

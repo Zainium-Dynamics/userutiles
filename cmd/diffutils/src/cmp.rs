@@ -1,8 +1,3 @@
-// This file is part of the uutils diffutils package.
-//
-// For the full copyright and license information, please view the LICENSE-*
-// files that was distributed with this source code.
-
 use crate::utils::format_failure_to_read_input_file;
 use std::env::{self, ArgsOs};
 use std::ffi::OsString;
@@ -53,7 +48,6 @@ fn is_stdout_dev_null() -> bool {
 
     let is_dev_null = stdout.dev() == dev_null.dev() && stdout.ino() == dev_null.ino();
 
-    // Don't let File close the fd. It's unfortunate that File doesn't have a leak_fd().
     std::mem::forget(stdout_file);
 
     is_dev_null
@@ -80,8 +74,6 @@ pub fn parse_params<I: Iterator<Item = OsString>>(mut opts: Peekable<I>) -> Resu
         };
 
         if suffix_start != param.len() {
-            // Note that GNU cmp advertises supporting up to Y, but fails if you try
-            // to actually use anything beyond E.
             let multiplier: usize = match &param[suffix_start..] {
                 "kB" => 1_000,
                 "K" => 1_024,
@@ -89,7 +81,6 @@ pub fn parse_params<I: Iterator<Item = OsString>>(mut opts: Peekable<I>) -> Resu
                 "M" => 1_048_576,
                 "GB" => 1_000_000_000,
                 "G" => 1_073_741_824,
-                // This only generates a warning when compiling for target_pointer_width < 64
                 #[allow(unused_variables)]
                 suffix @ ("TB" | "T" | "PB" | "P" | "EB" | "E") => {
                     #[cfg(target_pointer_width = "64")]
@@ -105,10 +96,10 @@ pub fn parse_params<I: Iterator<Item = OsString>>(mut opts: Peekable<I>) -> Resu
                     #[cfg(not(target_pointer_width = "64"))]
                     usize::MAX
                 }
-                "ZB" => usize::MAX, // 1_000_000_000_000_000_000_000,
-                "Z" => usize::MAX,  // 1_180_591_620_717_411_303_424,
-                "YB" => usize::MAX, // 1_000_000_000_000_000_000_000_000,
-                "Y" => usize::MAX,  // 1_208_925_819_614_629_174_706_176,
+                "ZB" => usize::MAX,
+                "Z" => usize::MAX,
+                "YB" => usize::MAX,
+                "Y" => usize::MAX,
                 _ => {
                     return Err(format!(
                         "{executable_str}: invalid --ignore-initial value '{skip_desc}'"
@@ -231,8 +222,6 @@ pub fn parse_params<I: Iterator<Item = OsString>>(mut opts: Peekable<I>) -> Resu
         }
     }
 
-    // Do as GNU cmp, and completely disable printing if we are
-    // outputing to /dev/null.
     #[cfg(not(target_os = "windows"))]
     if is_stdout_dev_null() {
         params.quiet = true;
@@ -261,7 +250,6 @@ pub fn parse_params<I: Iterator<Item = OsString>>(mut opts: Peekable<I>) -> Resu
         OsString::from("-")
     };
 
-    // GNU cmp ignores positional skip arguments if -i is provided.
     if params.skip_a.is_none() {
         if skip_pos1.is_some() {
             params.skip_a = skip_pos1;
@@ -334,8 +322,6 @@ pub fn cmp(params: &Params) -> Result<Cmp, String> {
         #[cfg(target_os = "windows")]
         let (a_size, b_size) = (a_meta.file_size(), b_meta.file_size());
 
-        // If the files have different sizes, we already know they are not identical. If we have not
-        // been asked to show even the first difference, we can quit early.
         if params.quiet && a_size != b_size {
             return Ok(Cmp::Different);
         }
@@ -346,7 +332,6 @@ pub fn cmp(params: &Params) -> Result<Cmp, String> {
 
     let offset_width = 1 + offset_width.checked_ilog10().unwrap_or(1) as usize;
 
-    // Capacity calc: at_byte width + 2 x 3-byte octal numbers + 2 x 4-byte value + 4 spaces
     let mut output = Vec::<u8>::with_capacity(offset_width + 3 * 2 + 4 * 2 + 4);
 
     let mut at_byte = 1;
@@ -355,7 +340,6 @@ pub fn cmp(params: &Params) -> Result<Cmp, String> {
     let mut stdout = BufWriter::new(io::stdout().lock());
     let mut compare = Cmp::Equal;
     loop {
-        // Fill up our buffers.
         let from_buf = match from.fill_buf() {
             Ok(buf) => buf,
             Err(e) => {
@@ -378,7 +362,6 @@ pub fn cmp(params: &Params) -> Result<Cmp, String> {
             }
         };
 
-        // Check for EOF conditions.
         if from_buf.is_empty() && to_buf.is_empty() {
             break;
         }
@@ -394,8 +377,6 @@ pub fn cmp(params: &Params) -> Result<Cmp, String> {
             return Ok(Cmp::Different);
         }
 
-        // Fast path - for long files in which almost all bytes are the same we
-        // can do a direct comparison to let the compiler optimize.
         let consumed = std::cmp::min(from_buf.len(), to_buf.len());
         if from_buf[..consumed] == to_buf[..consumed] {
             let last = from_buf[..consumed].last().unwrap();
@@ -417,8 +398,6 @@ pub fn cmp(params: &Params) -> Result<Cmp, String> {
             continue;
         }
 
-        // Iterate over the buffers, the zip iterator will stop us as soon as the
-        // first one runs out.
         for (&from_byte, &to_byte) in from_buf.iter().zip(to_buf.iter()) {
             if from_byte != to_byte {
                 compare = Cmp::Different;
@@ -459,7 +438,6 @@ pub fn cmp(params: &Params) -> Result<Cmp, String> {
             }
         }
 
-        // Notify our readers about the bytes we went over.
         from.consume(consumed);
         to.consume(consumed);
     }
@@ -467,11 +445,6 @@ pub fn cmp(params: &Params) -> Result<Cmp, String> {
     Ok(compare)
 }
 
-// Exit codes are documented at
-// https://www.gnu.org/software/diffutils/manual/html_node/Invoking-cmp.html
-// An exit status of 0 means no differences were found,
-// 1 means some differences were found,
-// and 2 means trouble.
 pub fn main(opts: Peekable<ArgsOs>) -> i32 {
     let params = match parse_params(opts) {
         Ok(param) => param,
@@ -510,9 +483,8 @@ fn format_octal(byte: u8, buf: &mut [u8; 3]) -> &str {
     *buf = *b"  0";
 
     let mut num = byte;
-    let mut idx = 2; // Start at the last position in the buffer
+    let mut idx = 2;
 
-    // Generate octal digits
     while num > 0 {
         buf[idx] = b'0' + num % 8;
         num /= 8;
@@ -548,13 +520,9 @@ fn format_byte(byte: u8) -> String {
     quoted.push(byte);
 
     // SAFETY: the checks and shifts we do above match what cat and GNU
-    // cmp do to ensure characters fall inside the ascii range.
     unsafe { String::from_utf8_unchecked(quoted) }
 }
 
-// This function has been optimized to not use the Rust fmt system, which
-// leads to a massive speed up when processing large files: cuts the time
-// for comparing 2 ~36MB completely different files in half on an M1 Max.
 #[inline]
 fn format_verbose_difference(
     from_byte: u8,
@@ -567,11 +535,10 @@ fn format_verbose_difference(
     assert!(!params.quiet);
 
     let mut at_byte_buf = itoa::Buffer::new();
-    let mut from_oct = [0u8; 3]; // for octal conversions
+    let mut from_oct = [0u8; 3];
     let mut to_oct = [0u8; 3];
 
     if params.print_bytes {
-        // "{:>width$} {:>3o} {:4} {:>3o} {}",
         let at_byte_str = at_byte_buf.format(at_byte);
         let at_byte_padding = offset_width.saturating_sub(at_byte_str.len());
 
@@ -606,7 +573,6 @@ fn format_verbose_difference(
 
         output.push(b'\n');
     } else {
-        // "{:>width$} {:>3o} {:>3o}"
         let at_byte_str = at_byte_buf.format(at_byte);
         let at_byte_padding = offset_width - at_byte_str.len();
 
@@ -791,7 +757,6 @@ mod tests {
             )
         );
 
-        // Bad positional arguments.
         assert_eq!(
             Err("Usage: cmp <from> <to>".to_string()),
             parse_params(
@@ -913,7 +878,6 @@ mod tests {
             )
         );
 
-        // Some options do not mix.
         assert_eq!(
             Err("cmp: options -l and -s are incompatible".to_string()),
             parse_params(
@@ -974,7 +938,6 @@ mod tests {
             )
         );
 
-        // Failure case
         assert_eq!(
             Err("cmp: invalid --bytes value '1K'".to_string()),
             parse_params(
@@ -1077,7 +1040,6 @@ mod tests {
             )
         );
 
-        // All special suffixes.
         for (i, suffixes) in [
             ["kB", "K"],
             ["MB", "M"],
@@ -1121,7 +1083,6 @@ mod tests {
             }
         }
 
-        // Ignores positional arguments when -i is provided.
         assert_eq!(
             Ok(Params {
                 executable: os("cmp"),
@@ -1147,7 +1108,6 @@ mod tests {
             )
         );
 
-        // Failure cases
         assert_eq!(
             Err("cmp: invalid --ignore-initial value '1mb'".to_string()),
             parse_params(
