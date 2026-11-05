@@ -1,7 +1,6 @@
 fn main() {
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS not set");
 
-    // Rustc uses target_os=linux for Zainium OS kernel ABI builds.
     if target_os != "linux" {
         panic!("trace targets Zainium OS only. Target OS: {target_os}");
     }

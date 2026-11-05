@@ -1,4 +1,4 @@
-//! user truncate — shrink or extend file size.
+//! user truncate: shrink or extend file size.
 use std::fs::OpenOptions;
 use std::os::unix::fs::MetadataExt;
 
@@ -143,8 +143,6 @@ fn resize_one(
         Some(r) => {
             let rmeta = std::fs::metadata(r).map_err(|e| format!("{r}: {e}"))?;
             match size {
-                // GNU: SIZE together with --reference adjusts relative to
-                // the reference file's size.
                 Some(s) => apply_spec(rmeta.len(), s, io_blocks, blksize),
                 None => rmeta.len(),
             }
@@ -265,7 +263,6 @@ mod tests {
         assert_eq!(apply_spec(100, SizeSpec::Absolute(50), false, 4096), 50);
         assert_eq!(apply_spec(100, SizeSpec::RelPlus(50), false, 4096), 150);
         assert_eq!(apply_spec(100, SizeSpec::RelMinus(50), false, 4096), 50);
-        // Underflow must saturate to 0, not panic or wrap.
         assert_eq!(apply_spec(10, SizeSpec::RelMinus(50), false, 4096), 0);
     }
 

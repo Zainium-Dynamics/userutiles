@@ -1,4 +1,4 @@
-//! user_trace — process & syscall inspector for Zainium OS (Zainium Dynamics).
+//! user_trace: process & syscall inspector for Zainium OS (Zainium Dynamics).
 
 pub mod cli;
 pub mod detector;
@@ -26,7 +26,6 @@ pub fn run() -> i32 {
     utils::init_logger(cli.verbose);
 
     if let Err(e) = cli.validate() {
-        // Subcommands info/processes skip the process/pid requirement — validate already allows that.
         eprintln!("{} {}", "✖".red(), e);
         return 1;
     }

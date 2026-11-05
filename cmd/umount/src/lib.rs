@@ -1,4 +1,4 @@
-//! user umount — unmount a filesystem.
+//! user umount: unmount a filesystem.
 use std::ffi::CString;
 use std::fs;
 use std::io;
@@ -48,7 +48,6 @@ fn do_umount(target: &str, force: bool, lazy: bool) -> io::Result<()> {
         flags |= libc::MNT_DETACH;
     }
     // SAFETY: `c_target` is a valid, NUL-terminated `CString` kept alive
-    // for the call; `umount2(2)` takes no other pointer arguments.
     let r = unsafe { libc::umount2(c_target.as_ptr(), flags) };
     if r == -1 {
         Err(io::Error::last_os_error())
@@ -118,8 +117,6 @@ pub fn run() -> i32 {
         }
     };
 
-    // Deepest-path-first order, so a child mount is always unmounted
-    // before its parent — required for -a and for -R on a subtree.
     let mut plan: Vec<String> = if all {
         let mut mps: Vec<String> = mounts.iter().map(|(_, mp)| mp.clone()).collect();
         mps.sort_by_key(|b| std::cmp::Reverse(b.len()));
@@ -194,8 +191,6 @@ mod tests {
 
     #[test]
     fn resolve_mountpoint_prefers_the_most_recent_mount_of_a_device() {
-        // A device re-mounted at a new location shows up twice in
-        // /proc/self/mounts; the last entry is the current mountpoint.
         let mounts = vec![
             ("/dev/sda1".to_string(), "/mnt/old".to_string()),
             ("/dev/sda1".to_string(), "/mnt/new".to_string()),
@@ -209,7 +204,6 @@ mod tests {
     #[test]
     fn do_umount_unprivileged_fails_cleanly() {
         // SAFETY: `libc::geteuid` takes no arguments and cannot fail or
-        // cause UB.
         if unsafe { libc::geteuid() } != 0 {
             assert!(do_umount("/", false, false).is_err());
         }

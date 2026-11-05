@@ -1,5 +1,4 @@
 //! Output formatting - fully configurable, zero hardcoded strings
-//! All UI messages are driven by configuration or defaults
 
 use owo_colors::OwoColorize;
 use std::collections::HashMap;
@@ -14,7 +13,6 @@ impl OutputFormatter {
     pub fn new() -> Self {
         let mut strings = HashMap::new();
 
-        // Hardcoded default messages - no config file needed
         strings.insert("resolving".to_string(), "Resolving...".to_string());
         strings.insert("executing".to_string(), "Executing...".to_string());
         strings.insert(

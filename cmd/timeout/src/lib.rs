@@ -1,4 +1,4 @@
-//! user timeout — run COMMAND with a time limit.
+//! user timeout: run COMMAND with a time limit.
 use std::os::unix::process::ExitStatusExt;
 use std::process::{Command, Stdio};
 use std::thread;
@@ -63,9 +63,6 @@ DURATION is a floating point number with optional suffix s/m/h/d.\n"
                 kill_after = Some(d);
             }
             s if s.starts_with('-') && s != "--" => {
-                // Not a recognized flag; treat as the DURATION operand if
-                // it parses as one (mirrors GNU accepting e.g. negative-
-                // looking durations), otherwise it's a bad option.
                 if parse_dur(s).is_some() {
                     break;
                 }
@@ -136,39 +133,24 @@ fn run_with(
             Ok(Some(status)) => {
                 return match status.code() {
                     Some(code) => code,
-                    // Killed by a signal before the timeout fired: mirror
-                    // shell convention (128 + signal number) instead of
-                    // silently reporting 1.
                     None => 128 + status.signal().unwrap_or(0),
                 };
             }
             Ok(None) => {
                 if rx.try_recv().is_ok() {
                     // SAFETY: `libc::kill` takes two plain integers (pid, signal)
-                    // and touches no memory on the Rust side. `pid` is the pid of
-                    // the child we just spawned via `Command::spawn` (still
-                    // running per the `Ok(None)` arm above), and `signal` was
-                    // either the default `SIGTERM` or validated by `parse_sig`.
-                    // Even if the pid had already exited concurrently, `kill`
-                    // just returns `ESRCH` — never UB — and there is no risk of
-                    // signaling an unrelated process because pids aren't
-                    // reused while we still hold the `Child` handle open.
                     unsafe {
                         libc::kill(pid, signal);
                     }
                     if let Some(k) = kill_after {
                         thread::sleep(Duration::from_secs_f64(k));
                         // SAFETY: same reasoning as above — `pid` is the same
-                        // child pid and `SIGKILL` is a fixed valid signal
-                        // constant; the call cannot be unsound.
                         unsafe {
                             libc::kill(pid, libc::SIGKILL);
                         }
                     }
-                    // Always reap the child ourselves so it can never be
-                    // left as a zombie under our own pid.
                     let _ = child.wait();
-                    return 124; // timed out
+                    return 124;
                 }
                 thread::sleep(Duration::from_millis(20));
             }
@@ -250,7 +232,7 @@ mod tests {
         assert_eq!(parse_dur("s"), None);
         assert_eq!(parse_dur("-5"), None);
         assert_eq!(parse_dur("5x"), None);
-        assert_eq!(parse_dur("nan"), None); // "nan" parses as f64 NaN; must be rejected
+        assert_eq!(parse_dur("nan"), None);
     }
 
     #[test]
@@ -269,20 +251,11 @@ mod tests {
 
     #[test]
     fn run_reports_missing_operand_as_usage_error() {
-        // Exercised indirectly: parse_dur/parse_sig already assert error
-        // (None) is returned instead of a silent default; full `run()`
-        // requires process::exec, which is covered by the shell-level
-        // integration below via a real child process.
         assert!(parse_dur("").is_none());
     }
 
     #[test]
     fn timeout_kills_long_running_child_and_reports_124() {
-        // Hermetic end-to-end check using `sleep`, present on any Linux
-        // test runner. Spawn via std::process directly against the
-        // compiled logic path is not exposed, so exercise parse_dur/
-        // parse_sig above for unit coverage and rely on integration tests
-        // (verification step) for full-process behavior.
         let d = parse_dur("0.05").unwrap();
         assert!(d > 0.0 && d < 1.0);
     }

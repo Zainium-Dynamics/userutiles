@@ -1,5 +1,4 @@
 //! Runtime discovery of applications and handlers
-//! Dynamically scans the system for installed applications and available interpreters
 
 use log::debug;
 use std::collections::HashMap;
@@ -24,13 +23,11 @@ impl Discoverer {
     pub fn discover_apps(&self) -> HashMap<String, String> {
         let mut apps = HashMap::new();
 
-        // Scan all application search paths
         for path in &self.platform.app_search_paths {
             if let Ok(entries) = fs::read_dir(path) {
                 for entry in entries.flatten() {
                     if let Ok(metadata) = entry.metadata() {
                         if metadata.is_file() {
-                            // Check if file is executable
                             #[cfg(unix)]
                             {
                                 use std::os::unix::fs::PermissionsExt;
@@ -70,7 +67,6 @@ impl Discoverer {
         let mut handlers = HashMap::new();
         let discovered_apps = self.discover_apps();
 
-        // List of handler candidates - (extension, handler_binary)
         let handler_candidates = vec![
             ("rs", "rustc"),
             ("py", "python3"),
@@ -103,7 +99,6 @@ impl Discoverer {
             ("ml", "ocamlc"),
         ];
 
-        // Check which handlers are available on the system
         for (ext, handler) in handler_candidates {
             if discovered_apps.contains_key(handler) {
                 debug!("Discovered handler: .{} -> {}", ext, handler);
@@ -177,7 +172,6 @@ mod tests {
     fn test_discover_apps_not_empty() {
         let discoverer = Discoverer::default();
         let apps = discoverer.discover_apps();
-        // Should at least find /bin/sh, /bin/bash, or similar
         assert!(!apps.is_empty(), "No applications discovered");
     }
 
@@ -185,7 +179,6 @@ mod tests {
     fn test_discover_handlers_not_empty() {
         let discoverer = Discoverer::default();
         let handlers = discoverer.discover_handlers();
-        // Should at least find sh handler
         assert!(!handlers.is_empty(), "No handlers discovered");
     }
 

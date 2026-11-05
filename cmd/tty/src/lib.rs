@@ -28,13 +28,6 @@ pub fn run() -> i32 {
         return 1;
     }
     // SAFETY: `libc::ttyname` takes a plain fd argument (`STDIN_FILENO`,
-    // always valid as a constant) and returns either NULL (checked below
-    // before use) or a pointer to an internal, NUL-terminated static buffer
-    // owned by libc. We only dereference that pointer with `CStr::from_ptr`
-    // after confirming it is non-null, and we don't hold onto it past this
-    // block (it's converted to an owned/borrowed Rust string via
-    // `to_string_lossy` and printed immediately), so there's no risk of it
-    // being invalidated by a subsequent call before we're done with it.
     unsafe {
         let p = libc::ttyname(libc::STDIN_FILENO);
         if p.is_null() {

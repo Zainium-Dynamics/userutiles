@@ -26,8 +26,8 @@ impl ProcessInfo {
         })?;
 
         let name = stat.comm.clone();
-        let memory_mb = status.vmrss.unwrap_or(0) / 1024; // Convert to MB
-        let cpu_percent = 0.0; // Simplified - would need more data for accurate calculation
+        let memory_mb = status.vmrss.unwrap_or(0) / 1024;
+        let cpu_percent = 0.0;
 
         Ok(ProcessInfo {
             pid,
@@ -40,7 +40,6 @@ impl ProcessInfo {
     }
 
     fn calculate_uptime(_stat: &procfs::process::Stat) -> String {
-        // Get boot time from /proc/stat
         if let Ok(boot_time) = Self::get_boot_time() {
             if let Ok(elapsed) = SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH + std::time::Duration::from_secs(boot_time))
@@ -68,7 +67,6 @@ impl ProcessInfo {
     }
 
     pub fn from_name(name: &str) -> TraceResult<Self> {
-        // Find process by name using procfs
         let all_procs = procfs::process::all_processes()
             .map_err(|_| TraceError::ProcessNotFound(name.to_string()))?;
 

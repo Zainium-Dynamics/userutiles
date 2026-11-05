@@ -60,7 +60,6 @@ pub fn run(trigger_args: &[String], dry_run: bool) -> Result<()> {
 fn detect_target_type(target: &str, config: &Config, platform: &Platform) -> Result<TargetType> {
     debug!("Detecting target type for: {}", target);
 
-    // Check if it's a file first (canonicalize to prevent symlink attacks)
     if let Ok(canonical) = fs::canonicalize(target) {
         if canonical.exists() {
             debug!("{} is a file", target);
@@ -87,17 +86,14 @@ fn detect_target_type(target: &str, config: &Config, platform: &Platform) -> Res
 
     debug!("{} is not a file, checking if it's an application", target);
 
-    // Check in discovered apps
     if config.get_app(target).is_some() {
         return Ok(TargetType::Application);
     }
 
-    // Check in PATH
     if find_in_path(target, platform).is_some() {
         return Ok(TargetType::Application);
     }
 
-    // Check if it's a registered ZainiumOS service
     if crate::zainium::find_service(target).is_some() {
         debug!(
             "'{}' is a Zainium service — will launch via service resolver",
@@ -144,8 +140,6 @@ fn run_application(
     dry_run: bool,
 ) -> Result<()> {
     let app_config = config.get_app(cmd);
-    // Use human-readable description if the user set one in config;
-    // auto-discovered entries have empty description so fall back to cmd name.
     let app_name = app_config
         .and_then(|cfg| {
             if !cfg.description.is_empty() {
@@ -167,7 +161,6 @@ fn run_application(
     );
     println!();
 
-    // Check privilege escalation - dynamic UID check, not hardcoded to "root"
     if platform.is_root && !trigger_args.iter().any(|arg| arg == "--no-sandbox") {
         warn!("Attempt to run application with elevated privileges");
         println!("{}", formatter.format_privilege_warning(app_name));
@@ -200,7 +193,6 @@ fn run_application(
     );
     println!();
 
-    // Execute application
     let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
     let mut child = Command::new(cmd)
         .args(&trigger_args[1..])
@@ -258,7 +250,6 @@ fn run_script(
         path: file_path.to_string(),
     })?;
 
-    // Check if file is executable (for awareness, not blocking)
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -363,8 +354,6 @@ fn find_suggestions(app: &str, config: &Config) -> Vec<String> {
         .map(|s| s.to_string())
         .collect()
 }
-
-// -- Public commands -------------------------------------------------------
 
 /// Print discovered resources to stdout (--list flag)
 pub fn list(target: ListTarget) -> ExitCode {

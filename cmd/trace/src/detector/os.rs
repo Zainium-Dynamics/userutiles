@@ -21,7 +21,6 @@ impl OsInfo {
     }
 
     fn detect_distro() -> TraceResult<String> {
-        // Try /etc/os-release
         if let Ok(content) = fs::read_to_string("/etc/os-release") {
             for line in content.lines() {
                 if line.starts_with("NAME=") {
@@ -34,7 +33,6 @@ impl OsInfo {
             }
         }
 
-        // Fallback
         Ok("Zainium OS".to_string())
     }
 

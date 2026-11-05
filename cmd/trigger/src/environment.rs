@@ -1,5 +1,4 @@
 //! Environment variable wrapper for real-time resolution
-//! Handles XDG Base Directory Specification and safe environment access
 
 use std::env;
 use std::path::PathBuf;
@@ -11,19 +10,16 @@ impl Environment {
     /// Get configuration directories respecting XDG Base Directory spec (Linux)
     /// or native Redox paths
     pub fn config_dir() -> Result<PathBuf, String> {
-        // Try XDG_CONFIG_HOME first
         if let Ok(xdg_config) = env::var("XDG_CONFIG_HOME") {
             if !xdg_config.is_empty() {
                 return Ok(PathBuf::from(xdg_config));
             }
         }
 
-        // Fall back to dirs crate
         if let Some(config_home) = dirs::config_dir() {
             return Ok(config_home);
         }
 
-        // Fall back to HOME/.config
         if let Ok(home) = env::var("HOME") {
             return Ok(PathBuf::from(home).join(".config"));
         }
@@ -34,19 +30,16 @@ impl Environment {
     /// Get cache directories respecting XDG spec
     #[allow(dead_code)]
     pub fn cache_dir() -> Result<PathBuf, String> {
-        // Try XDG_CACHE_HOME first
         if let Ok(xdg_cache) = env::var("XDG_CACHE_HOME") {
             if !xdg_cache.is_empty() {
                 return Ok(PathBuf::from(xdg_cache));
             }
         }
 
-        // Fall back to dirs crate
         if let Some(cache_home) = dirs::cache_dir() {
             return Ok(cache_home);
         }
 
-        // Fall back to HOME/.cache
         if let Ok(home) = env::var("HOME") {
             return Ok(PathBuf::from(home).join(".cache"));
         }
@@ -57,19 +50,16 @@ impl Environment {
     /// Get data directories respecting XDG spec
     #[allow(dead_code)]
     pub fn data_dir() -> Result<PathBuf, String> {
-        // Try XDG_DATA_HOME first
         if let Ok(xdg_data) = env::var("XDG_DATA_HOME") {
             if !xdg_data.is_empty() {
                 return Ok(PathBuf::from(xdg_data));
             }
         }
 
-        // Fall back to dirs crate
         if let Some(data_home) = dirs::data_dir() {
             return Ok(data_home);
         }
 
-        // Fall back to HOME/.local/share
         if let Ok(home) = env::var("HOME") {
             return Ok(PathBuf::from(home).join(".local/share"));
         }
@@ -103,14 +93,12 @@ impl Environment {
     /// Get home directory safely with fallback
     #[allow(dead_code)]
     pub fn home() -> Result<PathBuf, String> {
-        // Try HOME environment variable first
         if let Ok(home_path) = env::var("HOME") {
             if !home_path.is_empty() {
                 return Ok(PathBuf::from(home_path));
             }
         }
 
-        // Fall back to dirs crate
         if let Some(home_path) = dirs::home_dir() {
             return Ok(home_path);
         }
@@ -129,8 +117,6 @@ impl Environment {
     pub fn is_root() -> bool {
         #[cfg(unix)]
         // SAFETY: `libc::geteuid` takes no arguments, reads no
-        // caller-supplied pointers, and cannot fail — it is always safe to
-        // call regardless of process state.
         unsafe {
             libc::geteuid() == 0
         }

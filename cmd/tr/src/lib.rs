@@ -1,4 +1,4 @@
-//! user tr — translate or delete characters.
+//! user tr: translate or delete characters.
 use std::io::{self, Read, Write};
 
 pub fn run() -> i32 {
@@ -69,7 +69,6 @@ pub fn run() -> i32 {
     if delete {
         for &b in &set1 {
             if complement {
-                // mark all then unmark set1
             } else {
                 del[b as usize] = true;
             }
@@ -86,13 +85,11 @@ pub fn run() -> i32 {
             }
         }
     } else if let Some(ref s2) = set2 {
-        // translation
         let mut s2 = s2.clone();
         if s2.is_empty() {
             eprintln!("tr: SET2 must be non-empty when translating");
             return 1;
         }
-        // extend set2 by repeating last char if shorter
         if s2.len() < set1.len() {
             let last = *s2.last().unwrap();
             while s2.len() < set1.len() {
@@ -181,7 +178,6 @@ fn tokenize(s: &str) -> Vec<Tok<'_>> {
     let mut out = Vec::new();
     let mut i = 0;
     while i < bytes.len() {
-        // \ escapes, including POSIX octal \o, \oo, \ooo (so \0 is NUL)
         if bytes[i] == b'\\' && i + 1 < bytes.len() {
             let mut j = i + 1;
             let mut octal: u32 = 0;
@@ -208,11 +204,10 @@ fn tokenize(s: &str) -> Vec<Tok<'_>> {
             i += 2;
             continue;
         }
-        // [:class:]
         if bytes[i] == b'[' && i + 1 < bytes.len() && bytes[i + 1] == b':' {
             if let Some(end) = find_class_end(bytes, i) {
                 out.push(Tok::Class(&s[i + 2..end]));
-                i = end + 2; // skip :]
+                i = end + 2;
                 continue;
             }
         }
@@ -228,7 +223,6 @@ fn expand_set(s: &str) -> Vec<u8> {
     let mut i = 0;
     while i < toks.len() {
         match (&toks[i], toks.get(i + 1), toks.get(i + 2)) {
-            // ranges a-z, \0-\37
             (Tok::Byte(a), Some(Tok::Dash), Some(Tok::Byte(b))) if a <= b => {
                 out.extend(*a..=*b);
                 i += 3;
@@ -244,7 +238,6 @@ fn expand_set(s: &str) -> Vec<u8> {
 }
 
 fn find_class_end(bytes: &[u8], start: usize) -> Option<usize> {
-    // start at [:
     let mut j = start + 2;
     while j + 1 < bytes.len() {
         if bytes[j] == b':' && bytes[j + 1] == b']' {

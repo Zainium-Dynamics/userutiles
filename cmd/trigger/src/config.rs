@@ -113,13 +113,13 @@ impl Config {
 
     /// Get a UI string from configuration
     pub fn get_string(&self, _key: &str) -> Option<String> {
-        None // No config file, so no custom strings
+        None
     }
 
     /// Get a feature flag from configuration
     #[allow(dead_code)]
     pub fn get_feature(&self, _key: &str) -> bool {
-        false // No config file, so no features
+        false
     }
 
     /// Get list of all known applications
@@ -141,8 +141,6 @@ impl Config {
 
 impl Default for Config {
     fn default() -> Self {
-        // Default implementation uses dynamic discovery
-        // No hardcoded values!
         Self::discover_dynamic()
     }
 }
@@ -154,12 +152,10 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = Config::default();
-        // Should discover at least some apps
         assert!(
             !config.known_apps.is_empty(),
             "Should discover at least some apps"
         );
-        // Should discover at least some handlers
         assert!(
             !config.file_handlers.is_empty(),
             "Should discover at least some handlers"
@@ -169,9 +165,7 @@ mod tests {
     #[test]
     fn test_dynamic_discovery() {
         let config = Config::discover_dynamic();
-        // Should discover applications
         assert!(!config.known_apps.is_empty());
-        // Should discover handlers
         assert!(!config.file_handlers.is_empty());
     }
 

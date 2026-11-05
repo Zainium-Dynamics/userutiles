@@ -1,7 +1,4 @@
-//! user touch — update access/modification times; create empty files.
-//!
-//! For Zainium *structured* create (mkdir-p + no-overwrite file create), prefer
-//! `struct` — see `struct --help`. This `touch` is the traditional GNU-compatible tool.
+//! user touch: update access/modification times; create empty files.
 use std::fs::{self, File, OpenOptions};
 use std::io;
 use std::os::unix::ffi::OsStrExt;
@@ -101,13 +98,11 @@ pub fn run() -> i32 {
         return 1;
     }
 
-    // Both unset → update both (GNU default)
     if !access_only && !modify_only {
         access_only = true;
         modify_only = true;
     }
 
-    // -t [[CC]YY]MMDDhhmm[.ss] is a date in the local zone
     if let Some(t) = &stamp {
         let (main, ss) = t.split_once('.').unwrap_or((t.as_str(), "00"));
         let ok = main.bytes().all(|c| c.is_ascii_digit()) && matches!(main.len(), 8 | 10 | 12) && ss.len() == 2;
@@ -123,7 +118,6 @@ pub fn run() -> i32 {
             }
             _ => (String::new(), main),
         };
-        // MMDDhhmm alone is this year: MM/DD takes the current year
         date_spec = Some(if year.is_empty() {
             format!("{}/{} {}:{}:{ss}", &rest[..2], &rest[2..4], &rest[4..6], &rest[6..8])
         } else {
@@ -183,7 +177,6 @@ fn resolve_times(date_spec: Option<&str>, ref_file: Option<&Path>) -> Result<Tim
             mtime: ts,
         });
     }
-    // current time
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|e| e.to_string())?;
@@ -209,7 +202,6 @@ fn touch_one(
         if no_create {
             return Ok(());
         }
-        // create empty file (and parents are NOT auto-created — GNU touch does not mkdir -p)
         OpenOptions::new()
             .create(true)
             .truncate(false)
@@ -219,7 +211,6 @@ fn touch_one(
 
     let mut at = times.atime;
     let mut mt = times.mtime;
-    // UTIME_OMIT = max i64 on some; use libc::UTIME_OMIT if available
     const UTIME_OMIT: i64 = libc::UTIME_OMIT as i64;
     if !access_only {
         at.tv_nsec = UTIME_OMIT;
@@ -227,9 +218,6 @@ fn touch_one(
     if !modify_only {
         mt.tv_nsec = UTIME_OMIT;
     }
-    // If only one of a/m requested, the other is OMIT
-    // Wait: if access_only true and modify_only false, mtime OMIT
-    // if both true, both set
     if access_only && !modify_only {
         mt.tv_nsec = UTIME_OMIT;
         at = times.atime;
@@ -245,18 +233,11 @@ fn touch_one(
     let c = std::ffi::CString::new(path.as_os_str().as_bytes())
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "path contains interior NUL"))?;
     // SAFETY: `c` is a live `CString` (still in scope, not dropped) so
-    // `c.as_ptr()` is a valid, null-terminated C string for the duration of
-    // the call. `ts` is a local `[libc::timespec; 2]`, matching the
-    // `const struct timespec times[2]` array `utimensat` requires, and
-    // `ts.as_ptr()` points at both valid elements. `libc::AT_FDCWD` is the
-    // documented sentinel telling the kernel to resolve `c` relative to the
-    // current working directory rather than treating it as an fd, and flags
-    // flags: AT_SYMLINK_NOFOLLOW for -h (the link itself), else 0 (what it points at).
     let flags = if no_deref { libc::AT_SYMLINK_NOFOLLOW } else { 0 };
     let rc = unsafe { libc::utimensat(libc::AT_FDCWD, c.as_ptr(), ts.as_ptr(), flags) };
     if rc != 0 {
         return Err(io::Error::last_os_error());
     }
-    let _ = File::open(path); // ensure readable for some FS
+    let _ = File::open(path);
     Ok(())
 }

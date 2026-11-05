@@ -16,7 +16,7 @@ impl CpuStats {
         Ok(CpuStats {
             user_time: stat.utime,
             system_time: stat.stime,
-            cpu_percent: 0.0, // Simplified
+            cpu_percent: 0.0,
         })
     }
 }

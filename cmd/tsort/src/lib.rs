@@ -1,4 +1,4 @@
-//! user tsort — perform topological sort.
+//! user tsort: perform topological sort.
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};

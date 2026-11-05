@@ -1,4 +1,4 @@
-//! user uniq — report or omit repeated lines.
+//! user uniq: report or omit repeated lines.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 

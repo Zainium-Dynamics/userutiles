@@ -4,14 +4,12 @@ use colored::Colorize;
 pub fn format_table(data: &TraceData) -> crate::utils::TraceResult<String> {
     let mut output = String::new();
 
-    // Header with process name and PID
     output.push_str(&format!(
         "\nTrace started on process: {} (PID: {})\n\n",
         data.process.name.cyan().bold(),
         data.process.pid.to_string().cyan().bold()
     ));
 
-    // Process Information Section
     output.push_str(&format!("{}\n", "Process Information".bold()));
     output.push_str(&format_row("PID", &data.process.pid.to_string(), 15));
     output.push_str(&format_row("Name", &data.process.name, 15));
@@ -28,7 +26,6 @@ pub fn format_table(data: &TraceData) -> crate::utils::TraceResult<String> {
         15,
     ));
 
-    // Syscall Summary Section
     output.push_str(&format!("\n{}\n", "Syscall Summary".bold()));
     let stats = data.syscalls.get_stats();
     let total = data.syscalls.total_syscalls();
@@ -53,7 +50,6 @@ pub fn format_table(data: &TraceData) -> crate::utils::TraceResult<String> {
     ));
     output.push_str(&format_row("Top 3 syscalls", &top_3, 18));
 
-    // Network Activity Section
     output.push_str(&format!("\n{}\n", "Network Activity".bold()));
     output.push_str(&format_row(
         "Connections",
@@ -71,7 +67,6 @@ pub fn format_table(data: &TraceData) -> crate::utils::TraceResult<String> {
         15,
     ));
 
-    // Footer
     output.push_str(&format!(
         "\n{}\n",
         "✓ Trace completed successfully.".green().bold()

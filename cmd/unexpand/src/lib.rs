@@ -1,4 +1,4 @@
-//! user unexpand — convert spaces to tabs.
+//! user unexpand: convert spaces to tabs.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 
@@ -53,7 +53,6 @@ pub fn run() -> i32 {
             let converted = if all {
                 spaces_to_tabs(&line, tabstop)
             } else {
-                // only leading
                 let n = line.chars().take_while(|c| *c == ' ').count();
                 let tabs = n / tabstop;
                 let rem = n % tabstop;

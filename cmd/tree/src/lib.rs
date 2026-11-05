@@ -1,4 +1,4 @@
-//! user tree — guidance stub; Zainium uses `blueprint` instead of tree.
+//! user tree: guidance stub; Zainium uses `blueprint` instead of tree.
 pub fn run() -> i32 {
     eprintln!("tree: on Zainium OS use `blueprint` instead of `tree`.");
     eprintln!();

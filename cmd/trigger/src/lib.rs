@@ -1,5 +1,4 @@
-//! `trigger` — Universal Application and Script Runner
-//! Library crate exposing all modules for use by ZainiumOS components.
+//! `trigger`: Universal Application and Script Runner
 
 pub mod config;
 pub mod discovery;

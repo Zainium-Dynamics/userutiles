@@ -32,7 +32,6 @@ impl SyscallTracer {
     fn init_syscall_names() -> HashMap<u64, String> {
         let mut names = HashMap::new();
 
-        // x86_64 syscall numbers - common ones
         names.insert(0, "read".to_string());
         names.insert(1, "write".to_string());
         names.insert(2, "open".to_string());
@@ -134,7 +133,6 @@ impl SyscallTracer {
         names.insert(98, "readahead".to_string());
         names.insert(99, "readahead".to_string());
         names.insert(100, "readahead".to_string());
-        // Add more as needed...
         names.insert(101, "sendto".to_string());
         names.insert(102, "recvfrom".to_string());
         names.insert(129, "openat".to_string());

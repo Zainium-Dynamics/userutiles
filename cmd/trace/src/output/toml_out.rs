@@ -1,4 +1,4 @@
-//! Machine-readable TOML output (user_utils uses TOML only — never JSON/YAML).
+//! Machine-readable TOML output (user_utils uses TOML only: never JSON/YAML).
 
 use crate::tracer::TraceData;
 use serde::Serialize;

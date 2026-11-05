@@ -85,24 +85,13 @@ pub fn run() -> i32 {
     }
     let mut uts = MaybeUninit::<libc::utsname>::uninit();
     // SAFETY: `uts.as_mut_ptr()` gives `libc::uname` a valid, properly
-    // aligned pointer to enough space for a `libc::utsname` (the type the
-    // `MaybeUninit` was declared with); the kernel fully populates every
-    // field of the struct on success (return 0), which we check before
-    // treating the memory as initialized.
     if unsafe { libc::uname(uts.as_mut_ptr()) } != 0 {
         eprintln!("uname: {}", io::Error::last_os_error());
         return 1;
     }
     // SAFETY: reached only after `uname` returned 0 above, so the kernel has
-    // written every field of `uts`, making it fully initialized.
     let uts = unsafe { uts.assume_init() };
     // SAFETY: `buf` is one of the fixed-size `[c_char; N]` fields of
-    // `libc::utsname` (sysname/nodename/release/version/machine), which the
-    // `uname(2)` syscall always NUL-terminates within the field's bounds —
-    // the kernel enforces this by construction (e.g. hostnames/domainnames
-    // are length-limited at `sethostname`/`setdomainname` time to leave room
-    // for the terminator), so scanning from `buf.as_ptr()` for a NUL byte
-    // never reads past the end of the array.
     let field = |buf: &[libc::c_char]| unsafe {
         CStr::from_ptr(buf.as_ptr()).to_string_lossy().into_owned()
     };

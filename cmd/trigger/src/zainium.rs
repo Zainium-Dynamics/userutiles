@@ -1,12 +1,4 @@
 //! ZainiumOS service awareness
-//!
-//! Checks `/etc/zainium/services/` and `/etc/zainium/enabled/` for
-//! registered service definitions. Allows `trigger` to launch Zainium
-//! services by name, adding a third resolution tier:
-//!
-//! ```text
-//! Application (PATH) → Zainium Service → Script file → Error
-//! ```
 
 use log::debug;
 use std::path::PathBuf;
@@ -27,7 +19,6 @@ pub struct ZainiumService {
 /// Returns `None` if the name does not correspond to any known service.
 pub fn find_service(name: &str) -> Option<ZainiumService> {
     for dir in SERVICE_DIRS {
-        // Check <name>.toml (services/ uses this convention)
         let with_ext = PathBuf::from(dir).join(format!("{}.toml", name));
         if with_ext.exists() {
             debug!("zainium: found service '{}' at {:?}", name, with_ext);
@@ -37,7 +28,6 @@ pub fn find_service(name: &str) -> Option<ZainiumService> {
             });
         }
 
-        // Check bare <name> (enabled/ uses symlinks without extension)
         let bare = PathBuf::from(dir).join(name);
         if bare.exists() {
             debug!("zainium: found service symlink '{}' at {:?}", name, bare);
@@ -65,7 +55,6 @@ pub fn list_services() -> Vec<ZainiumService> {
             for entry in entries.flatten() {
                 let path = entry.path();
 
-                // Extract display name without extension
                 let name = path
                     .file_stem()
                     .or_else(|| path.file_name())
@@ -94,15 +83,12 @@ mod tests {
 
     #[test]
     fn test_find_nonexistent_service() {
-        // Should never find a service that doesn't exist
         assert!(find_service("zzz_no_such_zainium_service_xyz").is_none());
     }
 
     #[test]
     fn test_list_services_does_not_panic() {
-        // On a non-Zainium system this returns empty; on ZainiumOS it returns services
         let services = list_services();
-        // Just ensure it doesn't panic — content is system-dependent
         let _ = services;
     }
 }
