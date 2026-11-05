@@ -1,5 +1,4 @@
 //! Cell-value resolution and output rendering (table / export / newline /
-//! raw / json / pretty) for `lsipc`.
 use std::collections::HashMap;
 
 use crate::columns::column_title;
@@ -156,11 +155,6 @@ fn shm_field(
     match col {
         "SIZE" => Some(size_desc(e.size, bytes)),
         "NATTCH" => Some(e.nattch.to_string()),
-        // Unlike other blank fields (e.g. ATTACH/DETACH with no timestamp
-        // yet), STATUS is always `Some`, even when empty — verified
-        // against the real binary, which still prints a blank `Status:`
-        // line in the `-i` pretty view for a segment with no status flags
-        // set, rather than omitting the line entirely.
         "STATUS" => Some(shm_status(e.perms)),
         "ATTACH" => format_time(time_format, now, e.atime),
         "DETACH" => format_time(time_format, now, e.dtime),
@@ -367,8 +361,6 @@ fn format_time(format: TimeFormat, now: i64, time: i64) -> Option<String> {
 
 fn local_time(time: i64) -> Option<libc::tm> {
     // SAFETY: `localtime_r` writes into `tm` (zero-initialized first) and
-    // returns either a pointer to that same `tm` or null on error; we only
-    // read `tm` after checking the return value is non-null.
     unsafe {
         let mut tm: libc::tm = std::mem::zeroed();
         let time = time as libc::time_t;
@@ -382,7 +374,6 @@ fn local_time(time: i64) -> Option<libc::tm> {
 
 pub(crate) fn now_unix() -> i64 {
     // SAFETY: `gettimeofday` with a non-null `tv` pointer and null `tz`
-    // (the only supported form on Linux) always succeeds.
     unsafe {
         let mut tv: libc::timeval = std::mem::zeroed();
         libc::gettimeofday(&mut tv, std::ptr::null_mut());

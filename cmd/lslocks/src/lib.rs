@@ -1,6 +1,4 @@
-//! user lslocks — list local file locks held (or waited on) by processes on
-//! this system, by cross-referencing `/proc/locks` with each process's
-//! `/proc/<pid>/fdinfo/<fd>` `lock:` lines.
+//! user lslocks: list local file locks held (or waited on) by processes on
 mod render;
 
 use std::fs;
@@ -86,7 +84,6 @@ pub fn run() -> i32 {
                     }
                 }
             }
-            // Combined short options, e.g. `-bi`.
             s if s.starts_with('-') && !s.starts_with("--") && s.len() > 1 => {
                 for c in s[1..].chars() {
                     match c {
@@ -175,7 +172,7 @@ pub fn run() -> i32 {
 pub(crate) struct Lock {
     /// The numeric id `/proc/locks` groups a lock and its waiters under
     /// (`"<id>: ..."`); `-1` for locks sourced from `fdinfo` (which have no
-    /// id of their own — they're only used for cross-referencing/HOLDERS).
+    /// id of their own: they're only used for cross-referencing/HOLDERS).
     id: i64,
     blocked: bool,
     kind: String,
@@ -300,16 +297,10 @@ fn fallback_file_name(major: u32, minor: u32) -> Option<String> {
         if dev != want {
             continue;
         }
-        // Field 4 (`root`, already consumed by `nth`) precedes field 5
-        // (`mount point`, what we actually want) — skip one more.
         if let Some(mount_point) = fields.nth(1) {
             found = Some(mount_point);
         }
     }
-    // Matches the real `lslocks(1)` binary's fallback format exactly
-    // (empirically verified): the mount point with a literal `...`
-    // appended directly, no separator inserted even when the mount point
-    // isn't `/`.
     Some(format!("{found}...", found = found?))
 }
 
@@ -321,7 +312,7 @@ fn fallback_file_name(major: u32, minor: u32) -> Option<String> {
 /// per-process fdinfo locks; it's used to recover the true owning process
 /// and command name for a `/proc/locks` entry when the naive pid field
 /// there doesn't resolve locally (e.g. differing PID namespace, or an NFS
-/// server reporting a remote client's lock) — matching real `lslocks(1)`.
+/// server reporting a remote client's lock): matching real `lslocks(1)`.
 fn parse_and_resolve(
     no_inaccessible: bool,
     line: &str,
@@ -330,11 +321,6 @@ fn parse_and_resolve(
 ) -> Option<Lock> {
     let mut tokens = line.split_ascii_whitespace();
 
-    // Both `/proc/locks` lines and `/proc/<pid>/fdinfo/<fd>` `lock:` lines
-    // carry the same leading `<id>: ` token (verified against a live
-    // fdinfo file: `lock:\t1: FLOCK  ADVISORY  WRITE 2268 ...`) — always
-    // consume it, but only the top-level `/proc/locks` path (`fd_source:
-    // None`) actually needs the id, for `BLOCKER` cross-referencing later.
     let id_tok = tokens.next()?.strip_suffix(':')?;
     let id: i64 = if fd_source.is_none() {
         id_tok.parse().ok()?
@@ -354,9 +340,6 @@ fn parse_and_resolve(
     let mandatory = tokens.next()?.starts_with('M');
     let mode = tokens.next()?.to_string();
 
-    // Consumed positionally regardless of source: for a top-level
-    // `/proc/locks` line this is the owning pid; for an fdinfo `lock:`
-    // line the caller already knows the pid, so this field is discarded.
     let pid_field = tokens.next()?;
 
     let (mut process_id, mut command_name, unknown_command_name) =
@@ -533,7 +516,6 @@ mod tests {
     fn resolve_columns_explicit_list_replaces_default() {
         let cols = resolve_columns(Some("PID,PATH"), false).unwrap();
         assert_eq!(cols, vec!["PID", "PATH"]);
-        // --output-all is ignored when an explicit (non-`+`) list is given.
         let cols = resolve_columns(Some("PID,PATH"), true).unwrap();
         assert_eq!(cols, vec!["PID", "PATH"]);
     }
@@ -553,11 +535,6 @@ mod tests {
 
     #[test]
     fn parse_top_level_lock_line() {
-        // A real /proc/locks-style line; the pid here won't resolve to a
-        // real process in the test environment, so path resolution falls
-        // through to `None` (no_inaccessible=false, and there's unlikely to
-        // be a real mount matching major:minor 8:1 in the sandbox, so this
-        // just exercises the parse + graceful-fallback path).
         let line = "1: POSIX  MANDATORY  WRITE 999999 08:01:123456 0 EOF";
         let lock = parse_and_resolve(false, line, None, None).expect("should parse");
         assert_eq!(lock.id, 1);
@@ -571,7 +548,6 @@ mod tests {
         assert_eq!(lock.inode, 123456);
         assert_eq!(lock.start, 0);
         assert_eq!(lock.end, 0);
-        // No such pid: comm lookup fails -> "(unknown)".
         assert_eq!(lock.command_name.as_deref(), Some("(unknown)"));
     }
 
@@ -589,17 +565,11 @@ mod tests {
     #[test]
     fn parse_no_inaccessible_drops_unresolvable_lock() {
         let line = "1: POSIX  ADVISORY  WRITE 999999 08:01:123456 0 EOF";
-        // With no_inaccessible=true and no fd/mount match possible for this
-        // synthetic pid/inode, the lock must be dropped entirely.
         assert!(parse_and_resolve(true, line, None, None).is_none());
     }
 
     #[test]
     fn parse_fdinfo_lock_line_uses_given_pid_and_command() {
-        // fdinfo `lock:` lines carry the same leading "<id>: " token as
-        // `/proc/locks` (verified against a live `/proc/<pid>/fdinfo/<fd>`
-        // file); it's consumed but discarded, and so is the pid field
-        // present on the line, in favor of the already-known (pid, comm).
         let line = "1: FLOCK  ADVISORY  WRITE 42 00:1d:7 0 EOF";
         let lock =
             parse_and_resolve(false, line, Some((4242, "myproc", 7)), None).expect("should parse");
@@ -611,9 +581,6 @@ mod tests {
 
     #[test]
     fn parse_fdinfo_lock_line_without_id_prefix_fails() {
-        // Guards the fix above: a line missing the leading "<id>: " token
-        // must fail to parse rather than silently misreading "FLOCK" as an
-        // id and shifting every subsequent field by one.
         let line = "FLOCK  ADVISORY  WRITE 42 00:1d:7 0 EOF";
         assert!(parse_and_resolve(false, line, Some((4242, "myproc", 7)), None).is_none());
     }
@@ -643,10 +610,6 @@ mod tests {
             size: None,
             file_descriptor: 3,
         }];
-        // Same (kind, mandatory, mode, range, inode, device) signature as
-        // the fixture above, but sourced as a top-level /proc/locks line
-        // with an unresolvable pid (999999) — should adopt pid_locks' pid
-        // and command name instead of falling back to "(unknown)".
         let line = "1: POSIX  MANDATORY  WRITE 999999 08:01:123456 0 EOF";
         let lock = parse_and_resolve(false, line, None, Some(&pid_locks)).expect("should parse");
         assert_eq!(lock.process_id, 4242);

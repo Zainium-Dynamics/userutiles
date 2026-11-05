@@ -1,4 +1,4 @@
-//! user mkdir — create directories (POSIX `mkdir`, as Makefiles and configure scripts call it).
+//! user mkdir: create directories (POSIX `mkdir`, as Makefiles and configure scripts call it).
 use std::fs;
 use std::io;
 use std::os::unix::fs::PermissionsExt;
@@ -59,7 +59,6 @@ pub fn run() -> i32 {
                 return 1;
             }
             s => {
-                // bundled short options: -pv, -pm755, -m 755
                 let rest: Vec<char> = s.chars().skip(1).collect();
                 let mut i = 0;
                 while i < rest.len() {
@@ -148,7 +147,6 @@ fn make_with_parents(d: &Path, verbose: bool) -> io::Result<bool> {
                     println!("mkdir: created directory '{}'", p.display());
                 }
             }
-            // another process made it in between
             Err(e) if e.kind() == io::ErrorKind::AlreadyExists && p.is_dir() => {}
             Err(e) => return Err(e),
         }

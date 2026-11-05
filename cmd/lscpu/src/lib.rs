@@ -1,8 +1,4 @@
-//! user lscpu — display information about the CPU architecture.
-//!
-//! Ported from uutils/util-linux's `lscpu`. Reads `/proc/cpuinfo` and the
-//! `/sys/devices/system/cpu` sysfs tree and prints a tree of
-//! field/value pairs, either as aligned text (default) or JSON (`--json`).
+//! user lscpu: display information about the CPU architecture.
 use std::cmp;
 use std::fs;
 use std::path::Path;
@@ -73,7 +69,7 @@ pub fn run() -> i32 {
         match a.as_str() {
             "-B" | "--bytes" => out_opts.bytes = true,
             "-J" | "--json" => out_opts.json = true,
-            "-x" | "--hex" => {} // accepted, not implemented (see HELP)
+            "-x" | "--hex" => {}
             other => {
                 ui.err(&format!("unknown option -- '{other}'"));
                 return 1;
@@ -344,10 +340,6 @@ mod tests {
 
     #[test]
     fn bytes_flag_reaches_cache_totals_formatting() {
-        // Regression test for the bug where `-B/--bytes` was parsed but
-        // never threaded through to cache-size formatting, so `-B` output
-        // always stayed human-readable (e.g. "32K") instead of a bare
-        // integer byte count.
         let topo = sysfs::CpuTopology {
             cpus: vec![sysfs::Cpu {
                 pkg_id: 0,

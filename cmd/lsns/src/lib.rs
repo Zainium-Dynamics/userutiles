@@ -1,13 +1,4 @@
-//! user lsns — list the Linux namespaces present on the system and which
-//! processes belong to each one.
-//!
-//! Namespace identity is the inode number of `/proc/<pid>/ns/<type>` (a
-//! `nsfs` inode, unique across the whole system for the lifetime of the
-//! namespace), matching the real `lsns(8)`/util-linux algorithm. Namespaces
-//! with no attached process ("persistent", i.e. kept alive only by a
-//! bind-mount, typically under `/var/run/netns` or `/run/user/*/netns`) are
-//! discovered separately by scanning `/proc/self/mountinfo` for `nsfs`
-//! mounts.
+//! user lsns: list the Linux namespaces present on the system and which
 use std::collections::HashMap;
 use std::fs;
 use std::os::linux::fs::MetadataExt;
@@ -46,7 +37,6 @@ pub fn run() -> i32 {
             }
             "-n" | "--noheadings" => noheadings = true,
             "-P" | "--persistent" => persistent = true,
-            // Combined short options, e.g. `-nP`.
             s if s.starts_with('-') && !s.starts_with("--") && s.len() > 1 => {
                 for c in s[1..].chars() {
                     match c {
@@ -78,9 +68,6 @@ pub fn run() -> i32 {
     match add_persistent_namespaces(Path::new("/proc/self/mountinfo"), &mut namespaces) {
         Ok(()) => {}
         Err(e) => {
-            // Persistent-namespace discovery is best-effort: a missing or
-            // unreadable mountinfo shouldn't prevent reporting the
-            // process-attached namespaces we already found.
             ui.warn(&format!(
                 "cannot read /proc/self/mountinfo, persistent namespaces may be missing: {e}"
             ));
@@ -235,7 +222,6 @@ fn add_persistent_namespaces(
 
     for line in mountinfo.lines() {
         let mut fields = line.split_whitespace();
-        // Fields 0..=3 are: mount id, parent id, major:minor, root.
         let Some(mount_root) = fields.nth(3) else {
             continue;
         };
@@ -334,8 +320,8 @@ mod tests {
 
     fn proc_with_ns(pid: i32, uid: u32, mnt_inode: u64, net_inode: u64) -> Process {
         let mut ns_ids = [0u64; 8];
-        ns_ids[2] = mnt_inode; // mnt
-        ns_ids[3] = net_inode; // net
+        ns_ids[2] = mnt_inode;
+        ns_ids[3] = net_inode;
         Process {
             pid,
             uid,
@@ -352,13 +338,10 @@ mod tests {
             proc_with_ns(20, 1000, 100, 999),
         ];
         let namespaces = collect_assigned_namespaces(&processes);
-        // 3 distinct inodes across the fleet: mnt=100 (shared by all three),
-        // net=200 (shared by first two), net=999 (only pid 20).
         assert_eq!(namespaces.len(), 3);
 
         let mnt = namespaces.iter().find(|n| n.id == 100).unwrap();
         assert_eq!(mnt.nprocs, 3);
-        // Representative is the lowest pid among {10, 5, 20} => 5.
         assert_eq!(mnt.representative_pid, Some(5));
 
         let net_shared = namespaces.iter().find(|n| n.id == 200).unwrap();
@@ -439,7 +422,6 @@ mod tests {
         add_persistent_namespaces(&mountinfo, &mut namespaces).unwrap();
         fs::remove_dir_all(&dir).ok();
 
-        // Already-known namespace must not be duplicated or overwritten.
         assert_eq!(namespaces.len(), 1);
         assert_eq!(namespaces[0].nprocs, 2);
     }
@@ -468,10 +450,6 @@ mod tests {
 
     #[test]
     fn read_process_command_handles_single_nul_terminated_cmdline() {
-        // Some processes (e.g. Firefox content processes) rewrite their own
-        // argv into one descriptive NUL-terminated string containing
-        // embedded spaces rather than real per-arg NUL separators — the
-        // whole string (minus the trailing NUL) should come through as-is.
         let dir = std::env::temp_dir().join(format!("user-lsns-test5-{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("cmdline"), b"firefox -contentproc 279 tab\0").unwrap();

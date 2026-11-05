@@ -1,5 +1,4 @@
 //! Column definitions and output rendering (text table / raw / JSON) for
-//! `lslocks`.
 use crate::Lock;
 
 pub(crate) const ALL_COLUMNS: [&str; 13] = [
@@ -83,8 +82,6 @@ impl Cell {
                 if items.is_empty() {
                     "[]".to_string()
                 } else {
-                    // Matches the real `lslocks -J` array layout: one
-                    // holder per line, indented under the enclosing cell.
                     let rendered: Vec<String> = items
                         .iter()
                         .map(|s| format!("             {}", json_string(s)))
@@ -158,7 +155,7 @@ fn column_right_aligned(col: &str) -> bool {
 
 /// Longest path/holders text to keep on one line before truncating with a
 /// `...` marker. Real `lslocks` only truncates PATH/HOLDERS to the
-/// terminal width when connected to an interactive terminal — piped output
+/// terminal width when connected to an interactive terminal: piped output
 /// (the common case, and the one that matters for pipeline correctness) is
 /// left untruncated. This uses the same static cap rather than probing the
 /// real terminal width via an ioctl, but only applies it under the same
@@ -190,10 +187,6 @@ fn cell_for(
         "PID" => Cell::Int(Some(lock.process_id as i64)),
         "TYPE" => Cell::Str(Some(lock.kind.clone())),
         "SIZE" => match lock.size {
-            // Real lslocks leaves SIZE blank for a zero-byte file (e.g. a
-            // pure advisory lock file with no data), in both human and
-            // `--bytes` modes — not "0"/"0B". Matches empirically-verified
-            // behavior against the system `lslocks(1)` binary.
             None | Some(0) => {
                 if bytes {
                     Cell::Int(None)
@@ -463,9 +456,7 @@ mod tests {
     #[test]
     fn truncate_adds_ellipsis_only_on_a_tty() {
         let long = "a".repeat(150);
-        // Not a tty: never truncated, regardless of --notruncate.
         assert_eq!(truncate(&long, false, false), long);
-        // A tty: truncated unless --notruncate is given.
         let short = truncate(&long, false, true);
         assert_eq!(short.chars().count(), TRUNCATE_WIDTH);
         assert!(short.ends_with("..."));

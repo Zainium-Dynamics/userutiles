@@ -1,5 +1,4 @@
 //! Column name tables and default/explicit column-list resolution,
-//! mirroring the real `lsipc(1)` / uutils reference column model.
 
 pub(crate) const GENERIC: [&str; 13] = [
     "KEY", "ID", "OWNER", "PERMS", "CUID", "CUSER", "CGID", "CGROUP", "UID", "USER", "GID",
@@ -180,7 +179,6 @@ pub(crate) fn filter_defaults(flags: &ColumnFlags) -> Vec<&'static str> {
             columns.extend(["SEND", "RECV", "CTIME"]);
         }
         if flags.shmems || (!flags.queues && !flags.semaphores) {
-            // If COMMAND was the last column, keep it last.
             let reappend_command = matches!(columns.last(), Some(&"COMMAND"));
             if reappend_command {
                 columns.pop();
@@ -313,8 +311,6 @@ mod tests {
     fn filter_defaults_shm_time_reappends_command_last() {
         let f = flags(false, true, false, false, false, true);
         let cols = filter_defaults(&f);
-        // default::SHM already ends with COMMAND; -t should insert
-        // ATTACH/DETACH before it and put COMMAND back at the end.
         assert_eq!(cols.last(), Some(&"COMMAND"));
         let attach_pos = cols.iter().position(|&c| c == "ATTACH").unwrap();
         let command_pos = cols.iter().position(|&c| c == "COMMAND").unwrap();
@@ -363,8 +359,6 @@ mod tests {
 
     #[test]
     fn resolve_columns_warns_on_inapplicable_column() {
-        // NSEMS is a semaphore-only column; selecting it while listing
-        // shared memory should warn, not error.
         let f = flags(false, true, false, false, false, false);
         let (cols, warn) = resolve_columns(Some("KEY,NSEMS"), &f, false).unwrap();
         assert_eq!(cols, vec!["KEY", "NSEMS"]);

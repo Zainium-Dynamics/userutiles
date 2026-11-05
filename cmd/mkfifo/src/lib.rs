@@ -1,4 +1,4 @@
-//! user mkfifo — create named pipes.
+//! user mkfifo: create named pipes.
 use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
@@ -7,7 +7,7 @@ use usercore::Ui;
 
 /// Entry point for the `mkfifo` utility. Parses `std::env::args()` and
 /// creates each NAME as a FIFO via `mkfifo(2)`, applying `-m MODE`
-/// (default `0666`) minus the process umask — matching GNU `mkfifo`'s
+/// (default `0666`) minus the process umask: matching GNU `mkfifo`'s
 /// permission semantics.
 ///
 /// Returns 0 if every FIFO was created, 1 on a usage error or if any
@@ -71,10 +71,6 @@ pub fn run() -> i32 {
             }
         };
         // SAFETY: `c` is a `CString` that owns a NUL-terminated buffer and is kept alive
-        // for the duration of this call, so `c.as_ptr()` is a valid pointer to a
-        // NUL-terminated C string as `mkfifo` requires. `final_mode` is a plain integer
-        // value; the call can only fail via `errno`, which is read afterwards through
-        // `std::io::Error::last_os_error()`.
         let rc = unsafe { libc::mkfifo(c.as_ptr(), final_mode) };
         if rc != 0 {
             ui.err(&format!(
@@ -100,11 +96,8 @@ fn parse_mode(s: &str) -> Option<u32> {
 /// setting to `0` and immediately restoring the original value.
 fn process_umask() -> u32 {
     // SAFETY: `libc::umask` takes a `mode_t` by value and unconditionally returns the
-    // previous umask; it has no pointer arguments and cannot fail or cause UB. Calling
-    // it with `0` is the standard idiom for reading the current process umask.
     let mask = unsafe { libc::umask(0) };
     // SAFETY: same as above — `libc::umask` cannot fail or cause UB. This restores the
-    // umask we just displaced so the process's umask is left unchanged overall.
     unsafe {
         libc::umask(mask);
     }
@@ -125,13 +118,12 @@ mod tests {
     #[test]
     fn parse_mode_rejects_invalid_input() {
         assert_eq!(parse_mode("rw-rw-rw-"), None);
-        assert_eq!(parse_mode("899"), None); // 9 is not an octal digit
+        assert_eq!(parse_mode("899"), None);
         assert_eq!(parse_mode(""), None);
     }
 
     #[test]
     fn process_umask_is_idempotent() {
-        // Reading the umask must not perturb it: two reads agree.
         let a = process_umask();
         let b = process_umask();
         assert_eq!(a, b);
@@ -145,9 +137,6 @@ mod tests {
         let path = dir.join("pipe");
         let c = CString::new(path.as_os_str().as_bytes()).unwrap();
         // SAFETY: `c` is a valid, NUL-terminated `CString` kept alive for the
-        // duration of this call, so `c.as_ptr()` is a sound `mkfifo(2)` path
-        // argument. `0o600` is a plain mode bitmask. The checked return value
-        // is the only thing observed afterwards.
         let rc = unsafe { libc::mkfifo(c.as_ptr(), 0o600) };
         assert_eq!(rc, 0);
         let meta = std::fs::symlink_metadata(&path).unwrap();

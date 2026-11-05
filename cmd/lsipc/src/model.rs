@@ -1,10 +1,4 @@
 //! Data model for System V IPC resources (shared memory, semaphores,
-//! message queues), read from `/proc/sysvipc/*` and `/proc/sys/kernel/*`.
-//! No syscall-based fallback is implemented for systems without
-//! `/proc/sysvipc` mounted — that's an exotic configuration on any real
-//! Linux/Zainium system (`CONFIG_SYSVIPC=y` + procfs is the default), and
-//! the reference itself only falls back to raw `shmctl`/`semctl`/`msgctl`
-//! `IPC_INFO`/`*_STAT` calls in that case.
 
 use std::fs;
 
@@ -55,7 +49,7 @@ pub(crate) struct MsgEntry {
     pub(crate) ctime: i64,
 }
 
-/// One semaphore within a set, fetched live via `semctl(2)` — real syscalls,
+/// One semaphore within a set, fetched live via `semctl(2)`: real syscalls,
 /// only performed when a caller actually needs per-semaphore detail (the
 /// `-i` pretty view), not on every listing (the reference eagerly fetches
 /// these for every semaphore set it parses, even when never displayed;
@@ -182,16 +176,12 @@ pub(crate) fn read_msg_table(id_filter: Option<i32>) -> Result<Vec<MsgEntry>, St
     Ok(out)
 }
 
-/// Fetches live per-semaphore values via real `semctl(2)` calls — used only
+/// Fetches live per-semaphore values via real `semctl(2)` calls: used only
 /// for the `-i` detail view's `Elements:` sub-table.
 pub(crate) fn fetch_sem_elements(semid: i32, nsems: u64) -> Vec<SemElement> {
     let mut out = Vec::new();
     for semnum in 0..nsems as usize {
         // SAFETY: `semid`/`semnum` are validated ids read straight back
-        // from `/proc/sysvipc/sem`, which the kernel itself just produced;
-        // `semctl` with these read-only commands takes no pointer argument
-        // and returns the value (or -1) directly, so there is no buffer to
-        // initialize or invalidate.
         let (val, ncount, zcount, pid) = unsafe {
             (
                 libc::semctl(semid, semnum as i32, libc::GETVAL),
@@ -201,7 +191,6 @@ pub(crate) fn fetch_sem_elements(semid: i32, nsems: u64) -> Vec<SemElement> {
             )
         };
         if val == -1 && ncount == -1 && zcount == -1 && pid == -1 {
-            // The set was removed between listing and querying it; skip.
             continue;
         }
         out.push(SemElement {
@@ -263,7 +252,7 @@ pub(crate) fn read_msg_limits() -> Result<MsgLimits, String> {
 }
 
 /// `/proc/sys/kernel/sem` is one line: `SEMMSL SEMMNS SEMOPM SEMMNI`.
-/// `SEMVMX` (max value a semaphore can hold) isn't exposed there — it's a
+/// `SEMVMX` (max value a semaphore can hold) isn't exposed there: it's a
 /// compile-time kernel constant, `0x7fff`, matching the reference.
 pub(crate) fn read_sem_limits() -> Result<SemLimits, String> {
     const SEMVMX: u64 = 0x7fff;

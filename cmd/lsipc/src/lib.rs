@@ -1,6 +1,4 @@
-//! user lsipc — show information on System V IPC facilities (shared memory,
-//! semaphores, message queues) currently in use on the system, read from
-//! `/proc/sysvipc/*` and `/proc/sys/kernel/*`.
+//! user lsipc: show information on System V IPC facilities (shared memory,
 mod columns;
 mod model;
 mod render;
@@ -203,21 +201,13 @@ pub fn run() -> i32 {
     } else if opts.raw {
         OutputMode::Raw
     } else if opts.id.is_some() {
-        // `-l/--list` and the plain default both render as the aligned
-        // table (verified empirically against the real binary: `-l`
-        // produces byte-identical output to no output-format flag at all).
         OutputMode::Pretty
     } else {
         OutputMode::Table
     };
-    let _ = opts.list; // recognized, but doesn't change rendering (see above)
+    let _ = opts.list;
 
     let no_kind_given = kind_count == 0;
-    // Real `lsipc(1)` defaults to the global summary when no IPC kind is
-    // selected (verified against the system binary); the uutils reference
-    // instead falls through to `describe()` for every kind with an empty
-    // column set, which is a no-op/degenerate table. Matching the real
-    // tool's behavior here since it's the far more useful default.
     let effective_global = opts.global || no_kind_given;
 
     let flags = ColumnFlags {
@@ -273,8 +263,6 @@ pub fn run() -> i32 {
         return 0;
     }
 
-    // Exactly one kind flag is guaranteed set here (no_kind_given would
-    // have taken the `effective_global` branch above otherwise).
     let table_name = if opts.queues {
         "messages"
     } else if opts.shmems {
@@ -631,7 +619,6 @@ fn human_size(bytes: u64) -> String {
 
 fn page_size() -> Result<u64, String> {
     // SAFETY: `sysconf` with a valid, well-known name constant simply
-    // returns a `long`, or -1 on error (checked below); no pointers involved.
     let value = unsafe { libc::sysconf(libc::_SC_PAGE_SIZE) };
     if value <= 0 {
         Err("sysconf(_SC_PAGE_SIZE) failed".to_string())

@@ -1,4 +1,4 @@
-//! user mcookie — generate magic cookies for xauth.
+//! user mcookie: generate magic cookies for xauth.
 use std::fs::File;
 use std::io::{self, Read};
 
@@ -20,15 +20,11 @@ fn fill_random(buf: &mut [u8]) {
         }
     }
     // SAFETY: `libc::time` is called with a NULL `time_t*`, which POSIX
-    // defines as valid; `libc::srand`/`libc::rand` take only plain
-    // integers and dereference no pointers, so neither call can fail or
-    // invoke UB regardless of process state.
     unsafe {
         libc::srand(libc::time(std::ptr::null_mut()) as u32 ^ std::process::id());
     }
     for byte in buf.iter_mut() {
         // SAFETY: `libc::rand` takes no arguments and only mutates C's
-        // internal RNG state; it cannot fail or cause UB.
         *byte = unsafe { libc::rand() } as u8;
     }
 }
@@ -204,8 +200,6 @@ mod tests {
 
     #[test]
     fn compute_cookie_bytes_matches_manual_md5() {
-        // Cross-check against a fresh MD5 computed directly, independent
-        // of `compute_cookie_bytes`'s own internal call.
         let random = [7u8; RANDOM_BYTES];
         let seed = b"seed-data";
         let mut h = usercore::digest::Md5::new();
@@ -278,16 +272,11 @@ mod tests {
         let mut b = [0u8; 32];
         fill_random(&mut a);
         fill_random(&mut b);
-        // Overwhelmingly likely to differ; guards against a broken/stuck
-        // randomness source.
         assert_ne!(a, b);
     }
 
     #[test]
     fn run_end_to_end_prints_32_hex_chars() {
-        // Exercises the real `run()` codepath (real /dev/urandom or libc
-        // fallback) by calling compute_cookie_bytes with freshly filled
-        // random bytes, then checking the printable format is right.
         let mut random_bytes = [0u8; RANDOM_BYTES];
         fill_random(&mut random_bytes);
         let digest = compute_cookie_bytes(b"", &random_bytes);

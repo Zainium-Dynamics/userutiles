@@ -1,6 +1,4 @@
-//! user mesg — control write access to the invoking user's terminal
-//! (the setgid-tty group-write bit `crw--w----`, as toggled by
-//! `write(1)`/`talk(1)`).
+//! user mesg: control write access to the invoking user's terminal
 use std::io;
 
 use usercore::Ui;
@@ -57,8 +55,6 @@ pub fn run() -> i32 {
 
     match enable {
         Some(want) => {
-            // GNU/util-linux semantics: `mesg y` sets only the group-write
-            // bit; `mesg n` clears both group and other write bits.
             let new_mode = if want { mode | 0o020 } else { mode & !0o022 };
             if let Err(e) = fchmod(fd, new_mode) {
                 ui.err(&format!("failed to change terminal mode: {e}"));
@@ -92,15 +88,12 @@ pub fn run() -> i32 {
 fn first_tty_fd() -> Option<i32> {
     [0, 1, 2].into_iter().find(|&fd| {
         // SAFETY: `isatty` takes a plain fd, no pointers; safe for any fd
-        // value including invalid ones (just returns 0/sets errno).
         unsafe { libc::isatty(fd) == 1 }
     })
 }
 
 fn fstat_mode(fd: i32) -> io::Result<u32> {
     // SAFETY: `st` is a plain, fully-initialized-on-success POD struct;
-    // `fd` is a valid fd from `first_tty_fd`, and `&mut st` is a valid
-    // pointer to stack memory of the correct type for `fstat(2)`.
     unsafe {
         let mut st: libc::stat = std::mem::zeroed();
         if libc::fstat(fd, &mut st) != 0 {
@@ -112,7 +105,6 @@ fn fstat_mode(fd: i32) -> io::Result<u32> {
 
 fn fchmod(fd: i32, mode: u32) -> io::Result<()> {
     // SAFETY: `fd` is a valid fd; `mode` is a plain mode_t value with no
-    // aliasing/pointer concerns.
     let rc = unsafe { libc::fchmod(fd, mode as libc::mode_t) };
     if rc != 0 {
         return Err(io::Error::last_os_error());

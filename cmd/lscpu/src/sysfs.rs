@@ -1,9 +1,4 @@
 //! Sysfs-reading layer for `lscpu`.
-//!
-//! Every reader takes an explicit base directory rather than hard-coding
-//! `/sys/devices/system/cpu` so tests can point at a synthetic fixture
-//! directory shaped like the real sysfs tree (see `chcpu`'s `SysCpu` for
-//! the same pattern).
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -375,8 +370,6 @@ mod tests {
             return;
         }
         let topo = CpuTopology::read(real);
-        // Just confirm this doesn't panic and produces at least one CPU
-        // if the sandbox exposes any online CPUs at all.
         let online = read_online_cpus(real);
         if !online.is_empty() {
             assert!(!topo.cpus.is_empty());

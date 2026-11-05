@@ -1,4 +1,4 @@
-//! user mknod — create special files.
+//! user mknod: create special files.
 use std::ffi::CString;
 use std::io;
 use std::os::unix::ffi::OsStrExt;
@@ -122,9 +122,6 @@ fn make_node(
     let dev = libc::makedev(major as libc::c_uint, minor as libc::c_uint);
     let m = (file_type | (mode as libc::mode_t)) as libc::mode_t;
     // SAFETY: `c` is a `CString` kept alive across this call, so `c.as_ptr()` is a
-    // valid pointer to a NUL-terminated C string as `mknod` requires. `m` and `dev`
-    // are plain integer values built above from parsed CLI input, not pointers, so
-    // they cannot themselves cause UB; any failure is reported via `errno`.
     let rc = unsafe { libc::mknod(c.as_ptr(), m, dev) };
     if rc != 0 {
         return Err(io::Error::last_os_error());
@@ -176,8 +173,6 @@ mod tests {
 
     #[test]
     fn make_node_creates_fifo_without_root() {
-        // FIFOs don't require root, unlike block/char devices, so this is
-        // hermetically testable.
         let dir = scratch_dir("fifo");
         let path = dir.join("myfifo");
         let _ = std::fs::remove_file(&path);

@@ -1,10 +1,4 @@
-//! user mkswap — set up a swap area.
-//!
-//! Writes a real v1 `SWAPSPACE2` header (`linux/swap.h`'s
-//! `union swap_header`, verified against util-linux's own
-//! `libblkid/src/superblocks/swap.c`), so the result is byte-for-byte
-//! what the kernel's `swapon(2)` and real `blkid`/`mkswap` expect — not
-//! a stub format.
+//! user mkswap: set up a swap area.
 use std::fs::OpenOptions;
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -18,13 +12,10 @@ const HEADER_SIZE: usize = 4 + 4 + 4 + 16 + 16 + 117 * 4 + 4;
 const SB_OFFSET: u64 = 1024;
 const MIN_PAGES: u64 = 10;
 
-/// The system's real page size — swap always uses it, and it varies by
+/// The system's real page size: swap always uses it, and it varies by
 /// architecture (4096 on x86_64/aarch64, but not universally).
 fn page_size() -> u64 {
     // SAFETY: `sysconf` takes a plain integer constant and cannot fail
-    // in a way that causes UB; a negative return (only possible if the
-    // parameter were invalid, which `_SC_PAGESIZE` never is) is handled
-    // by the fallback below.
     let r = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
     if r > 0 {
         r as u64
@@ -37,9 +28,6 @@ fn random_uuid() -> [u8; 16] {
     let mut buf = [0u8; 16];
     if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
         if f.read_exact(&mut buf).is_ok() {
-            // Stamp the standard "version 4, variant 1" bits so this
-            // reads as a conventional random UUID like `uuidgen -r` would
-            // produce, even though swap doesn't itself require that.
             buf[6] = (buf[6] & 0x0f) | 0x40;
             buf[8] = (buf[8] & 0x3f) | 0x80;
             return buf;
@@ -67,7 +55,7 @@ fn set_label(buf: &mut [u8; 16], label: &str) {
 }
 
 /// Determine `path`'s size in bytes: `metadata().len()` works for a
-/// regular file, but block devices always report 0 there — `SEEK_END`
+/// regular file, but block devices always report 0 there: `SEEK_END`
 /// is what actually reports a block device's real size on Linux.
 fn device_size(f: &mut std::fs::File) -> io::Result<u64> {
     let size = f.seek(SeekFrom::End(0))?;
@@ -82,7 +70,6 @@ fn build_header(lastpage: u32, uuid: [u8; 16], label: &str) -> [u8; HEADER_SIZE]
     let mut hdr = [0u8; HEADER_SIZE];
     hdr[0..4].copy_from_slice(&1u32.to_le_bytes());
     hdr[4..8].copy_from_slice(&lastpage.to_le_bytes());
-    // nr_badpages stays 0.
     hdr[12..28].copy_from_slice(&uuid);
     let mut vol = [0u8; 16];
     set_label(&mut vol, label);
@@ -223,7 +210,6 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("user_mkswap_test_{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("swap.img");
-        // 10 pages minimum; use the real page size to size the file.
         let page = page_size();
         std::fs::write(&path, vec![0u8; (page * 12) as usize]).unwrap();
 

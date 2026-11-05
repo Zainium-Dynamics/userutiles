@@ -1,5 +1,4 @@
-//! user lsmem — list the ranges of available memory and their online
-//! status, from the `/sys/devices/system/memory` sysfs tree.
+//! user lsmem: list the ranges of available memory and their online
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -32,7 +31,7 @@ const ALL_COLUMNS: [&str; 7] = [
 ];
 const DEFAULT_COLUMNS: [&str; 5] = ["RANGE", "SIZE", "STATE", "REMOVABLE", "BLOCK"];
 /// Columns whose differing values across otherwise-adjacent blocks force
-/// them apart even without `-a`/`-S` — a coalesced row can't show two
+/// them apart even without `-a`/`-S`: a coalesced row can't show two
 /// different states for a single displayed column.
 const SPLITTABLE_COLUMNS: [&str; 4] = ["STATE", "REMOVABLE", "NODE", "ZONES"];
 
@@ -171,9 +170,6 @@ pub fn run() -> i32 {
         coalesce(&blocks, &split_keys)
     };
 
-    // The summary lines are a plain-table-only convention: real lsmem
-    // doesn't append them to `-J`/`-P` output unless `--summary` is given
-    // explicitly (verified: `lsmem -J` alone has no trailing summary).
     let summary = if (opts.json || opts.pairs) && !summary_explicit {
         Summary::Never
     } else {
@@ -231,7 +227,7 @@ fn resolve_columns(output: Option<&str>, output_all: bool) -> Result<Vec<&'stati
 /// A row can't be coalesced across blocks that differ in a column it's
 /// displaying, so `STATE`/`REMOVABLE` are always split keys, and
 /// `NODE`/`ZONES` become split keys too whenever they're part of the
-/// selected output columns (matches real `lsmem` — including `NODE`/`ZONES`
+/// selected output columns (matches real `lsmem`: including `NODE`/`ZONES`
 /// via `-o`/`--output-all` splits ranges even without an explicit `-S`).
 /// `-S/--split` adds any further named columns explicitly.
 fn resolve_split_keys(
@@ -581,7 +577,7 @@ fn summary_line(label: &str, value: &str) {
 }
 
 /// Real util-linux 2^n scaling + one-decimal rounding, up to `E` (exabyte)
-/// — fixes the earlier version's naive fallback, which only handled exact
+///: fixes the earlier version's naive fallback, which only handled exact
 /// multiples cleanly and used a narrower unit set.
 fn human_size(bytes: u64) -> String {
     const UNITS: [char; 7] = ['B', 'K', 'M', 'G', 'T', 'P', 'E'];
@@ -636,7 +632,6 @@ mod tests {
 
     #[test]
     fn human_size_rounds_non_power_of_two() {
-        // Matches real util-linux rounding, e.g. 3.1G/4.9G-style values.
         assert_eq!(human_size(3_355_443_200), "3.1G");
         assert_eq!(human_size(163_840), "160K");
     }
@@ -671,10 +666,7 @@ mod tests {
             block(1, 100, 100, "online", false),
         ];
         blocks[1].zones = "DMA32".into();
-        // Without ZONES as a split key, these merge (same state/removable).
         assert_eq!(coalesce(&blocks, &["STATE", "REMOVABLE"]).len(), 1);
-        // With ZONES as a split key (as happens when ZONES is a selected
-        // output column), differing zones keep them apart.
         assert_eq!(coalesce(&blocks, &["STATE", "REMOVABLE", "ZONES"]).len(), 2);
     }
 
