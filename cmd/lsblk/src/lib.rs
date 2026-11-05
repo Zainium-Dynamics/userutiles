@@ -1,8 +1,4 @@
-//! user lsblk — list block devices as a tree.
-//!
-//! Reads `/sys/block` directly (major:minor, size, removable, read-only)
-//! rather than `libblkid`/`libmount`; filesystem type/label/UUID come
-//! from `usercore::blkprobe` and mountpoints from `/proc/self/mounts`.
+//! user lsblk: list block devices as a tree.
 use std::fs;
 use std::path::Path;
 
@@ -245,7 +241,6 @@ fn cell(d: &Device, col: &str, mounts: &[(String, String)], o: &Opts, probe: &mu
 }
 
 fn print_table(devices: &[Device], cols: &[&str], headings: bool, nodeps: bool, mounts: &[(String, String)], o: &Opts) {
-    // (tree prefix, device) in display order
     let mut rows: Vec<(String, &Device)> = Vec::new();
     for d in devices {
         rows.push((String::new(), d));
@@ -334,7 +329,6 @@ fn print_help() {
 ///
 /// Returns 0 on success, 1 on a usage error.
 pub fn run() -> i32 {
-    // `lsblk | head` ends quietly instead of panicking on the closed pipe
     // SAFETY: restoring the default action of a signal has no other effect.
     unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
     let ui = Ui::new("lsblk");
@@ -380,7 +374,6 @@ pub fn run() -> i32 {
                     ui.err("option requires an argument -- 'o'");
                     return 1;
                 };
-                // -o +COL adds to the default columns
                 let (base, list) = match v.strip_prefix('+') {
                     Some(rest) => (cols.clone(), rest.to_string()),
                     None => (Vec::new(), v),
@@ -465,8 +458,6 @@ mod tests {
 
     #[test]
     fn list_devices_does_not_panic() {
-        // Real assertion: this must run to completion on a real
-        // /sys/block without panicking, whatever it finds there.
         let devices = list_devices();
         assert!(devices.len() < 10_000);
     }

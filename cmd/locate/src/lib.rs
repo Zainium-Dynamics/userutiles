@@ -1,4 +1,4 @@
-//! user locate — list files in databases that match a pattern.
+//! user locate: list files in databases that match a pattern.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::PathBuf;
@@ -83,7 +83,6 @@ pub fn run() -> i32 {
     }
 
     if dbs.is_empty() {
-        // LOCATE_PATH can be multi
         if let Ok(lp) = std::env::var("LOCATE_PATH") {
             for p in lp.split(':').filter(|s| !s.is_empty()) {
                 dbs.push(PathBuf::from(p));
@@ -163,7 +162,6 @@ pub fn run() -> i32 {
 /// glob trigger but are not actually special-cased by [`glob_match`], so
 /// a literal `[` in the pattern must match a literal `[` in `text`.
 fn match_pat(text: &str, pat: &str, ignore_case: bool) -> bool {
-    // If pattern has glob metacharacters, use glob; else substring (GNU locate default).
     let is_glob = pat.contains('*') || pat.contains('?') || pat.contains('[');
     if is_glob {
         if ignore_case {

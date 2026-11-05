@@ -1,12 +1,4 @@
-//! user last — show a listing of last logged-in users, reconstructed from
-//! wtmp-format login records (default `/var/log/wtmp`).
-//!
-//! Session end-state detection (normal logout / clean shutdown ("down") /
-//! abrupt power loss ("crash")) and the exact row formatting for each
-//! (including the `--time-format notime` and `-t/--until` "gone - no
-//! logout" special cases) were reverse-engineered by diffing this
-//! implementation's output against the real `last(1)` binary on real wtmp
-//! history — see `checklist/last.md` for the verification log.
+//! user last: show a listing of last logged-in users, reconstructed from
 mod utmpx;
 
 use std::collections::HashMap;
@@ -202,7 +194,7 @@ pub fn run() -> i32 {
         .filter(|s| opts.until.map_or(true, |until| s.start <= until))
         .filter(|s| matches_filters(s, &opts.filters))
         .collect();
-    rows.reverse(); // sessions are built oldest-first; display newest-first.
+    rows.reverse();
     if let Some(n) = opts.limit {
         rows.truncate(n);
     }
@@ -211,10 +203,6 @@ pub fn run() -> i32 {
         println!("{}", format_row(s, &opts));
     }
 
-    // The trailer is omitted entirely for `notime`; for `short` it still
-    // uses the `full` format (not `short`) — verified against the real
-    // binary, which shows the same trailer regardless of `short` vs `full`
-    // but switches to `iso` when that's the requested format.
     let trailer_format = match opts.time_format {
         TimeFormat::NoTime => None,
         TimeFormat::Short => Some(TimeFormat::Full),
@@ -260,7 +248,7 @@ struct Session {
 ///   still-open user sessions as "down" (clean shutdown, no explicit
 ///   logout) and closes the current "system boot" pseudo-session normally;
 /// - a `BOOT_TIME` record closes any still-open user sessions *and* the
-///   current reboot pseudo-session as "crash" (abrupt loss — no shutdown
+///   current reboot pseudo-session as "crash" (abrupt loss: no shutdown
 ///   marker was seen first), and closes any open shutdown pseudo-session
 ///   normally (its "downtime" duration just ended).
 fn build_sessions(records: &[Record]) -> Vec<Session> {
@@ -344,7 +332,7 @@ fn matches_filters(s: &Session, filters: &[String]) -> bool {
 /// after the queried `until` boundary hasn't observably ended as of that
 /// point. Real `last` shows that as `"gone - no logout"` for a login
 /// session (there's no logout to report yet, but unlike a session that's
-/// genuinely still open today, we know it later did end) — verified
+/// genuinely still open today, we know it later did end): verified
 /// against the real binary with `-t`. Reboot/shutdown pseudo-sessions have
 /// no "logout" concept, so they just show as still-open instead.
 enum Display {
@@ -392,10 +380,6 @@ fn format_row(s: &Session, opts: &Options) -> String {
     row.push_str(&format_time_part(s, &disp, opts.time_format));
 
     if !opts.nohostname && opts.hostlast {
-        // The row (everything before the host) is padded to a fixed total
-        // width of 60 columns, then the untruncated host is appended
-        // directly — verified against the real binary across several
-        // differing row lengths, all of which put the host at column 60.
         row = format!("{row:<60}{host_resolved}");
     }
 
@@ -461,7 +445,7 @@ fn format_time_part(s: &Session, disp: &Display, format: TimeFormat) -> String {
 
 /// The gap before the `(duration)` parenthesis is one space narrower when
 /// the duration spans multiple days (`"D+HH:MM"`) than when it's a plain
-/// `"HH:MM"` — verified against the real binary across both single- and
+/// `"HH:MM"`: verified against the real binary across both single- and
 /// multi-day sessions.
 fn duration_paren_gap(duration: &str) -> &'static str {
     if duration.contains('+') {
@@ -474,7 +458,7 @@ fn duration_paren_gap(duration: &str) -> &'static str {
 /// In `full`/`iso` mode, the "down"/"crash"/end-datetime field is padded to
 /// a fixed width (the same width regardless of which of the three fills
 /// it) equal to the login-time string's own length plus the same 1-or-2
-/// gap `duration_paren_gap` uses — verified against the real binary: e.g.
+/// gap `duration_paren_gap` uses: verified against the real binary: e.g.
 /// `"down"` and a full end-datetime both pad out to width 26 for a
 /// single-day duration, 25 for a multi-day one.
 fn end_state_field_width(start: &str, duration: &str) -> usize {
@@ -502,7 +486,7 @@ fn format_duration(secs: i64) -> String {
 }
 
 /// Truncates a hostname/kernel-version string to 16 display columns,
-/// replacing the last character with `*` when it doesn't fit — matches
+/// replacing the last character with `*` when it doesn't fit: matches
 /// real `last(1)`'s host column exactly (verified: `7.0.13-200.fc44.x86_64`
 /// truncates to `7.0.13-200.fc44*`).
 fn truncate_host(s: &str) -> String {
@@ -524,8 +508,6 @@ const MONTHS: [&str; 12] = [
 
 fn local_time(t: i64) -> libc::tm {
     // SAFETY: `localtime_r` writes into a zero-initialized `tm` (a valid
-    // all-zero bit pattern for every field, including the `tm_zone`
-    // pointer) and fully populates it before we read any field.
     unsafe {
         let mut tm: libc::tm = std::mem::zeroed();
         let time = t as libc::time_t;
@@ -597,16 +579,11 @@ fn resolve_host(host: &str) -> String {
     let sockaddr = match ip {
         IpAddr::V4(v4) => {
             // SAFETY: `sockaddr_in` is a plain C struct of integer/array
-            // fields; the all-zero bit pattern is valid for all of them,
-            // and every field is then explicitly assigned below or passed
-            // to `getnameinfo` in the also-`unsafe` call further down.
             let mut sa: libc::sockaddr_in = unsafe { std::mem::zeroed() };
             sa.sin_family = libc::AF_INET as libc::sa_family_t;
             sa.sin_addr.s_addr = u32::from_ne_bytes(v4.octets());
             let mut buf = [0u8; 256];
             // SAFETY: `sa` is a fully-initialized, correctly-sized
-            // `sockaddr_in`; `buf` is passed with its exact length as the
-            // output buffer bound, which `getnameinfo` respects.
             let rc = unsafe {
                 libc::getnameinfo(
                     (&sa as *const libc::sockaddr_in).cast(),
@@ -622,7 +599,6 @@ fn resolve_host(host: &str) -> String {
         }
         IpAddr::V6(v6) => {
             // SAFETY: same reasoning as the IPv4 branch's `sockaddr_in`
-            // above — an all-zero `sockaddr_in6` is a valid initial value.
             let mut sa: libc::sockaddr_in6 = unsafe { std::mem::zeroed() };
             sa.sin6_family = libc::AF_INET6 as libc::sa_family_t;
             sa.sin6_addr.s6_addr = v6.octets();
@@ -651,7 +627,7 @@ fn resolve_host(host: &str) -> String {
     String::from_utf8_lossy(&buf[..end]).into_owned()
 }
 
-/// A small, fixed set of accepted `-s`/`-t` date formats — not a full
+/// A small, fixed set of accepted `-s`/`-t` date formats: not a full
 /// GNU-date-like relative-time parser. Matches the same documented
 /// simplification already made in `dmesg --since`/`--until` (see
 /// `checklist/dmesg.md`); a fuller parser is a separate, larger effort.
@@ -691,9 +667,6 @@ fn parse_ymd_parts(s: &str) -> Option<(i32, i32, i32)> {
 /// (as local time, same as the wtmp records themselves).
 fn to_epoch(year: i32, month: i32, day: i32, hour: i32, minute: i32, second: i32) -> Option<i64> {
     // SAFETY: `libc::tm` (glibc) is integer fields plus a `tm_zone`
-    // pointer; an all-zero bit pattern is valid for both, and every field
-    // we rely on is explicitly assigned immediately below before `mktime`
-    // (which fully repopulates the struct, including `tm_zone`) is called.
     let mut tm: libc::tm = unsafe { std::mem::zeroed() };
     tm.tm_year = year - 1900;
     tm.tm_mon = month - 1;
@@ -703,11 +676,6 @@ fn to_epoch(year: i32, month: i32, day: i32, hour: i32, minute: i32, second: i32
     tm.tm_sec = second;
     tm.tm_isdst = -1;
     // SAFETY: `tm` has been populated with caller-supplied but
-    // range-plausible calendar fields; `mktime` normalizes out-of-range
-    // values itself and returns -1 on failure, which we don't specially
-    // handle beyond passing it through (an obviously-invalid date will
-    // just fail to match any real records, which is acceptable for a CLI
-    // date filter).
     let epoch = unsafe { libc::mktime(&mut tm) };
     if epoch == -1 {
         None
@@ -768,7 +736,6 @@ mod tests {
         let records = vec![
             rec(BOOT_TIME, 0, "reboot", "~", "kernel-1", 500),
             rec(USER_PROCESS, 100, "alice", "tty1", "local", 1000),
-            // No RUN_LVL shutdown marker before the next boot: crash.
             rec(BOOT_TIME, 0, "reboot", "~", "kernel-2", 2000),
         ];
         let sessions = build_sessions(&records);
@@ -786,9 +753,9 @@ mod tests {
             rec(BOOT_TIME, 0, "reboot", "~", "kernel-2", 2000),
         ];
         let sessions = build_sessions(&records);
-        assert!(matches!(sessions[0].end, End::Normal(1500))); // reboot #1
-        assert!(matches!(sessions[1].end, End::Normal(2000))); // shutdown
-        assert!(matches!(sessions[2].end, End::Open)); // reboot #2, still running
+        assert!(matches!(sessions[0].end, End::Normal(1500)));
+        assert!(matches!(sessions[1].end, End::Normal(2000)));
+        assert!(matches!(sessions[2].end, End::Open));
     }
 
     #[test]

@@ -1,8 +1,4 @@
-//! user ls — list directory contents (Zainium coloured).
-//!
-//! GNU ls's layouts: one per line when not writing to a terminal, columns (`-C`, `-x`)
-//! otherwise, `-m` with commas, `-l` with columns as wide as their widest entry.
-//! Operands that aren't directories come first, then each directory's contents.
+//! user ls: list directory contents (Zainium coloured).
 
 use colored::Colorize;
 use std::cmp::Ordering;
@@ -146,7 +142,6 @@ pub fn run_args(args: &[String]) -> i32 {
     let ui = Ui::new("ls");
     let mut o = Opts::new();
     let mut paths: Vec<PathBuf> = Vec::new();
-    // -c/-u sort by that time unless -l is given without -t
     let mut time_given = false;
     let mut sort_time_given = false;
 
@@ -371,7 +366,6 @@ pub fn run_args(args: &[String]) -> i32 {
             other => paths.push(PathBuf::from(other)),
         }
     }
-    // -c / -u: sort by that time, unless only -l asks to show it
     if time_given && o.sort == Sort::Name && !(o.format == Format::Long && !sort_time_given) {
         o.sort = Sort::Time;
     }
@@ -383,7 +377,6 @@ pub fn run_args(args: &[String]) -> i32 {
     let mut status = 0;
     let mut files: Vec<Item> = Vec::new();
     let mut dirs: Vec<Item> = Vec::new();
-    // symlinks named on the command line are followed unless -l/-d/-F looks at the link
     let follow_args = o.deref || o.deref_args || !(o.format == Format::Long || o.directory || o.classify);
     for p in &paths {
         let meta = if follow_args {
@@ -657,7 +650,6 @@ fn print_items(out: &mut impl Write, items: &[Item], o: &Opts, in_dir: bool) {
         let total = if o.human { human_size(total * 1024) } else { total.to_string() };
         let _ = writeln!(out, "total {total}");
     }
-    // prefix columns (inode, blocks) are right-aligned to their widest
     let ino_w = items.iter().map(|i| i.meta.ino().to_string().len()).max().unwrap_or(0);
     let blk_w = items.iter().map(|i| block_size(&i.meta, o).len()).max().unwrap_or(0);
     let cells: Vec<(String, usize)> = items
@@ -706,7 +698,6 @@ fn print_items(out: &mut impl Write, items: &[Item], o: &Opts, in_dir: bool) {
             if n == 0 {
                 return;
             }
-            // the most columns that fit, each as wide as its widest name + 2
             let mut best = (1, vec![cells.iter().map(|c| c.1).max().unwrap_or(0)]);
             for cols in (2..=n.min(o.width / 3 + 1)).rev() {
                 let rows = n.div_ceil(cols);
@@ -871,7 +862,6 @@ fn mode_string(meta: &fs::Metadata) -> String {
     for (bit, ch) in bits {
         s.push(if mode & bit != 0 { ch } else { '-' });
     }
-    // setuid/setgid/sticky display
     if mode & 0o4000 != 0 {
         let c = if mode & 0o100 != 0 { 's' } else { 'S' };
         s.replace_range(3..4, &c.to_string());
@@ -980,9 +970,6 @@ fn strftime_local(fmt: &str, secs: i64, nsec: i64) -> String {
     let Ok(cfmt) = std::ffi::CString::new(f) else {
         return String::new();
     };
-    // `libc::tm` has no `Default` impl, but every field is a public primitive
-    // (int/long/pointer), so we can build a zeroed value with a plain struct
-    // literal instead of `mem::zeroed`.
     let mut tm = libc::tm {
         tm_sec: 0,
         tm_min: 0,
@@ -999,9 +986,6 @@ fn strftime_local(fmt: &str, secs: i64, nsec: i64) -> String {
     let t = secs as libc::time_t;
     let mut buf = vec![0u8; 512];
     // SAFETY: `t` and `tm` are valid, initialized stack values that outlive
-    // both calls; `localtime_r` reads `t` and writes `tm`. `strftime` writes at
-    // most `buf.len()` bytes into `buf`, reads the NUL-terminated `cfmt` and
-    // `tm`, and returns the number of bytes written (0 if they did not fit).
     let n = unsafe {
         libc::localtime_r(&t, &mut tm);
         libc::strftime(
@@ -1211,8 +1195,6 @@ mod tests {
 
     #[test]
     fn run_args_lists_explicit_directory_path() {
-        // Uses an absolute scratch path rather than changing the process
-        // cwd, so this stays safe under cargo's parallel test runner.
         let dir = scratch_dir("run_args");
         fs::write(dir.join("a.txt"), b"a").unwrap();
         assert_eq!(run_args(&[dir.to_string_lossy().into_owned()]), 0);

@@ -1,11 +1,10 @@
-//! user losetup — set up and control loop devices.
+//! user losetup: set up and control loop devices.
 use std::fs::{self, File, OpenOptions};
 use std::io;
 use std::os::unix::io::AsRawFd;
 
 use usercore::Ui;
 
-// linux/loop.h — stable kernel ABI, not exposed by the `libc` crate.
 const LOOP_SET_FD: libc::c_ulong = 0x4C00;
 const LOOP_CLR_FD: libc::c_ulong = 0x4C01;
 const LOOP_SET_STATUS64: libc::c_ulong = 0x4C04;
@@ -37,7 +36,6 @@ struct LoopInfo64 {
 impl Default for LoopInfo64 {
     fn default() -> Self {
         // SAFETY: an all-zero `loop_info64` is a valid value — the kernel
-        // itself zero-initializes it before filling in queried fields.
         unsafe { std::mem::zeroed() }
     }
 }
@@ -53,7 +51,6 @@ fn set_name(buf: &mut [u8; LO_NAME_SIZE], name: &str) {
 fn find_free() -> io::Result<i64> {
     let ctl = File::open("/dev/loop-control")?;
     // SAFETY: `LOOP_CTL_GET_FREE` takes no third argument; the ioctl's
-    // return value (not an out-pointer) is the free index.
     let r = unsafe { libc::ioctl(ctl.as_raw_fd(), LOOP_CTL_GET_FREE as _) };
     if r == -1 {
         Err(io::Error::last_os_error())
@@ -74,8 +71,6 @@ fn attach(device: &str, file: &str, offset: u64, read_only: bool) -> io::Result<
         .open(device)?;
 
     // SAFETY: `loop_dev` and `backing` are both valid, open file
-    // descriptors kept alive for the call; `LOOP_SET_FD` takes the
-    // backing fd directly as its third argument (not a pointer).
     let r = unsafe { libc::ioctl(loop_dev.as_raw_fd(), LOOP_SET_FD as _, backing.as_raw_fd()) };
     if r == -1 {
         return Err(io::Error::last_os_error());
@@ -89,12 +84,10 @@ fn attach(device: &str, file: &str, offset: u64, read_only: bool) -> io::Result<
     set_name(&mut info.lo_file_name, file);
 
     // SAFETY: `info` is a correctly-sized, fully-initialized
-    // `loop_info64`; `loop_dev` stays open for the call.
     let r = unsafe { libc::ioctl(loop_dev.as_raw_fd(), LOOP_SET_STATUS64 as _, &info) };
     if r == -1 {
         let save = io::Error::last_os_error();
         // SAFETY: undoing the SET_FD above on the same fd; takes no
-        // pointer argument.
         unsafe { libc::ioctl(loop_dev.as_raw_fd(), LOOP_CLR_FD as _, 0) };
         return Err(save);
     }
@@ -104,7 +97,6 @@ fn attach(device: &str, file: &str, offset: u64, read_only: bool) -> io::Result<
 fn detach(device: &str) -> io::Result<()> {
     let loop_dev = OpenOptions::new().read(true).open(device)?;
     // SAFETY: `loop_dev` is open for the call; `LOOP_CLR_FD` takes no
-    // pointer argument.
     let r = unsafe { libc::ioctl(loop_dev.as_raw_fd(), LOOP_CLR_FD as _, 0) };
     if r == -1 {
         Err(io::Error::last_os_error())
@@ -119,7 +111,6 @@ fn status(device: &str) -> io::Result<LoopInfo64> {
     let loop_dev = OpenOptions::new().read(true).open(device)?;
     let mut info = LoopInfo64::default();
     // SAFETY: `info` is a correctly-sized `loop_info64` out-param;
-    // `loop_dev` stays open for the call.
     let r = unsafe { libc::ioctl(loop_dev.as_raw_fd(), LOOP_GET_STATUS64 as _, &mut info) };
     if r == -1 {
         Err(io::Error::last_os_error())
@@ -345,9 +336,6 @@ mod tests {
 
     #[test]
     fn find_free_returns_a_nonnegative_index() {
-        // /dev/loop-control needs group `disk` (or root); unprivileged
-        // CI/sandbox users legitimately get EACCES here, so only assert
-        // the happy path when it actually opens.
         if let Ok(idx) = find_free() {
             assert!(idx >= 0);
         }

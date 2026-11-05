@@ -1,5 +1,4 @@
-//! user lsattr — list ext2/3/4 file attributes.
-//! Ported from e2fsprogs' `misc/lsattr.c` (GPL-2.0).
+//! user lsattr: list ext2/3/4 file attributes.
 use std::fs::{self, OpenOptions};
 use std::io;
 use std::os::unix::fs::OpenOptionsExt;
@@ -8,8 +7,6 @@ use std::path::{Path, PathBuf};
 
 use usercore::Ui;
 
-// ext2/3/4 inode flag bits (linux/fs.h — stable ABI, mirrors e2fsprogs'
-// ext2fs/ext2_fs.h). libc doesn't expose these.
 const FS_SECRM_FL: u32 = 0x0000_0001;
 const FS_UNRM_FL: u32 = 0x0000_0002;
 const FS_COMPR_FL: u32 = 0x0000_0004;
@@ -34,7 +31,7 @@ const FS_PROJINHERIT_FL: u32 = 0x2000_0000;
 const FS_CASEFOLD_FL: u32 = 0x4000_0000;
 
 /// (bit, short char, long name), matching e2fsprogs' `pf.c` `flags_array`
-/// exactly — order is display order.
+/// exactly: order is display order.
 const DISPLAY_FLAGS: &[(u32, char, &str)] = &[
     (FS_SECRM_FL, 's', "Secure_Deletion"),
     (FS_UNRM_FL, 'u', "Undelete"),
@@ -112,9 +109,6 @@ fn get_flags(path: &Path) -> io::Result<u32> {
     let f = open_for_ioctl(path, true)?;
     let mut flags: libc::c_int = 0;
     // SAFETY: `flags` is a valid 4-byte out-param; e2fsprogs' own
-    // `fgetflags` uses the same `int` (not the `long` the ioctl number's
-    // encoded size suggests — the kernel handler always copies an `int`
-    // regardless), and `f` stays open for the call.
     let r = unsafe { libc::ioctl(f.as_raw_fd(), libc::FS_IOC_GETFLAGS as _, &mut flags) };
     if r == -1 {
         return Err(io::Error::last_os_error());
@@ -137,7 +131,6 @@ fn get_project(path: &Path) -> io::Result<u32> {
     let f = open_for_ioctl(path, false)?;
     let mut fsx = FsXAttr::default();
     // SAFETY: `fsx` is a correctly-sized (28-byte) `fsxattr` out-param for
-    // FS_IOC_FSGETXATTR; `f` stays open for the call.
     let r = unsafe { libc::ioctl(f.as_raw_fd(), FS_IOC_FSGETXATTR as _, &mut fsx) };
     if r == -1 {
         return Err(io::Error::last_os_error());

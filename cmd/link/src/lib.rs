@@ -1,4 +1,4 @@
-//! user link — create a hard link.
+//! user link: create a hard link.
 use std::fs;
 
 use usercore::Ui;
@@ -90,7 +90,6 @@ mod tests {
         let b = dir.join("b.txt");
         fs::write(&a, b"x").unwrap();
         fs::write(&b, b"already here").unwrap();
-        // link(2) must not silently overwrite an existing FILE2.
         assert!(fs::hard_link(&a, &b).is_err());
         let _ = fs::remove_dir_all(&dir);
     }

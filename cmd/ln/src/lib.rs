@@ -1,4 +1,4 @@
-//! user ln — make hard and symbolic links between files.
+//! user ln: make hard and symbolic links between files.
 use std::fs;
 use std::io::{self, Write};
 use std::os::unix::fs::symlink;
@@ -126,7 +126,6 @@ pub fn run() -> i32 {
     let (targets, link_dir_or_name) = if let Some(dir) = target_dir {
         (paths, dir)
     } else if paths.len() == 1 {
-        // ln TARGET -> create link in cwd named after target
         let t = paths[0].clone();
         let name = t
             .file_name()
@@ -134,11 +133,6 @@ pub fn run() -> i32 {
             .unwrap_or_else(|| t.clone());
         (vec![t], name)
     } else {
-        // paths.len() >= 2 here (the len()==1 arm above and the is_empty()
-        // check further up cover the other cases), so this is provably
-        // non-empty — but pop() stays an explicit error path rather than an
-        // unwrap() so a future refactor of the checks above fails loudly
-        // with a message instead of panicking.
         let Some(dest) = paths.pop() else {
             eprintln!("ln: missing file operand");
             return 1;
@@ -180,7 +174,6 @@ pub fn run() -> i32 {
             continue;
         }
 
-        // -r: the symlink's target relative to the directory the link is in
         let rel;
         let target = if relative && symbolic {
             match relative_target(target, &link_path) {
@@ -194,9 +187,6 @@ pub fn run() -> i32 {
             target
         };
 
-        // Try the create directly first — symlink(2)/link(2) already fail
-        // atomically with EEXIST if link_path exists, so the common
-        // (non-clobbering) case has no check-then-act race at all.
         match create_link(target, &link_path, symbolic) {
             Ok(()) => {
                 if verbose {
@@ -257,7 +247,7 @@ fn create_link(target: &Path, link_path: &Path, symbolic: bool) -> io::Result<()
 /// Replace an existing `link_path` with a fresh link to `target`.
 ///
 /// Creates the new link at a temporary sibling path first, then atomically
-/// `rename()`s it into place — never a window where `link_path` is missing,
+/// `rename()`s it into place: never a window where `link_path` is missing,
 /// and never a way to lose the original entry if link creation fails partway
 /// through (the previous implementation removed the existing entry *before*
 /// attempting the create, so a failed create silently destroyed the original
@@ -273,7 +263,6 @@ fn replace_link(target: &Path, link_path: &Path, symbolic: bool) -> io::Result<(
         .unwrap_or_default();
     let tmp_path = parent.join(format!(".{file_name}.user-ln-tmp-{}", std::process::id()));
 
-    // Best-effort cleanup of a stale temp file from a previous crashed run.
     let _ = fs::remove_file(&tmp_path);
 
     create_link(target, &tmp_path, symbolic)?;
@@ -331,7 +320,6 @@ mod tests {
 
         let err = create_link(&target, &link, true).unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::AlreadyExists);
-        // Original must be untouched — no check-then-act window opened.
         assert_eq!(fs::read(&link).unwrap(), b"pre-existing");
         fs::remove_dir_all(&dir).ok();
     }
@@ -349,7 +337,6 @@ mod tests {
         assert!(link.symlink_metadata().unwrap().file_type().is_symlink());
         assert_eq!(fs::read(&link).unwrap(), b"new content");
 
-        // No stray temp file left behind in the directory.
         let leftover: Vec<_> = fs::read_dir(&dir)
             .unwrap()
             .filter_map(|e| e.ok())
@@ -362,16 +349,11 @@ mod tests {
 
     #[test]
     fn replace_link_preserves_original_when_target_missing() {
-        // If the new link can't be created (bad target scenario simulated by
-        // pointing at a path whose parent doesn't exist), the original entry
-        // at link_path must survive untouched — unlike the old
-        // remove-then-create approach, which deleted the original first.
         let dir = tmp_dir("replace_preserves_original");
         let link = dir.join("link.txt");
         fs::write(&link, b"must survive").unwrap();
         let bogus_target = dir.join("no/such/parent/target.txt");
 
-        // Hard-linking to a target through a missing parent directory fails.
         let result = replace_link(&bogus_target, &link, false);
         assert!(result.is_err());
         assert_eq!(fs::read(&link).unwrap(), b"must survive");

@@ -1,4 +1,4 @@
-//! user kill — send signals to processes.
+//! user kill: send signals to processes.
 use usercore::Ui;
 
 /// Entry point for the `kill` utility. Parses `std::env::args()` and
@@ -45,10 +45,8 @@ pub fn run() -> i32 {
                 }
             }
             s if s.starts_with('-') && s.len() > 1 => {
-                // -9 or -TERM or -n PID (negative pid)
                 let rest = &s[1..];
                 if rest.chars().all(|c| c.is_ascii_digit()) {
-                    // could be signal number or negative pid; if only digits and small, signal
                     if let Ok(n) = rest.parse::<i32>() {
                         if n <= 64 && pids.is_empty() {
                             signal = n;
@@ -59,7 +57,6 @@ pub fn run() -> i32 {
                 } else if let Ok(s) = parse_signal(rest) {
                     signal = s;
                 } else if rest.starts_with('-') {
-                    // -- invalid
                     ui.err(&format!("invalid option -- '{s}'"));
                     return 1;
                 } else {
@@ -89,10 +86,6 @@ pub fn run() -> i32 {
     let mut status = 0;
     for pid in pids {
         // SAFETY: `kill(2)` takes only plain integer arguments (a pid and
-        // a signal number) and performs no memory access on the caller's
-        // behalf; a nonexistent pid or invalid signal is reported via a
-        // normal errno/return-value failure (handled below), never
-        // undefined behavior.
         let rc = unsafe { libc::kill(pid as libc::pid_t, signal) };
         if rc != 0 {
             ui.err(&format!("({pid}): {}", std::io::Error::last_os_error()));

@@ -1,4 +1,4 @@
-//! user join — join lines of two files on a common field.
+//! user join: join lines of two files on a common field.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 
@@ -10,7 +10,7 @@ use usercore::Ui;
 /// field followed by the remaining fields of both lines.
 ///
 /// Uses an O(n·m) nested scan rather than a sorted merge, so unlike GNU
-/// `join` it does not require its inputs to be pre-sorted — at the cost
+/// `join` it does not require its inputs to be pre-sorted: at the cost
 /// of being unsuitable for very large files.
 ///
 /// Returns 0 on success, 1 on a usage or I/O error.
@@ -117,7 +117,6 @@ pub fn run() -> i32 {
 
     let sep = delim.unwrap_or(' ');
     let mut out = io::stdout().lock();
-    // Nested scan (correct for unsorted small files; works for sorted too)
     for line1 in &a {
         let f1 = field(line1, field1, delim);
         for line2 in &b {
