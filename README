@@ -3,8 +3,7 @@ userutiles
 
 The Unix command line of Zainium OS, written in Rust: coreutils, a growing
 part of util-linux, and a few Zainium tools. 175+ programs, one binary per
-tool, with no multi-call dispatcher and no uutils dependency. MISSING.md
-lists what is left.
+tool, with no multi-call dispatcher and no uutils dependency.
 
 Paths go through usercore::zainium, which reads /overlayer/syshub on
 Zainium OS and falls back to the usual places on any other Linux, so the
