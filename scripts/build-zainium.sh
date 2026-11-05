@@ -2,8 +2,6 @@
 # =============================================================================
 # Cross-build user_utils for Zainium OS's native x86_64-zainium-linux-musl
 # target, using the custom target spec at targets/x86_64-zainium-linux-musl.json
-# (see targets/README.md for why this exists alongside the plain
-# TARGET=x86_64-unknown-linux-musl path in scripts/build.sh).
 # =============================================================================
 # Unlike zex-native/elevate-privilege's build-zainium.sh, there's no
 # dynamic/static split here: every cmd/* crate is a plain executable (no
