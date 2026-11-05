@@ -1,0 +1,31 @@
+userutiles
+==========
+
+The Unix command line of Zainium OS, written in Rust: coreutils, a growing
+part of util-linux, and a few Zainium tools. 175+ programs, one binary per
+tool, with no multi-call dispatcher and no uutils dependency. MISSING.md
+lists what is left.
+
+Paths go through usercore::zainium, which reads /overlayer/syshub on
+Zainium OS and falls back to the usual places on any other Linux, so the
+tools also build and test there.
+
+Layout
+------
+
+    core/          shared code
+    cmd/<name>/    one crate per tool
+    scripts/       build, install and test
+
+Building
+--------
+
+    ./scripts/build.sh
+    cargo build --release -p user_ls       one tool
+    cargo test --workspace
+    PREFIX=/overlayer/syshub ./scripts/install.sh
+
+License
+-------
+
+GPL-3.0.
