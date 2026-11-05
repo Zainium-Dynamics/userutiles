@@ -1,4 +1,4 @@
-//! user basename — strip directory and suffix from filenames.
+//! user basename: strip directory and suffix from filenames.
 use std::path::Path;
 
 use usercore::Ui;
@@ -94,7 +94,6 @@ fn parse_args(args: &[String]) -> Result<Parsed, String> {
     if names.is_empty() {
         return Err("missing operand".into());
     }
-    // Historic form: `basename NAME SUFFIX`.
     if !multiple && names.len() == 2 && suffix.is_none() {
         suffix = names.pop();
     }
@@ -145,7 +144,6 @@ mod tests {
 
     #[test]
     fn strip_name_suffix_equal_to_whole_basename_is_not_stripped() {
-        // GNU basename: suffix must not consume the *entire* basename.
         assert_eq!(strip_name(".h", Some(".h")), ".h");
     }
 

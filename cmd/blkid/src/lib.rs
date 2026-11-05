@@ -1,7 +1,4 @@
-//! user blkid — locate/print block device attributes.
-//!
-//! Probes filesystem/swap superblocks via `usercore::blkprobe` (this
-//! workspace's from-scratch libblkid stand-in — see that module's docs).
+//! user blkid: locate/print block device attributes.
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -42,7 +39,7 @@ fn field_value(probe: &Probe, field: &str) -> Option<String> {
     }
 }
 
-/// Find the first device whose probed `field` equals `value` — the
+/// Find the first device whose probed `field` equals `value`: the
 /// shared logic behind both `blkid -L`/`-U` and the standalone `findfs`
 /// utility.
 pub fn find_by_field(field: &str, value: &str) -> Option<PathBuf> {
@@ -244,8 +241,6 @@ mod tests {
 
     #[test]
     fn list_devices_does_not_panic() {
-        // /proc/partitions may not exist in a restricted test sandbox;
-        // this must degrade to an empty list, not error out.
         assert!(list_devices().len() < 10_000);
     }
 

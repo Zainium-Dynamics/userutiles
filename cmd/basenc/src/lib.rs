@@ -1,4 +1,4 @@
-//! user basenc — encode/decode with multiple bases; `base64` and `base32` run through it too.
+//! user basenc: encode/decode with multiple bases; `base64` and `base32` run through it too.
 use std::fs::File;
 use std::io::{self, Read, Write};
 
@@ -143,7 +143,6 @@ pub fn run_as(name: &str, fixed: Option<Base>) -> i32 {
                 return 1;
             }
         };
-        // -w 0 writes one unwrapped line without a newline, like GNU; empty input writes nothing
         if wrap == 0 {
             let _ = out.write_all(&enc);
         } else {
@@ -318,7 +317,6 @@ fn radix_decode(data: &[u8], alphabet: &[u8], bits: u32) -> (Vec<u8>, Option<Str
             return (out, Some("invalid input".into()));
         };
         if padded {
-            // data after the padding of an earlier quantum: a new, concatenated block
             padded = false;
             acc = 0;
             n = 0;
@@ -333,7 +331,6 @@ fn radix_decode(data: &[u8], alphabet: &[u8], bits: u32) -> (Vec<u8>, Option<Str
             acc &= (1 << n) - 1;
         }
     }
-    // a lone trailing symbol (or 3 / 6 in base32) cannot carry a whole byte
     let rem = symbols % if bits == 6 { 4 } else { 8 };
     let bad = if bits == 6 { rem == 1 } else { matches!(rem, 1 | 3 | 6) };
     (out, bad.then(|| "invalid input".to_string()))

@@ -1,8 +1,4 @@
 //! blueprint
-//!
-//! Generate a directory tree blueprint for a target project. The output file is named
-//! `{project}_blueprint.txt`, with old blueprints archived as `{project}_blueprint-1.txt`,
-//! `{project}_blueprint-2.txt`, etc.
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
@@ -29,8 +25,6 @@ struct Args {
 /// Returns an error if the target path doesn't exist, the output
 /// directory isn't writable, or any I/O step (rename/write/walk) fails.
 pub fn run(args: Vec<String>) -> Result<()> {
-    // Use `parse_from` (not `try_parse_from`) so `--help` / `--version` match the
-    // standard clap exit path (process exit 0), same as a standalone binary.
     let cli = Args::parse_from(args);
     let target_path_str = cli.path.as_deref().unwrap_or(".");
     let target_path = Path::new(target_path_str);
@@ -42,7 +36,6 @@ pub fn run(args: Vec<String>) -> Result<()> {
     let base_name = get_base_name(target_path)?;
     let out_dir = std::env::current_dir()?;
 
-    // Check write permissions on output directory
     if !is_writable(&out_dir)? {
         return Err(anyhow!(
             "No write permission in output directory: {}",
@@ -112,7 +105,7 @@ fn is_writable(dir: &Path) -> Result<bool> {
     let test_file = dir.join(".blueprint_write_test");
     match fs::File::create(&test_file) {
         Ok(_) => {
-            let _ = fs::remove_file(&test_file); // Clean up
+            let _ = fs::remove_file(&test_file);
             Ok(true)
         }
         Err(_) => Ok(false),
@@ -203,7 +196,6 @@ fn plan_blueprint_write(out_dir: &Path, base_name: &str) -> Result<BlueprintPlan
         });
     }
 
-    // Latest is {base}_blueprint-{max_num}.txt
     let prev_path = out_dir.join(format!("{base_name}_blueprint-{max_num}.txt"));
     let archived_num = max_num + 1;
     let new_num = max_num + 2;
@@ -279,7 +271,7 @@ fn walk_dir(
     blueprint_base: &str,
     depth: usize,
 ) -> Result<()> {
-    const MAX_DEPTH: usize = 100; // Prevent infinite recursion in pathological cases
+    const MAX_DEPTH: usize = 100;
     if depth > MAX_DEPTH {
         return Err(anyhow!(
             "Directory depth exceeds maximum limit of {}",
@@ -295,10 +287,6 @@ fn walk_dir(
         .filter(|e| !should_ignore(e.path(), blueprint_base))
         .collect();
 
-    // Sort by `entry.file_type()` (from `follow_links(false)`, so it
-    // reflects `symlink_metadata`, not the symlink's target) rather than
-    // `path.is_dir()` (a `stat` that follows symlinks). This keeps the
-    // ordering consistent with the recursion decision below.
     visible.sort_by(|a, b| {
         let da = a.file_type().is_dir();
         let db = b.file_type().is_dir();
@@ -312,13 +300,6 @@ fn walk_dir(
     let total = visible.len();
     for (i, entry) in visible.iter().enumerate() {
         let path = entry.path();
-        // `entry.file_type()` (not `path.is_dir()`): the latter follows
-        // symlinks, so a directory-symlink would be treated as a real
-        // subdirectory and recursed into below — including a
-        // self-referential symlink (`dir/self -> dir`), which would
-        // recurse forever. `file_type()` reports the symlink's own type
-        // (since `follow_links(false)` above), so symlinks are always
-        // rendered as leaves here, never walked into.
         let is_dir = entry.file_type().is_dir();
 
         if root_level_spacers && is_dir && i > 0 {
@@ -408,7 +389,6 @@ mod tests {
     fn should_ignore_own_blueprint_outputs() {
         assert!(should_ignore(Path::new("proj_blueprint.txt"), "proj"));
         assert!(should_ignore(Path::new("proj_blueprint-3.txt"), "proj"));
-        // Different project's blueprint file is not ours to ignore.
         assert!(!should_ignore(Path::new("other_blueprint.txt"), "proj"));
         assert!(!should_ignore(Path::new("readme.txt"), "proj"));
     }
@@ -438,7 +418,6 @@ mod tests {
         fs::write(dir.join("proj_blueprint-1.txt"), "").unwrap();
         fs::write(dir.join("proj_blueprint-7.txt"), "").unwrap();
         fs::write(dir.join("proj_blueprint-3.txt"), "").unwrap();
-        // Different base name / non-matching suffix must not count.
         fs::write(dir.join("other_blueprint-99.txt"), "").unwrap();
         fs::write(dir.join("proj_blueprint-notanumber.txt"), "").unwrap();
         assert_eq!(max_numbered_blueprint(&dir, "proj").unwrap(), 7);
@@ -470,7 +449,6 @@ mod tests {
         fs::write(dir.join("proj_blueprint-1.txt"), "old").unwrap();
         fs::write(dir.join("proj_blueprint-2.txt"), "older").unwrap();
         let plan = plan_blueprint_write(&dir, "proj").unwrap();
-        // Latest existing is -2, so it archives to -3 and writes -4.
         let (from, to) = plan.archive_rename.unwrap();
         assert_eq!(from, dir.join("proj_blueprint-2.txt"));
         assert_eq!(to, dir.join("proj_blueprint-3.txt"));
@@ -507,15 +485,6 @@ mod tests {
 
     #[test]
     fn walk_dir_does_not_follow_a_self_referential_symlink() {
-        // Regression: walking used to determine "is this a directory to
-        // recurse into?" via `path.is_dir()`, which follows symlinks. A
-        // symlink pointing back at its own parent directory would then be
-        // walked forever (bounded only by the MAX_DEPTH backstop, which
-        // would still make this test slow and would still misreport the
-        // tree). Using `entry.file_type()` (from `follow_links(false)`)
-        // means the symlink is rendered as a leaf and never recursed
-        // into, so this resolves quickly and `stats.directories` does not
-        // count the symlink.
         let dir = scratch_dir("walk_symlink_loop");
         std::os::unix::fs::symlink(&dir, dir.join("self_link")).expect("create symlink");
 

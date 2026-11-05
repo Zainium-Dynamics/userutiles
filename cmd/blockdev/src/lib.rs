@@ -1,9 +1,4 @@
-//! user blockdev — call block device ioctls from the command line.
-//!
-//! Ported from uutils/util-linux's `blockdev`. The ioctl request numbers
-//! below are the stable Linux ABI constants from `<linux/fs.h>` (verified
-//! against the system header rather than re-derived), since this crate
-//! deliberately avoids depending on `uucore`/`linux-raw-sys`.
+//! user blockdev: call block device ioctls from the command line.
 use std::fs::File;
 use std::io;
 use std::os::fd::AsRawFd;
@@ -28,7 +23,7 @@ enum Kind {
     /// Read an attribute back and print it.
     Get(ArgType),
     /// Write a caller-supplied value (the ioctl argument is the value
-    /// itself, not a pointer to it — matches historic Linux block ioctls
+    /// itself, not a pointer to it: matches historic Linux block ioctls
     /// such as `BLKRASET`).
     Set,
     /// Fire-and-forget operation; `Op(n)` passes a pointer to the fixed
@@ -327,9 +322,6 @@ fn parse_args(args: &[String]) -> Result<Parsed, String> {
 /// the address of a correctly-sized/aligned local for pointer-based ones).
 unsafe fn raw_ioctl(fd: i32, code: libc::c_ulong, arg: usize) -> io::Result<()> {
     // SAFETY: forwarded from the caller's contract above. The `as _` cast
-    // is required because `libc::ioctl`'s request parameter type differs
-    // by target libc (c_ulong on glibc, c_int on musl) — `code` stays
-    // c_ulong at the call boundary and narrows/widens per target here.
     let ret = unsafe { libc::ioctl(fd, code as _, arg) };
     if ret < 0 {
         Err(io::Error::last_os_error())
@@ -345,7 +337,6 @@ fn get_attribute(file: &File, code: libc::c_ulong, arg_type: ArgType) -> io::Res
         ArgType::Short => {
             let mut v: libc::c_ushort = 0;
             // SAFETY: `code` is one of our `Get(Short)` constants (BLKSECTGET)
-            // and `v` is a correctly-sized, live local the ioctl writes into.
             unsafe { raw_ioctl(fd, code, &mut v as *mut _ as usize)? };
             Ok(v as u64)
         }
@@ -370,7 +361,6 @@ fn get_attribute(file: &File, code: libc::c_ulong, arg_type: ArgType) -> io::Res
         ArgType::U64Sectors => {
             let mut v: u64 = 0;
             // SAFETY: same contract as above; BLKGETSIZE64 writes a byte
-            // count into `v`, which we then convert to 512-byte sectors.
             unsafe { raw_ioctl(fd, code, &mut v as *mut _ as usize)? };
             Ok(v / 512)
         }
@@ -474,9 +464,6 @@ fn do_ioctl(file: &File, act: &Action, verbose: bool, value: usize) -> io::Resul
         }
         Kind::Set => {
             // SAFETY: `act.code` is one of the `Set` ioctls (BLKBSZSET,
-            // BLKFRASET, BLKRASET), which — matching historic Linux block
-            // ioctl calling convention — take the value directly as the
-            // ioctl argument rather than a pointer to it.
             unsafe { raw_ioctl(file.as_raw_fd(), act.code, value)? };
             if verbose {
                 println!("{} succeeded.", act.name);
@@ -484,9 +471,6 @@ fn do_ioctl(file: &File, act: &Action, verbose: bool, value: usize) -> io::Resul
         }
         Kind::Op(param) => {
             // SAFETY: `act.code` is one of the `Op` ioctls (BLKFLSBUF,
-            // BLKRRPART, BLKROSET); `param` is a live local for the
-            // duration of the call, and its address is what the ioctl
-            // (when it reads an argument at all, e.g. BLKROSET) expects.
             unsafe { raw_ioctl(file.as_raw_fd(), act.code, &param as *const u32 as usize)? };
             if verbose {
                 println!("{} succeeded.", act.name);
@@ -502,8 +486,6 @@ mod tests {
 
     #[test]
     fn ioctl_constants_match_linux_fs_h() {
-        // Cross-checked against a tiny C program compiled with the system
-        // <linux/fs.h> (see the port notes) rather than re-derived by hand.
         assert_eq!(BLKROSET, 0x125d);
         assert_eq!(BLKGETSIZE64, 0x80081272);
         assert_eq!(BLKBSZSET, 0x40081271);

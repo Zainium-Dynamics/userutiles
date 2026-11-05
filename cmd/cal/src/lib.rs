@@ -1,4 +1,4 @@
-//! user cal — display a calendar.
+//! user cal: display a calendar.
 use std::io::IsTerminal;
 
 use chrono::{Datelike, Local, Months, NaiveDate, Weekday};
@@ -206,7 +206,7 @@ fn try_parse_date(year: &str, month: &str, day: &str) -> Result<NaiveDate, Strin
 }
 
 /// Compute (day-column width, single-month line width) for the given
-/// options — julian day-of-year numbers need 3 columns, plain days need 2;
+/// options: julian day-of-year numbers need 3 columns, plain days need 2;
 /// showing week numbers adds a 3-character gutter.
 fn calculate_field_widths(options: &CalOptions) -> (usize, usize) {
     let day_width = if options.julian { 3 } else { 2 };
@@ -278,8 +278,6 @@ fn generate_month_lines(date: NaiveDate, options: &CalOptions) -> Vec<String> {
             }
         }
 
-        // Space-pad the days that belong to this week but fall in the
-        // previous month.
         if d.day() == 1 {
             let num_padding_days = (d - d.week(week_start).first_day()).num_days() as usize;
             current_line.push_str(&" ".repeat(num_padding_days * (day_width + 1)));
@@ -384,21 +382,10 @@ mod tests {
         }
     }
 
-    // Expected outputs below were captured verbatim from the system
-    // `cal` (util-linux 2.41.5, `cal 1 2000`, `cal -j 1 2000`,
-    // `cal -m -w 1 2000`) to double-check against a second source.
-
-    // NOTE: These expected strings use explicit `\n` on a single source
-    // line rather than a `"\` continuation + multi-line literal, because
-    // Rust's line-continuation escape strips leading whitespace from the
-    // following source line — which would silently eat the centering
-    // padding these calendars rely on.
-
     #[test]
     fn january_2000_default_layout() {
         let date = NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
         let options = opts(date, DisplayMode::NMonths(1));
-        // Cross-checked against system `cal` (util-linux 2.41.5) `cal 1 2000`.
         let expected = "    January 2000    \nSu Mo Tu We Th Fr Sa\n                   1\n 2  3  4  5  6  7  8\n 9 10 11 12 13 14 15\n16 17 18 19 20 21 22\n23 24 25 26 27 28 29\n30 31               \n";
         assert_eq!(render(&options), expected);
     }
@@ -408,7 +395,6 @@ mod tests {
         let date = NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
         let mut options = opts(date, DisplayMode::NMonths(1));
         options.julian = true;
-        // Cross-checked against system `cal` (util-linux 2.41.5) `cal -j 1 2000`.
         let expected = "       January 2000        \nSun Mon Tue Wed Thu Fri Sat\n                          1\n  2   3   4   5   6   7   8\n  9  10  11  12  13  14  15\n 16  17  18  19  20  21  22\n 23  24  25  26  27  28  29\n 30  31                    \n";
         assert_eq!(render(&options), expected);
     }
@@ -419,7 +405,6 @@ mod tests {
         let mut options = opts(date, DisplayMode::NMonths(1));
         options.monday_first = true;
         options.week_numbers = true;
-        // Cross-checked against system `cal` (util-linux 2.41.5) `cal -m -w 1 2000`.
         let expected = "     January 2000      \n   Mo Tu We Th Fr Sa Su\n52                 1  2\n 1  3  4  5  6  7  8  9\n 2 10 11 12 13 14 15 16\n 3 17 18 19 20 21 22 23\n 4 24 25 26 27 28 29 30\n 5 31                  \n";
         assert_eq!(render(&options), expected);
     }
@@ -428,13 +413,6 @@ mod tests {
     fn three_months_around_january_2000() {
         let date = NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
         let options = opts(date, DisplayMode::ThreeMonths);
-        // This crate's `NUM_SPACES_BETWEEN_CALENDARS` (3) is ported
-        // verbatim from uutils/util-linux's cal.rs; the system `cal`
-        // (util-linux, a different codebase) uses a 2-space gutter here,
-        // so this expected value is derived from the ported algorithm
-        // itself (verified arithmetically: 20-col months, 3-space gutter,
-        // width-20 center-formatted headers) rather than cross-checked
-        // against the system binary.
         let expected = "   December 1999           January 2000          February 2000    \nSu Mo Tu We Th Fr Sa   Su Mo Tu We Th Fr Sa   Su Mo Tu We Th Fr Sa\n          1  2  3  4                      1          1  2  3  4  5\n 5  6  7  8  9 10 11    2  3  4  5  6  7  8    6  7  8  9 10 11 12\n12 13 14 15 16 17 18    9 10 11 12 13 14 15   13 14 15 16 17 18 19\n19 20 21 22 23 24 25   16 17 18 19 20 21 22   20 21 22 23 24 25 26\n26 27 28 29 30 31      23 24 25 26 27 28 29   27 28 29            \n                       30 31                                      \n";
         assert_eq!(render(&options), expected);
     }
@@ -447,7 +425,6 @@ mod tests {
         let lines: Vec<&str> = out.lines().collect();
         assert_eq!(lines[0].trim(), "2000");
         assert!(lines[1].is_empty());
-        // 12 months laid out 3 to a row, each 8 lines tall.
         assert_eq!(lines.len(), 2 + 4 * NUM_CALENDAR_LINES);
         assert!(lines[2].contains("January"));
         assert!(lines[2].contains("February"));

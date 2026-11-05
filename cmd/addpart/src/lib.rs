@@ -1,4 +1,4 @@
-//! user addpart — tell the kernel a partition was added.
+//! user addpart: tell the kernel a partition was added.
 use std::path::Path;
 
 use usercore::blkpg::{self, BLKPG_ADD_PARTITION};
