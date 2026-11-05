@@ -1,4 +1,4 @@
-//! user shred — securely overwrite and optionally delete files.
+//! user shred: securely overwrite and optionally delete files.
 use std::fs::{self, OpenOptions};
 use std::io::{Seek, SeekFrom, Write};
 use std::path::Path;
@@ -165,8 +165,6 @@ fn shred_file(
 fn fill_random(buf: &mut [u8]) {
     for b in buf.iter_mut() {
         // SAFETY: `rand(3)` takes no arguments, dereferences no
-        // pointers, and always returns an `int` — it cannot fail or
-        // invoke UB regardless of prior seeding state.
         *b = (unsafe { libc::rand() } & 0xff) as u8;
     }
 }
@@ -265,8 +263,6 @@ mod tests {
         let path = dir.join("secret.txt");
         fs::write(&path, vec![b'A'; 100]).unwrap();
 
-        // Shred only the first 10 bytes with zeros; the rest should be
-        // untouched since size caps how many bytes the pass writes.
         shred_file(&path, 1, true, false, false, Some(10)).unwrap();
 
         let contents = fs::read(&path).unwrap();

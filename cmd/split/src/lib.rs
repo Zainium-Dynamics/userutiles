@@ -1,4 +1,4 @@
-//! user split — split a file into pieces.
+//! user split: split a file into pieces.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
@@ -217,7 +217,7 @@ fn parse_bytes(s: &str) -> Option<u64> {
     n.checked_mul(mult)
 }
 
-/// Remove `p` if it exists and is a zero-length file — cleans up the
+/// Remove `p` if it exists and is a zero-length file: cleans up the
 /// trailing empty chunk `split` creates before discovering EOF.
 fn remove_if_empty(p: &PathBuf) {
     if let Ok(m) = std::fs::metadata(p) {
@@ -258,7 +258,7 @@ mod tests {
         assert_eq!(parse_bytes("10K"), Some(10 * 1024));
         assert_eq!(parse_bytes("2M"), Some(2 * 1024 * 1024));
         assert_eq!(parse_bytes("1G"), Some(1024 * 1024 * 1024));
-        assert_eq!(parse_bytes("1k"), Some(1024)); // lowercase accepted
+        assert_eq!(parse_bytes("1k"), Some(1024));
     }
 
     #[test]
@@ -279,7 +279,6 @@ mod tests {
 
     #[test]
     fn parse_bytes_rejects_overflow() {
-        // u64::MAX worth of gigabytes overflows on multiply by 1024^3.
         assert_eq!(parse_bytes("99999999999999999999G"), None);
     }
 

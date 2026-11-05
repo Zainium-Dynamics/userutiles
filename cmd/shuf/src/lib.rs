@@ -1,4 +1,4 @@
-//! user shuf — shuffle lines.
+//! user shuf: shuffle lines.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 
@@ -102,7 +102,6 @@ pub fn run() -> i32 {
             lines.push(n.to_string());
         }
     } else if echo {
-        // no args after -e
     } else {
         let f = input.as_deref().unwrap_or("-");
         let reader: Box<dyn BufRead> = if f == "-" {
@@ -158,17 +157,11 @@ fn parse_range(s: &str) -> Result<(i64, i64), String> {
 /// when `zero` is set, newline otherwise.
 fn shuffle_print(lines: &mut [String], n: Option<usize>, zero: bool) -> i32 {
     // SAFETY: `time(2)` with a null `tloc` and `srand(3)` both take only
-    // plain integers/null pointers and dereference nothing — neither can
-    // fail or invoke UB. `libc::time` returning a null-pointer-safe value
-    // is combined with the PID via XOR purely as an arithmetic seed.
     unsafe {
         libc::srand(libc::time(std::ptr::null_mut()) as u32 ^ std::process::id());
     }
     for i in (1..lines.len()).rev() {
         // SAFETY: `rand(3)` takes no arguments and dereferences no
-        // pointers; it cannot fail or invoke UB. The result is reduced
-        // mod `(i + 1)` before being used as a `swap` index, so it is
-        // always in bounds regardless of the raw value returned.
         let j = (unsafe { libc::rand() } as usize) % (i + 1);
         lines.swap(i, j);
     }
@@ -208,8 +201,6 @@ mod tests {
     #[test]
     fn shuffle_print_take_limits_output_count() {
         let mut lines = vec!["1".to_string(), "2".to_string(), "3".to_string()];
-        // Just exercise the take/min logic path without asserting order,
-        // since shuffling is randomized.
         let status = shuffle_print(&mut lines, Some(2), false);
         assert_eq!(status, 0);
     }

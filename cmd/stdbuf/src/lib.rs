@@ -1,10 +1,4 @@
-//! user stdbuf — run COMMAND with modified I/O buffering preferences.
-//!
-//! GNU stdbuf uses `LD_PRELOAD` + `libstdbuf`. This ZEX build records the
-//! requested modes in the environment (`_STDBUF_I` / `_STDBUF_O` / `_STDBUF_E`,
-//! GNU-compatible names) and then `exec`s COMMAND. Full effect requires a
-//! preload helper; without it, this still provides a compatible CLI entry
-//! point for scripts and for future libstdbuf integration.
+//! user stdbuf: run COMMAND with modified I/O buffering preferences.
 use std::os::unix::process::CommandExt;
 use std::process::Command;
 
@@ -188,7 +182,6 @@ mod tests {
 
     #[test]
     fn parse_mode_rejects_garbage_instead_of_defaulting() {
-        // Regression: previously fell back silently to `Mode::Line`.
         assert!(parse_mode("bogus").is_err());
         assert!(parse_mode("-1").is_err());
         assert!(parse_mode("1.5").is_err());

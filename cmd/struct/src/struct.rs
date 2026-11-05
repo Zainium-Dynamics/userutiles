@@ -1,11 +1,4 @@
 //! Core implementation for the `struct` binary.
-//!
-//! Design priorities:
-//! - zero external dependencies;
-//! - manual argument parsing;
-//! - one target per process invocation;
-//! - no overwrite semantics under normal operation or race conditions;
-//! - Linux path fidelity through `OsStrExt::as_bytes`.
 
 use std::ffi::{OsStr, OsString};
 use std::fs::{self, OpenOptions};
@@ -111,8 +104,6 @@ where
                 force_file = true;
             }
             b"--" => {
-                // Everything after `--` is positional, allowing targets such as
-                // `-name` without interpreting them as options.
                 let next = args
                     .next()
                     .ok_or_else(|| usage_error("missing path after `--`"))?;
@@ -170,9 +161,6 @@ where
 fn execute(request: Request) -> Result<CreateReport, StructError> {
     validate_non_empty_path(&request.path)?;
 
-    // Safety preflight: inspect the terminal target before creating parents or
-    // files. `symlink_metadata` is used deliberately because a symlink itself is
-    // an existing filesystem object and must be protected from replacement.
     ensure_target_absent(&request.path)?;
 
     let target = Target {
@@ -180,9 +168,6 @@ fn execute(request: Request) -> Result<CreateReport, StructError> {
         path: request.path,
     };
 
-    // Classification happens after the existence preflight so existing root
-    // paths such as `/` abort as "already exists" instead of producing a lower
-    // quality validation error.
     validate_target_shape(&target)?;
 
     match target.kind {
@@ -249,7 +234,6 @@ fn classify_target(path: &Path, force_file: bool) -> TargetKind {
     }
 }
 
-// Only the last component decides; a leading dot (.config) or a trailing `/` stays a directory.
 fn name_has_dot(path: &Path) -> bool {
     if path.as_os_str().as_bytes().ends_with(b"/") {
         return false;
@@ -268,8 +252,6 @@ fn validate_target_shape(target: &Target) -> Result<(), StructError> {
 }
 
 fn validate_file_target(path: &Path) -> Result<(), StructError> {
-    // Unix cannot create a regular file through a path ending in `/`.
-    // Rejecting it before parent creation prevents confusing partial work.
     if path.as_os_str().as_bytes().ends_with(b"/") {
         return Err(StructError {
             kind: ErrorKind::Runtime,
@@ -290,7 +272,6 @@ fn validate_file_target(path: &Path) -> Result<(), StructError> {
         });
     };
 
-    // `.` and `..` are path navigation components, not creatable leaf files.
     if matches!(file_name.as_bytes(), b"." | b"..") {
         return Err(StructError {
             kind: ErrorKind::Runtime,
@@ -308,8 +289,6 @@ fn create_file(path: &Path) -> Result<CreateReport, StructError> {
     let parent = meaningful_parent(path).map(Path::to_path_buf);
 
     if let Some(parent) = parent.as_deref() {
-        // Parent creation is allowed; the protected terminal target was already
-        // checked above, and `create_new(true)` below closes the remaining race.
         fs::create_dir_all(parent).map_err(|source| StructError {
             kind: ErrorKind::Runtime,
             message: "failed to create parent directory tree".to_string(),
@@ -319,9 +298,6 @@ fn create_file(path: &Path) -> Result<CreateReport, StructError> {
         })?;
     }
 
-    // `create_new(true)` maps to atomic "create only if absent" behavior. This
-    // is the final no-overwrite guard in case another process creates the same
-    // path between our preflight check and the open call.
     OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -353,9 +329,6 @@ fn create_directory(path: &Path) -> Result<CreateReport, StructError> {
     let parent = meaningful_parent(path).map(Path::to_path_buf);
 
     if let Some(parent) = parent.as_deref() {
-        // Build only the ancestors with `create_dir_all`, then create the final
-        // target using `create_dir` so an already-existing terminal directory is
-        // reported as an error instead of being accepted like `mkdir -p`.
         fs::create_dir_all(parent).map_err(|source| StructError {
             kind: ErrorKind::Runtime,
             message: "failed to create parent directory tree".to_string(),
@@ -389,9 +362,6 @@ fn create_directory(path: &Path) -> Result<CreateReport, StructError> {
 }
 
 fn meaningful_parent(path: &Path) -> Option<&Path> {
-    // `Path::parent("file")` is `Some("")`; that empty parent is not a real
-    // directory to create. Root (`/`) is intentionally retained for absolute
-    // paths such as `/var/lib/zainium/state.db`.
     path.parent()
         .filter(|parent| !parent.as_os_str().is_empty())
 }

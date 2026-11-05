@@ -1,4 +1,4 @@
-//! user sleep — pause for a given amount of time.
+//! user sleep: pause for a given amount of time.
 use std::thread;
 use std::time::Duration;
 

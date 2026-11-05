@@ -1,10 +1,4 @@
-//! user sort — sort lines of text files.
-//!
-//! GNU's model: a line is compared key by key (`-k F[.C][OPTS][,F[.C][OPTS]]`, fields
-//! split at `-t SEP` or where blanks begin, leading blanks belonging to the field unless
-//! `b`), each key with its own options or the global ones; when all keys tie, the whole
-//! lines are compared bytewise (unless `-s`). `-u` keeps the first of each run of equal
-//! keys. In the C/UTF-8 locales collation is byte order.
+//! user sort: sort lines of text files.
 use std::cmp::Ordering;
 use std::fs::File;
 use std::io::{self, Read, Write};
@@ -86,7 +80,6 @@ fn parse_key(spec: &str) -> Result<Key, String> {
         Some((a, b)) => (a, Some(b)),
         None => (spec, None),
     };
-    // F[.C]OPTS
     let split = |p: &str| -> Result<(usize, usize, KeyOpts, bool), String> {
         let digits_end = p.find(|c: char| !c.is_ascii_digit() && c != '.').unwrap_or(p.len());
         let (pos, opts) = p.split_at(digits_end);
@@ -116,7 +109,6 @@ fn parse_key(spec: &str) -> Result<Key, String> {
         Some(b) => {
             let (ef, ec, o2, eb) = split(b)?;
             let blanks = opts.blanks;
-            // options after POS2 apply to the key as well
             if o2.any() {
                 let merged = KeyOpts { blanks, ..o2 };
                 opts = KeyOpts {
@@ -174,7 +166,6 @@ fn key_slice<'a>(line: &'a [u8], key: &Key, sep: Option<u8>, global_blanks: bool
     let starts = field_starts(line, sep);
     let field_end = |f: usize| -> usize {
         match starts.get(f) {
-            // a separator ends the field before it
             Some(next) => if sep.is_some() { next - 1 } else { *next },
             None => line.len(),
         }
@@ -314,7 +305,7 @@ fn cmp_lines(a: &[u8], b: &[u8], c: &Config) -> Ordering {
 pub fn run() -> i32 {
     let ui = Ui::new("sort");
     let mut cfg = Config { keys: Vec::new(), global: KeyOpts::default(), sep: None, stable: false, unique: false, seed: 0 };
-    let mut check: Option<bool> = None; // Some(quiet)
+    let mut check: Option<bool> = None;
     let mut merge = false;
     let mut zero = false;
     let mut output: Option<String> = None;
@@ -727,17 +718,13 @@ mod tests {
 
     #[test]
     fn ver_cmp_does_not_panic_on_huge_digit_run() {
-        // 40 digits overflows u64; saturating arithmetic must not panic.
         let a = "9999999999999999999999999999999999999999";
         let b = "1";
-        // Should not panic regardless of the resulting ordering.
         let _ = ver_cmp(a, b);
     }
 
     #[test]
     fn cmp_lines_numeric_ties_break_on_text() {
-        // "1" and "01" both parse to 1.0, so the string comparison
-        // decides the tie.
         let mut c = Config { keys: Vec::new(), global: KeyOpts::default(), sep: None, stable: false, unique: false, seed: 0 };
         c.global.kind = KeyType::Numeric;
         let ord = cmp_lines(b"01", b"1", &c);
