@@ -1,4 +1,4 @@
-//! user stty — print/change terminal line settings (common subset).
+//! user stty: print/change terminal line settings (common subset).
 use std::io;
 
 use usercore::Ui;
@@ -23,14 +23,8 @@ pub fn run() -> i32 {
     }
     let fd = libc::STDIN_FILENO;
     // SAFETY: `libc::termios` is a plain C struct of integer/array
-    // fields with no pointers and no bit pattern that is invalid to
-    // hold, so the all-zero value produced by `mem::zeroed` is a valid
-    // (if not yet meaningful) `termios` value. It is immediately
-    // overwritten by `tcgetattr` below before any field is read.
     let mut term: libc::termios = unsafe { std::mem::zeroed() };
     // SAFETY: `term` is a valid, initialized (zeroed) local declared
-    // just above, so `&mut term` is a valid, non-null, uniquely-owned
-    // pointer of the expected type for `tcgetattr(3)` to write into.
     if unsafe { libc::tcgetattr(fd, &mut term) } != 0 {
         ui.err(&io::Error::last_os_error().to_string());
         return 1;
@@ -91,9 +85,6 @@ pub fn run() -> i32 {
                 changed = true;
             }
             other if !other.is_empty() && other.bytes().all(|b| b.is_ascii_digit()) => {
-                // Baud rate argument accepted for compatibility; this
-                // build reports the terminal's existing speed rather
-                // than reprogramming the line discipline's baud rate.
             }
             other => {
                 ui.err(&format!("invalid argument '{other}'"));
@@ -111,10 +102,6 @@ pub fn run() -> i32 {
     }
     if changed {
         // SAFETY: `term` is a valid, fully-initialized local (populated
-        // by `tcgetattr` above and only mutated through the typed
-        // `apply_*`/flag-flip helpers, never via raw pointers), so
-        // `&term` is a valid pointer of the expected type for
-        // `tcsetattr(3)` to read from.
         if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &term) } != 0 {
             ui.err(&io::Error::last_os_error().to_string());
             return 1;
@@ -149,7 +136,6 @@ fn print_all(t: &libc::termios) {
 }
 
 fn print_g(t: &libc::termios) {
-    // simplified g format
     println!(
         "{:x}:{:x}:{:x}:{:x}:{:x}:{:x}:{:x}:{:x}",
         t.c_iflag,
@@ -166,8 +152,6 @@ fn print_g(t: &libc::termios) {
 /// Read the terminal's output baud rate via `cfgetospeed(3)`.
 fn speed(t: &libc::termios) -> libc::speed_t {
     // SAFETY: `t` is a valid `&libc::termios` reference (coerced to
-    // `*const termios`), guaranteed non-null and properly initialized by
-    // the caller; `cfgetospeed(3)` only reads from it and cannot fail.
     unsafe { libc::cfgetospeed(t) }
 }
 
@@ -202,9 +186,6 @@ fn apply_sane(t: &mut libc::termios) {
 
 fn apply_raw(t: &mut libc::termios) {
     // SAFETY: `t` is a valid `&mut libc::termios` reference (coerced to
-    // `*mut termios`), guaranteed non-null, properly initialized, and
-    // uniquely borrowed by the caller; `cfmakeraw(3)` only mutates the
-    // struct's flag fields in place and cannot fail.
     unsafe {
         libc::cfmakeraw(t);
     }
@@ -220,9 +201,6 @@ mod tests {
 
     fn zeroed_termios() -> libc::termios {
         // SAFETY: `libc::termios` is a plain-old-data struct of integer
-        // fields; the all-zero bit pattern is a valid (if not
-        // "sane") value, and this test never passes it to a real
-        // ioctl.
         unsafe { std::mem::zeroed() }
     }
 

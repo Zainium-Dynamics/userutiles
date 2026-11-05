@@ -11,7 +11,6 @@ use std::path::Path;
 /// `bracket` selects the diagnostic prefix (`[:` vs `test:`) used for error
 /// messages; it does not otherwise change evaluation semantics.
 pub fn eval(args: &[String], bracket: bool) -> i32 {
-    // POSIX decides by the number of arguments first
     match args.len() {
         0 => 1,
         1 => i32::from(args[0].is_empty()),
@@ -130,10 +129,6 @@ fn unary(op: &str, arg: &str, bracket: bool) -> i32 {
         "-t" => match arg.parse::<i32>() {
             Ok(fd) => {
                 // SAFETY: `libc::isatty` takes a plain `c_int` file
-                // descriptor and performs no pointer dereferences. It is
-                // defined behavior for any `i32` value, valid or not — an
-                // invalid/unopened fd simply makes it return 0 and set
-                // errno to EBADF, it cannot cause UB.
                 unsafe { libc::isatty(fd) != 0 }
             }
             Err(_) => {
@@ -174,10 +169,6 @@ fn binary(a: &str, op: &str, b: &str, bracket: bool) -> i32 {
                 _ => x <= y,
             }),
             None => {
-                // Regression guard: a non-numeric operand here must be a
-                // hard evaluation error (exit 2), not silently "false"
-                // (exit 1) — the two are observably different to callers
-                // (e.g. `if`/`&&` chains, scripts checking `$?`).
                 let bad = if a.parse::<i64>().is_err() { a } else { b };
                 eprintln!("{}: {bad}: integer expression expected", prog(bracket));
                 2
@@ -265,8 +256,6 @@ mod tests {
 
     #[test]
     fn non_numeric_comparison_is_a_hard_error_not_false() {
-        // Regression: previously `nums(...).unwrap_or(false)` made this
-        // indistinguishable from a legitimate "false" (exit 1) result.
         assert_eq!(eval(&args(&["abc", "-eq", "3"]), false), 2);
         assert_eq!(eval(&args(&["3", "-eq", "abc"]), false), 2);
     }

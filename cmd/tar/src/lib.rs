@@ -1,4 +1,4 @@
-//! user tar — ustar/GNU/pax archives: create, extract, list, with -C and gzip/bzip2/xz/zstd/lz4.
+//! user tar: ustar/GNU/pax archives: create, extract, list, with -C and gzip/bzip2/xz/zstd/lz4.
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
@@ -84,19 +84,16 @@ enum Mode {
 const HELP: &str = "Usage: tar {-c|-x|-t} [OPTION]... [-f ARCHIVE] [FILE]...\n  -c, -x, -t            create / extract / list\n  -f ARCHIVE            archive file ('-' for stdin/stdout)\n  -C DIR                change to DIR first\n  -v                    verbose\n  -z, -j, -J            gzip / bzip2 / xz\n      --zstd, --lz4     zstd / lz4 (compression is auto-detected on extract)\n  -a, --auto-compress   pick compression from the archive name\n      --strip-components=N  drop N leading path parts on extract\n      --exclude=GLOB    skip matching names\n  -O, --to-stdout       extract file contents to stdout\n  -k, --keep-old-files  don't replace existing files\n";
 
 pub fn run() -> i32 {
-    // a closed pipe (`| head`) ends the program quietly instead of panicking
     // SAFETY: restoring the default SIGPIPE action has no preconditions.
     unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
     let ui = Ui::new("tar");
     let mut mode: Option<Mode> = None;
     let mut file: Option<PathBuf> = None;
     let mut o = Opts::default();
-    // (directory to work in, path) for create; dir changes apply to the paths after them
     let mut items: Vec<(Option<PathBuf>, PathBuf)> = Vec::new();
     let mut cwd: Option<PathBuf> = None;
     let mut args: Vec<String> = std::env::args().skip(1).collect();
 
-    // old style: `tar xzvf a.tar.gz` without a dash
     if let Some(first) = args.first() {
         if !first.starts_with('-') && !first.is_empty() && first.chars().all(|c| "ctxvfzjJaOkpC".contains(c)) {
             args[0] = format!("-{first}");
@@ -267,7 +264,6 @@ pub fn run() -> i32 {
         return 2;
     };
     let archive = file.unwrap_or_else(|| PathBuf::from("-"));
-    // the archive is named relative to where tar started, before any -C
     let archive = if archive.as_os_str() == "-" || archive.is_absolute() {
         archive
     } else {
@@ -289,7 +285,6 @@ pub fn run() -> i32 {
             create(&archive, &items, &o)
         }
         Mode::Extract | Mode::List => {
-            // -C for extract applies to the whole archive; names after it filter members
             let filters: Vec<PathBuf> = items.iter().map(|(_, p)| p.clone()).collect();
             if mode == Mode::Extract {
                 if let Some(d) = &cwd {
@@ -320,8 +315,6 @@ fn tool_path(tool: &str) -> io::Result<String> {
     }
     Err(io::Error::new(io::ErrorKind::NotFound, format!("{tool} is not installed (needed for this archive)")))
 }
-
-// ── create ────────────────────────────────────────────────────────────────────
 
 fn create(archive: &Path, items: &[(Option<PathBuf>, PathBuf)], o: &Opts) -> io::Result<()> {
     let comp = o.comp.unwrap_or(Comp::None);
@@ -387,7 +380,6 @@ fn glob(p: &str, n: &str) -> bool {
 
 fn add_path(out: &mut dyn Write, path: &Path, o: &Opts) -> io::Result<()> {
     let meta = fs::symlink_metadata(path)?;
-    // stored as given, like GNU tar ("." gives "./", "./e/"); only a leading '/' goes
     let mut name = path.to_string_lossy().trim_start_matches('/').to_string();
     if name.is_empty() {
         name = ".".into();
@@ -530,8 +522,6 @@ fn put(dst: &mut [u8], src: &[u8]) {
     let n = src.len().min(dst.len());
     dst[..n].copy_from_slice(&src[..n]);
 }
-
-// ── extract / list ────────────────────────────────────────────────────────────
 
 /// Reader that first hands back bytes already peeked at.
 struct Peeked<R: Read + Send> {
@@ -810,7 +800,6 @@ fn read_archive(archive: &Path, o: &Opts, list: bool, filters: &[PathBuf]) -> io
             set_mtime(&path, mtime, true);
         }
     }
-    // directories last, so files written inside don't bump their times
     for (d, t, m) in dir_times.into_iter().rev() {
         let _ = fs::set_permissions(&d, fs::Permissions::from_mode(m | 0o700 & m));
         set_mtime(&d, t, false);
@@ -870,7 +859,6 @@ fn cstr(b: &[u8]) -> String {
 /// Decode an octal-ASCII numeric field; a malformed field is an error, never silently zero.
 fn oct(b: &[u8]) -> io::Result<u64> {
     if b.first().is_some_and(|&c| c & 0x80 != 0) {
-        // GNU base-256 for large values
         let mut v: u64 = (b[0] & 0x7f) as u64;
         for &c in &b[1..] {
             v = v.checked_mul(256).and_then(|v| v.checked_add(c as u64)).ok_or_else(|| {

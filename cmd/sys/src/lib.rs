@@ -1,4 +1,4 @@
-//! user sys — ZainiumOS System Inspector & Manager.
+//! user sys: ZainiumOS System Inspector & Manager.
 
 mod cli;
 mod commands;

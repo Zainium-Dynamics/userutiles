@@ -1,4 +1,4 @@
-//! user swapoff — disable a swap area.
+//! user swapoff: disable a swap area.
 use std::ffi::CString;
 use std::fs;
 use std::io;
@@ -12,7 +12,6 @@ fn to_cstring(s: &str) -> io::Result<CString> {
 fn do_swapoff(path: &str) -> io::Result<()> {
     let c_path = to_cstring(path)?;
     // SAFETY: `c_path` is a valid, NUL-terminated `CString` kept alive
-    // for the call; `swapoff(2)` takes no other argument.
     let r = unsafe { libc::swapoff(c_path.as_ptr()) };
     if r == -1 {
         Err(io::Error::last_os_error())

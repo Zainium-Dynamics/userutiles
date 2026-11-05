@@ -1,13 +1,4 @@
-//! user switch_root — switch to another filesystem as root (initramfs).
-//!
-//! Implements the core mechanism (validate `NEWROOT` is its own
-//! filesystem, `mount --move` it onto `/`, `chroot`, `exec INIT`) that
-//! every initramfs actually depends on. Deliberately does **not**
-//! recursively delete the old root's contents first — real
-//! `switch_root(8)` does that purely to reclaim initramfs RAM before
-//! `exec`; it's an optimization, not part of what "switching root"
-//! means, and skipping it means this can never wipe the wrong directory
-//! tree from a bad invocation.
+//! user switch_root: switch to another filesystem as root (initramfs).
 use std::ffi::CString;
 use std::io;
 use std::os::unix::ffi::OsStrExt;
@@ -27,7 +18,7 @@ fn to_cstring(s: &str) -> io::Result<CString> {
 }
 
 /// `true` if `path` is already a mountpoint (its device id differs from
-/// its parent's) — matches the check real `switch_root` uses to decide
+/// its parent's): matches the check real `switch_root` uses to decide
 /// whether `NEWROOT` needs a self-bind-mount first.
 fn is_mountpoint(path: &Path) -> io::Result<bool> {
     let meta = std::fs::metadata(path)?;
@@ -41,8 +32,6 @@ fn is_mountpoint(path: &Path) -> io::Result<bool> {
 fn self_bind_mount(path: &Path) -> io::Result<()> {
     let c_path = to_cstring_path(path)?;
     // SAFETY: `c_path` is valid, NUL-terminated, and used as both the
-    // source and target argument, kept alive for the call; no other
-    // pointer is passed.
     let r = unsafe {
         libc::mount(
             c_path.as_ptr(),
@@ -63,7 +52,6 @@ fn mount_move(source: &str, target: &str) -> io::Result<()> {
     let c_source = to_cstring(source)?;
     let c_target = to_cstring(target)?;
     // SAFETY: both `CString`s are valid, NUL-terminated, and kept alive
-    // for the call; `MS_MOVE` ignores the (NULL) type and data args.
     let r = unsafe {
         libc::mount(
             c_source.as_ptr(),
@@ -83,8 +71,6 @@ fn mount_move(source: &str, target: &str) -> io::Result<()> {
 fn chroot_dot() -> io::Result<()> {
     let dot = to_cstring(".")?;
     // SAFETY: `dot` is a valid, NUL-terminated `CString` naming the
-    // current directory (already `chdir`'d into `NEWROOT`), kept alive
-    // for the call.
     let r = unsafe { libc::chroot(dot.as_ptr()) };
     if r == -1 {
         Err(io::Error::last_os_error())
@@ -105,7 +91,7 @@ fn print_help() {
 
 /// Entry point for the `switch_root` utility. Parses `std::env::args()`
 /// for `NEWROOT INIT [ARG...]`, performs the root switch (see module
-/// docs), and `exec`s `INIT` — this function only returns if that setup,
+/// docs), and `exec`s `INIT`: this function only returns if that setup,
 /// or the final `exec`, fails.
 ///
 /// Returns 1 on any usage or setup error, or `INIT`'s own not-found exit
@@ -189,8 +175,6 @@ mod tests {
 
     #[test]
     fn is_mountpoint_detects_root() {
-        // "/" always straddles a device boundary from its own ".." in
-        // every real environment (there's no parent above the root).
         assert!(is_mountpoint(Path::new("/")).is_ok());
     }
 
@@ -208,7 +192,6 @@ mod tests {
     #[test]
     fn self_bind_mount_unprivileged_fails_cleanly() {
         // SAFETY: `libc::geteuid` takes no arguments and cannot fail or
-        // cause UB.
         if unsafe { libc::geteuid() } != 0 {
             let dir = std::env::temp_dir()
                 .join(format!("user_switch_root_test_bind_{}", std::process::id()));

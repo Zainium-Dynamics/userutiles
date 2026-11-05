@@ -1,4 +1,4 @@
-//! user tac — write each file to stdout, last line first.
+//! user tac: write each file to stdout, last line first.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 
@@ -125,9 +125,6 @@ mod tests {
 
     #[test]
     fn handles_non_utf8_bytes_without_dropping_content() {
-        // Regression: the previous `BufRead::lines()` + `unwrap_or_default()`
-        // implementation silently replaced any line that failed UTF-8
-        // validation with an empty string.
         let input = [b'a', 0xff, 0xfe, b'\n', b'b', b'\n'];
         let lines = reversed(&input);
         assert_eq!(lines, vec![b"b\n".to_vec(), vec![b'a', 0xff, 0xfe, b'\n']]);

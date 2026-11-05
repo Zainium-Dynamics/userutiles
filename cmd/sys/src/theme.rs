@@ -1,11 +1,4 @@
-//! theme.rs — Unified 5-tone ANSI theme for Zex sys driver.
-//!
-//! Identical palette to install/search/refresh drivers:
-//!   Green  (\x1b[32m) — action words, labels, section markers
-//!   Purple (\x1b[35m) — values, names, commands
-//!   Blue   (\x1b[36m) — numbers, versions, IDs
-//!   Black  (no code)  — dim/secondary text
-//!   Red    (\x1b[31m) — errors, critical alerts
+//! theme.rs: Unified 5-tone ANSI theme for Zex sys driver.
 
 use std::io::IsTerminal;
 
@@ -184,9 +177,6 @@ mod tests {
     #[test]
     fn test_bar_clamps_out_of_range_percent() {
         std::env::set_var("NO_COLOR", "1");
-        // Regression: an out-of-range percent (e.g. from an upstream
-        // rounding computation) must not produce a bar longer/shorter
-        // than `width` cells.
         assert_eq!(bar(150.0, 10), "██████████");
         assert_eq!(bar(-20.0, 10), "░░░░░░░░░░");
     }

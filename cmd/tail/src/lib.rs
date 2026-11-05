@@ -1,4 +1,4 @@
-//! user tail — output the last part of files.
+//! user tail: output the last part of files.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -15,7 +15,6 @@ pub fn run() -> i32 {
     let ui = Ui::new("tail");
     let mut lines: Option<u64> = Some(10);
     let mut bytes: Option<u64> = None;
-    // +NUM: starting with line or byte NUM rather than the last NUM
     let mut from_start = false;
     let mut quiet = false;
     let mut verbose = false;
@@ -258,7 +257,7 @@ fn tail_bytes(path: &str, n: u64, out: &mut impl Write) -> io::Result<()> {
 
 /// Poll `path` for appended data (like `tail -f`) and stream it to `out`,
 /// re-seeking to the start if the file shrinks (was truncated/rotated).
-/// Never returns on success — only on an I/O error.
+/// Never returns on success: only on an I/O error.
 fn follow_file(path: &str, out: &mut impl Write) -> io::Result<()> {
     use std::thread;
     use std::time::Duration;
@@ -269,7 +268,6 @@ fn follow_file(path: &str, out: &mut impl Write) -> io::Result<()> {
         match file.read(&mut buf) {
             Ok(0) => {
                 thread::sleep(Duration::from_millis(200));
-                // re-check size for truncation
                 let pos = file.stream_position()?;
                 let meta = std::fs::metadata(path)?;
                 if meta.len() < pos {

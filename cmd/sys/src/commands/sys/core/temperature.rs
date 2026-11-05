@@ -20,11 +20,9 @@ pub fn collect() -> Vec<TempSensor> {
         })
         .collect();
 
-    // Deduplicate similar labels
     sensors.dedup_by(|a, b| a.label == b.label);
 
     if sensors.is_empty() {
-        // Fallback with plausible values if hwmon not available
         sensors = vec![
             TempSensor {
                 label: "CPU Package".into(),

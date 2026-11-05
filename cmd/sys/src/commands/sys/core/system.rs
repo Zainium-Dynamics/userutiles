@@ -21,7 +21,6 @@ pub struct SystemInfo {
 pub fn collect() -> SystemInfo {
     let mut sys = System::new_all();
     sys.refresh_all();
-    // Second refresh for accurate CPU usage
     std::thread::sleep(Duration::from_millis(300));
     sys.refresh_cpu();
 

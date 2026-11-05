@@ -16,7 +16,7 @@ pub struct Cli {
     #[arg(short, long, global = true)]
     pub verbose: bool,
 
-    /// Machine-readable TOML output (user_utils uses .toml only — never JSON)
+    /// Machine-readable TOML output (user_utils uses .toml only: never JSON)
     #[arg(long, global = true)]
     pub toml: bool,
 }

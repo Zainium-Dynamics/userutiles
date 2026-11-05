@@ -65,9 +65,6 @@ pub fn run(_ctx: &Ctx) {
     println!();
     theme::header("Top Processes");
     let mut processes: Vec<_> = sys.processes().values().collect();
-    // `total_cmp` (not `partial_cmp().unwrap()`) so a NaN `cpu_usage()`
-    // reading — which sysinfo can report transiently right after a
-    // process starts — sorts deterministically instead of panicking.
     processes.sort_by(|a, b| b.cpu_usage().total_cmp(&a.cpu_usage()));
 
     println!(

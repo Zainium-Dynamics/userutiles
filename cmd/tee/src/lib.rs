@@ -1,4 +1,4 @@
-//! user tee — read from standard input and write to standard output and files.
+//! user tee: read from standard input and write to standard output and files.
 use std::fs::OpenOptions;
 use std::io::{self, Read, Write};
 
@@ -29,11 +29,6 @@ pub fn run() -> i32 {
             }
             "-a" | "--append" => append = true,
             // SAFETY: `libc::signal` takes two plain integer arguments (a signal
-            // number and either a function pointer or one of the sentinel
-            // constants `SIG_IGN`/`SIG_DFL`); it performs no pointer
-            // dereference on the Rust side and cannot fail in a way that
-            // corrupts memory. Installing SIG_IGN for SIGINT only changes how
-            // the process handles that signal going forward.
             "-i" | "--ignore-interrupts" => unsafe {
                 libc::signal(libc::SIGINT, libc::SIG_IGN);
             },
@@ -42,8 +37,6 @@ pub fn run() -> i32 {
                     match c {
                         'a' => append = true,
                         // SAFETY: same as above — `libc::signal(SIGINT, SIG_IGN)`
-                        // takes no pointers and cannot be unsound regardless of
-                        // process state.
                         'i' => unsafe {
                             libc::signal(libc::SIGINT, libc::SIG_IGN);
                         },

@@ -1,4 +1,4 @@
-//! user_test_cmd — the POSIX `test` / `[` builtin.
+//! user_test_cmd: the POSIX `test` / `[` builtin.
 mod logic;
 
 /// Entry point for the `test`/`[` utility. Detects which name it was
@@ -25,10 +25,6 @@ pub fn run() -> i32 {
 
 #[cfg(test)]
 mod tests {
-    // `run()` reads `std::env::args()` directly and cannot be driven
-    // hermetically per-case; `logic::eval` (exercised in `logic.rs`'s own
-    // tests) covers the evaluation semantics. This just checks the crate
-    // wires up without panicking under the process's real argv.
     #[test]
     fn run_does_not_panic() {
         let _ = super::run();

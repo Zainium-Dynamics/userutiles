@@ -87,7 +87,6 @@ pub fn run(_ctx: &Ctx) {
         notes: format!("{:.0}% utilized", mem_used_pct),
     });
 
-    // Table header
     println!(
         "  {} {} {} {}",
         theme::paint_pad(Tone::Green, "Component", 16),

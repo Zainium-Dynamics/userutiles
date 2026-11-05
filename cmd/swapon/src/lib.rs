@@ -1,11 +1,10 @@
-//! user swapon — enable a swap area.
+//! user swapon: enable a swap area.
 use std::ffi::CString;
 use std::fs;
 use std::io;
 
 use usercore::Ui;
 
-// linux/swap.h — stable kernel ABI, not exposed by the `libc` crate.
 const SWAP_FLAG_PREFER: libc::c_int = 0x8000;
 const SWAP_FLAG_DISCARD: libc::c_int = 0x10000;
 const SWAP_FLAG_PRIO_MASK: libc::c_int = 0x7fff;
@@ -26,7 +25,6 @@ fn do_swapon(path: &str, priority: Option<i32>, discard: bool) -> io::Result<()>
         flags |= SWAP_FLAG_DISCARD;
     }
     // SAFETY: `c_path` is a valid, NUL-terminated `CString` kept alive
-    // for the call; `swapon(2)` takes no other pointer argument.
     let r = unsafe { libc::swapon(c_path.as_ptr(), flags) };
     if r == -1 {
         Err(io::Error::last_os_error())

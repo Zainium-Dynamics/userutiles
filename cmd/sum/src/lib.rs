@@ -1,4 +1,4 @@
-//! user sum — BSD or System V checksum.
+//! user sum: BSD or System V checksum.
 use std::fs::File;
 use std::io::{self, Read};
 
@@ -85,8 +85,6 @@ pub fn sum_bsd(path: &str) -> io::Result<(u16, u64)> {
         checksum = (checksum >> 1) + ((checksum & 1) << 15);
         checksum = checksum.wrapping_add(b as u16);
     }
-    // Manual ceil-div: `div_ceil` isn't available until Rust 1.73, but this
-    // crate targets rust-version 1.70.
     let blocks = (data.len() as u64 + 1023) / 1024;
     Ok((checksum, blocks))
 }
@@ -137,14 +135,9 @@ mod tests {
 
     #[test]
     fn sum_bsd_known_value() {
-        // "abc" -> BSD rotating checksum, verified against the algorithm's
-        // reference implementation (busybox/coreutils `sum -r`).
         let p = tmp("bsd_abc", b"abc");
         let (checksum, blocks) = sum_bsd(p.to_str().unwrap()).unwrap();
         assert_eq!(blocks, 1);
-        // Recompute independently to guard against a regression in the
-        // rotate/add logic, rather than hardcoding a possibly-wrong magic
-        // number.
         let mut expect: u16 = 0;
         for b in b"abc" {
             expect = (expect >> 1) + ((expect & 1) << 15);

@@ -1,4 +1,4 @@
-//! user sync — flush filesystem buffers.
+//! user sync: flush filesystem buffers.
 use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
@@ -36,8 +36,6 @@ pub fn run() -> i32 {
     }
     if paths.is_empty() {
         // SAFETY: `sync(2)` takes no arguments, dereferences no
-        // pointers, and has no failure mode reported to the caller — it
-        // cannot invoke UB.
         unsafe {
             libc::sync();
         }
@@ -70,18 +68,11 @@ fn sync_path(path: &std::path::Path, data_only: bool, file_sys: bool) -> std::io
     let c = CString::new(path.as_os_str().as_bytes())
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "path contains NUL"))?;
     // SAFETY: `c` is a valid, NUL-terminated `CString` built from
-    // `path`'s bytes and kept alive across this call, so `c.as_ptr()` is
-    // a valid C string pointer; `open(2)` cannot invoke UB regardless
-    // of whether the path exists (a failure is reported via a
-    // negative return, checked below).
     let fd = unsafe { libc::open(c.as_ptr(), libc::O_RDONLY) };
     if fd < 0 {
         return Err(std::io::Error::last_os_error());
     }
     // SAFETY: `fd` was just returned by `open` above and confirmed
-    // `>= 0` (i.e. a valid, open file descriptor owned by this
-    // process); `syncfs`/`fdatasync`/`fsync` take only that integer
-    // fd and have no pointer arguments.
     let rc = unsafe {
         if file_sys {
             libc::syncfs(fd)
@@ -97,10 +88,6 @@ fn sync_path(path: &std::path::Path, data_only: bool, file_sys: bool) -> std::io
         None
     };
     // SAFETY: `fd` is still the same valid, open, and (aside from
-    // the sync calls above, which don't close it) untouched
-    // descriptor opened above; `close(2)` on an fd owned by this
-    // process is well-defined even on error, and `fd` is not used
-    // again after this point.
     unsafe {
         libc::close(fd);
     }
