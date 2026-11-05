@@ -1,8 +1,4 @@
-//! user uuidgen — create RFC 4122 universally unique identifiers.
-//!
-//! Supports v4 (random, default), v1 (time-based), v3 (namespace+name,
-//! MD5), and v5 (namespace+name, SHA-1) UUIDs, matching util-linux's
-//! `uuidgen -r|-t|-m|-s`.
+//! user uuidgen: create RFC 4122 universally unique identifiers.
 use std::io::Read;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -24,7 +20,7 @@ const NAMESPACE_X500: [u8; 16] = [
 
 /// Fill `buf` with random bytes, preferring `/dev/urandom` and falling back
 /// to a `libc::rand`-seeded stream (not cryptographically secure) only if
-/// `/dev/urandom` cannot be opened or read — e.g. in a stripped-down
+/// `/dev/urandom` cannot be opened or read: e.g. in a stripped-down
 /// sandbox without device nodes.
 fn fill_random(buf: &mut [u8]) {
     if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
@@ -33,16 +29,11 @@ fn fill_random(buf: &mut [u8]) {
         }
     }
     // SAFETY: `libc::time` is called with a NULL `time_t*`, which POSIX
-    // defines as valid (the current time is simply not also stored through
-    // the absent output pointer); `libc::srand`/`libc::rand` take only
-    // plain integers and dereference no pointers, so neither call can fail
-    // or invoke UB regardless of process state.
     unsafe {
         libc::srand(libc::time(std::ptr::null_mut()) as u32 ^ std::process::id());
     }
     for byte in buf.iter_mut() {
         // SAFETY: `libc::rand` takes no arguments and only mutates C's
-        // internal RNG state; it cannot fail or cause UB.
         *byte = unsafe { libc::rand() } as u8;
     }
 }
@@ -107,15 +98,13 @@ pub fn uuid_v5(namespace: [u8; 16], name: &[u8]) -> [u8; 16] {
 ///
 /// Since this workspace targets Zainium OS containers/sandboxes that may
 /// not always expose a real network interface, the 48-bit node id is
-/// generated randomly with the multicast bit set — the fallback RFC 4122
+/// generated randomly with the multicast bit set: the fallback RFC 4122
 /// §4.1.6 explicitly allows for systems without an IEEE 802 address,
 /// rather than reading a real MAC address.
 pub fn uuid_v1() -> [u8; 16] {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default();
-    // 100ns ticks since the UUID epoch (1582-10-15), i.e. Unix time plus
-    // the fixed Gregorian-to-Unix offset (RFC 4122 §4.1.4 / Appendix A).
     let unix_100ns = now.as_secs().wrapping_mul(10_000_000) + u64::from(now.subsec_nanos()) / 100;
     const GREGORIAN_OFFSET: u64 = 0x01B2_1DD2_1381_4000;
     let ts = unix_100ns.wrapping_add(GREGORIAN_OFFSET);
@@ -134,7 +123,7 @@ pub fn uuid_v1() -> [u8; 16] {
     set_variant(&mut bytes);
 
     fill_random(&mut bytes[10..16]);
-    bytes[10] |= 0x01; // multicast/local bit: random node id, no real NIC.
+    bytes[10] |= 0x01;
 
     bytes
 }
@@ -261,7 +250,6 @@ pub fn run() -> i32 {
             uuid_v5(ns_bytes, nm.as_bytes())
         }
     } else {
-        // -r is the default whether or not it's explicitly passed.
         let _ = random;
         uuid_v4()
     };
@@ -291,15 +279,13 @@ mod tests {
         let u = uuid_v4();
         let s = format_uuid(&u);
         assert!(is_well_formed(&s), "not well-formed: {s}");
-        assert_eq!(s.as_bytes()[14], b'4'); // version nibble
+        assert_eq!(s.as_bytes()[14], b'4');
         let variant_nibble = u8::from_str_radix(&s[19..20], 16).unwrap();
-        assert_eq!(variant_nibble & 0b1100, 0b1000); // top 2 bits = 10
+        assert_eq!(variant_nibble & 0b1100, 0b1000);
     }
 
     #[test]
     fn v4_calls_produce_different_uuids() {
-        // Astronomically unlikely to collide; guards against a broken RNG
-        // that always returns the same bytes.
         assert_ne!(format_uuid(&uuid_v4()), format_uuid(&uuid_v4()));
     }
 
@@ -309,21 +295,17 @@ mod tests {
         let s = format_uuid(&u);
         assert!(is_well_formed(&s), "not well-formed: {s}");
         assert_eq!(s.as_bytes()[14], b'1');
-        assert_eq!(u[10] & 0x01, 0x01); // multicast bit set on node id
+        assert_eq!(u[10] & 0x01, 0x01);
     }
 
     #[test]
     fn v3_matches_known_rfc4122_test_vector() {
-        // Cross-checked against Python's `uuid.uuid3(uuid.NAMESPACE_DNS,
-        // 'python.org')`, a widely cited canonical example.
         let u = uuid_v3(NAMESPACE_DNS, b"python.org");
         assert_eq!(format_uuid(&u), "6fa459ea-ee8a-3ca4-894e-db77e160355e");
     }
 
     #[test]
     fn v5_matches_known_rfc4122_test_vector() {
-        // Cross-checked against Python's `uuid.uuid5(uuid.NAMESPACE_DNS,
-        // 'python.org')`.
         let u = uuid_v5(NAMESPACE_DNS, b"python.org");
         assert_eq!(format_uuid(&u), "886313e1-3b8a-5372-9b90-0c9aee199e5d");
     }

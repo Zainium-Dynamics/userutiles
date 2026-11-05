@@ -1,4 +1,4 @@
-//! user xargs — build and execute command lines from standard input.
+//! user xargs: build and execute command lines from standard input.
 use std::io::{self, BufRead, Read};
 use std::os::unix::process::ExitStatusExt;
 use std::process::{Command, Stdio};
@@ -51,7 +51,6 @@ pub fn run() -> i32 {
             "-I" | "--replace" => {
                 replace = Some("{}".into());
                 if i + 1 < args.len() && !args[i + 1].starts_with('-') {
-                    // optional R may be attached as -I{}
                 }
             }
             s if s.starts_with("-I") && s.len() > 2 => replace = Some(s[2..].to_string()),
@@ -65,7 +64,6 @@ pub fn run() -> i32 {
             s if s.starts_with("-L") && s.len() > 2 => max_lines = s[2..].parse().ok(),
             s if s.starts_with("--max-lines=") => max_lines = s["--max-lines=".len()..].parse().ok(),
             s if s.starts_with("--max-args=") => max_args = s["--max-args=".len()..].parse().ok(),
-            // one command at a time here
             "-P" | "--max-procs" => i += 1,
             s if s.starts_with("-P") || s.starts_with("--max-procs=") => {}
             "--" => {
@@ -101,7 +99,6 @@ pub fn run() -> i32 {
         return 0;
     }
 
-    // GNU's exit status: 123 when a command failed, 124/125/126/127 stop at once
     let mut status = 0;
     let mut run = |argv: &[String]| -> bool {
         let code = run_cmd(argv, verbose);
@@ -110,7 +107,6 @@ pub fn run() -> i32 {
     };
 
     if let Some(ref token) = replace {
-        // -I: one command per input line, the whole line in place of TOKEN
         for item in &items {
             let argv: Vec<String> = cmd.iter().map(|a| a.replace(token, item)).collect();
             if !run(&argv) {
@@ -123,7 +119,6 @@ pub fn run() -> i32 {
     if items.is_empty() {
         run(&cmd);
     } else if let (None, Some(n)) = (max_args, max_lines) {
-        // -L: N input lines per command
         for chunk in lines.chunks(n.max(1)) {
             let mut argv = cmd.clone();
             argv.extend(chunk.iter().flatten().cloned());
@@ -215,7 +210,6 @@ fn read_items(null: bool, delimiter: Option<u8>, whole_lines: bool) -> io::Resul
             .map(|s| vec![String::from_utf8_lossy(s).into_owned()])
             .collect());
     }
-    // whitespace separated (default)
     let mut lines = Vec::new();
     for line in stdin.lines() {
         let line = line?;

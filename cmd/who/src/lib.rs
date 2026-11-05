@@ -1,4 +1,4 @@
-//! user who — show who is logged on (utmpx).
+//! user who: show who is logged on (utmpx).
 use std::io::{self, Write};
 
 pub fn run() -> i32 {
@@ -58,14 +58,6 @@ struct Entry {
 fn read_utmp() -> Vec<Entry> {
     let mut v = Vec::new();
     // SAFETY: `setutxent`/`getutxent`/`endutxent` form the standard utmpx
-    // iteration protocol: `setutxent` (re)starts the cursor, each
-    // `getutxent` call returns either NULL (checked before deref) or a
-    // pointer to a libc-owned record valid until the next utmpx call — we
-    // only dereference `u` within this same loop iteration and copy out
-    // owned `String`s (via the bounds-checked `cstr` helper below) and a
-    // plain `i64`, never retaining the pointer itself. `endutxent` closes
-    // the database. Not called concurrently with other utmpx users in this
-    // single-threaded CLI.
     unsafe {
         libc::setutxent();
         loop {
@@ -93,7 +85,7 @@ fn read_utmp() -> Vec<Entry> {
 }
 
 /// Decode a fixed-size utmpx `c_char` field into a `String`, stopping at the
-/// first NUL byte or the end of the array — whichever comes first.
+/// first NUL byte or the end of the array: whichever comes first.
 ///
 /// `ut_user`/`ut_line`/`ut_host` are fixed-size arrays that are only
 /// NUL-terminated when the value is *shorter* than the field (see `man
@@ -111,17 +103,9 @@ fn cstr(buf: &[libc::c_char]) -> String {
 
 fn format_time(epoch: i64) -> String {
     // SAFETY: `libc::tm` (glibc) consists only of integer fields plus a
-    // `tm_zone: *const c_char` pointer field; the all-zero bit pattern is
-    // valid for every integer field and is a valid (null) value for the
-    // pointer field, so `mem::zeroed` cannot produce an invalid value here.
-    // `localtime_r` below fully populates the fields we read before we use
-    // them.
     let mut tm = unsafe { std::mem::zeroed::<libc::tm>() };
     let t = epoch as libc::time_t;
     // SAFETY: `&t` and `&mut tm` are valid, non-null, properly aligned
-    // pointers to a live `time_t` and a live `libc::tm`. `localtime_r` is
-    // the reentrant variant so it touches no shared global state, and it
-    // only writes into `tm`.
     unsafe {
         libc::localtime_r(&t, &mut tm);
     }

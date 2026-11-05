@@ -1,4 +1,4 @@
-//! user users — print login names currently logged in.
+//! user users: print login names currently logged in.
 use usercore::Ui;
 
 /// Entry point for the `users` utility. Parses `std::env::args()` and
@@ -39,14 +39,6 @@ pub fn run() -> i32 {
 fn logged_in_users() -> Vec<String> {
     let mut names = Vec::new();
     // SAFETY: `setutxent`/`getutxent`/`endutxent` form the standard utmpx
-    // iteration protocol: `setutxent` (re)starts the cursor, each
-    // `getutxent` call returns either NULL (checked before deref) or a
-    // pointer to a libc-owned record valid until the next utmpx call — we
-    // only dereference `u` within this same loop iteration and copy the
-    // `ut_user` field out into an owned `String` via the bounds-checked
-    // `utmp_field_to_string` helper below, never retaining the pointer
-    // itself. `endutxent` closes the database. Not called concurrently with
-    // other utmpx users in this single-threaded CLI.
     unsafe {
         libc::setutxent();
         loop {
@@ -110,8 +102,6 @@ mod tests {
 
     #[test]
     fn logged_in_users_does_not_panic() {
-        // Just exercise the unsafe utmpx walk end-to-end; contents are
-        // environment-dependent so we only assert it returns cleanly.
         let _ = logged_in_users();
     }
 }

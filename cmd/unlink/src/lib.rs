@@ -1,4 +1,4 @@
-//! user unlink — remove a single file via unlink(2).
+//! user unlink: remove a single file via unlink(2).
 use std::fs;
 use std::path::Path;
 
@@ -6,7 +6,7 @@ use usercore::{protect, Ui};
 
 /// Entry point for the `unlink` utility. Parses `std::env::args()` and
 /// removes exactly one named file by calling `unlink(2)` (via
-/// [`fs::remove_file`]) directly — no directory recursion, no globbing.
+/// [`fs::remove_file`]) directly: no directory recursion, no globbing.
 ///
 /// Returns 0 on success, 1 on a usage or I/O error.
 pub fn run() -> i32 {

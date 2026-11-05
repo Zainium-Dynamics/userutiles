@@ -1,7 +1,4 @@
-//! user vdir — long listing (`ls -l`).
-//!
-//! `vdir` is a thin historical alias: it behaves exactly like `ls -l`, just
-//! under a different invocation name. All listing logic lives in `user_ls`.
+//! user vdir: long listing (`ls -l`).
 
 /// Entry point for the `vdir` utility. Forwards `std::env::args()` (minus
 /// argv0) to [`user_ls::run_args`] with `-l` prepended, so `vdir FOO` behaves

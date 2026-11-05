@@ -1,4 +1,4 @@
-//! user which — locate a command on PATH (Zainium: /overlayer/syshub/{bin,sbin}).
+//! user which: locate a command on PATH (Zainium: /overlayer/syshub/{bin,sbin}).
 use std::env;
 use std::fs;
 
@@ -70,7 +70,7 @@ pub fn run() -> i32 {
             status = 1;
         }
     }
-    let _ = env::var_os("PATH"); // keep env used for docs clarity
+    let _ = env::var_os("PATH");
     status
 }
 

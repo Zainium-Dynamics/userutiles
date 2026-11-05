@@ -1,4 +1,4 @@
-//! user wc — print newline, word, and byte counts for each file.
+//! user wc: print newline, word, and byte counts for each file.
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::Path;
@@ -155,7 +155,6 @@ fn count_file(path: &str) -> io::Result<Counts> {
         }
         for &b in &buf[..n] {
             c.bytes += 1;
-            // char count: count UTF-8 leading bytes approx + ASCII
             if b & 0xC0 != 0x80 {
                 c.chars += 1;
             }
@@ -283,10 +282,9 @@ mod tests {
 
     #[test]
     fn count_file_max_line_tracks_tabs() {
-        // A tab advances to the next multiple of 8.
         let p = tmp_file("tabs", b"a\tb\n");
         let c = count_file(p.to_str().unwrap()).unwrap();
-        assert_eq!(c.max_line, 9); // 'a' -> col 1, tab -> col 8, 'b' -> col 9
+        assert_eq!(c.max_line, 9);
         let _ = std::fs::remove_file(p);
     }
 
@@ -294,7 +292,7 @@ mod tests {
     fn count_file_utf8_chars_vs_bytes() {
         let p = tmp_file("utf8", "héllo\n".as_bytes());
         let c = count_file(p.to_str().unwrap()).unwrap();
-        assert_eq!(c.bytes, 7); // 'é' is 2 bytes in UTF-8
+        assert_eq!(c.bytes, 7);
         assert_eq!(c.chars, 6);
     }
 }

@@ -1,7 +1,4 @@
-//! user updatedb — update a file name database for locate.
-//!
-//! Database path is **not** hardcoded to `/usr/*`. Resolution order:
-//! CLI `--output` → `LOCATE_PATH` / `ZEX_LOCATEDB` → `$ZEX_PREFIX/var/lib/misc/locatedb`.
+//! user updatedb: update a file name database for locate.
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -118,9 +115,6 @@ pub fn run() -> i32 {
         }
     }
 
-    // Write to a per-process temp file then rename atomically onto the
-    // real database, so a reader never observes a partially written db and
-    // two concurrent `updatedb` runs don't clobber each other's temp file.
     let tmp = db.with_extension(format!("db.tmp.{}", std::process::id()));
     let file = match File::create(&tmp) {
         Ok(f) => f,
@@ -179,7 +173,7 @@ fn split_list(s: &str) -> Vec<String> {
 /// Recursively walk `path` (part of the tree rooted at `root`), writing
 /// one line per non-pruned entry to `out` and bumping `count`. Pruned
 /// directories (by exact/prefix path match or by bare directory name) are
-/// skipped entirely — their contents are never visited or logged.
+/// skipped entirely: their contents are never visited or logged.
 ///
 /// I/O errors reading individual directories are swallowed (matches GNU
 /// `updatedb`'s best-effort tree walk: an unreadable subtree just yields
@@ -210,7 +204,6 @@ fn walk(
     } else {
         path.display().to_string()
     };
-    // skip paths with newlines (format constraint)
     if !display.contains('\n') {
         writeln!(out, "{display}")?;
         *count += 1;
@@ -294,7 +287,7 @@ mod tests {
         assert!(text.contains("a.txt"));
         assert!(text.contains("sub"));
         assert!(text.contains("b.txt"));
-        assert_eq!(count, 4); // root, a.txt, sub, sub/b.txt
+        assert_eq!(count, 4);
 
         fs::remove_dir_all(&root).unwrap();
     }

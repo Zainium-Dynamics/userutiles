@@ -1,4 +1,4 @@
-//! user uptime — system uptime and load averages.
+//! user uptime: system uptime and load averages.
 use std::fs;
 use std::io::{self, Write};
 
@@ -86,13 +86,6 @@ fn read_loadavg() -> Option<(f64, f64, f64)> {
 /// Count distinct `USER_PROCESS` entries in the utmpx database.
 fn count_users() -> usize {
     // SAFETY: `setutxent`/`getutxent`/`endutxent` form the standard utmpx
-    // iteration protocol: `setutxent` (re)starts the cursor, each
-    // `getutxent` call returns either NULL (end of database, checked before
-    // deref) or a pointer to a libc-owned record that stays valid until the
-    // next utmpx call, which is exactly when we dereference it (`(*u)`) —
-    // we never retain `u` past this loop iteration. `endutxent` closes the
-    // database. This function does not run concurrently with other utmpx
-    // users within this single-threaded CLI process.
     unsafe {
         libc::setutxent();
         let mut n = 0usize;
@@ -122,18 +115,9 @@ fn now_epoch() -> i64 {
 /// Format an epoch-seconds timestamp as local `HH:MM:SS`.
 fn format_time(epoch: i64) -> String {
     // SAFETY: `libc::tm` (glibc) consists only of integer fields plus a
-    // `tm_zone: *const c_char` pointer field; the all-zero bit pattern is
-    // valid for every integer field and is a valid (null) value for the
-    // pointer field, so `mem::zeroed` cannot produce an invalid value here.
-    // `localtime_r` below fully populates the fields we read (`tm_hour`,
-    // `tm_min`, `tm_sec`) before we use them.
     let mut tm = unsafe { std::mem::zeroed::<libc::tm>() };
     let t = epoch as libc::time_t;
     // SAFETY: `&t` and `&mut tm` are valid, non-null, properly aligned
-    // pointers to a live `time_t` and a live `libc::tm` respectively.
-    // `localtime_r` is the reentrant variant so it touches no shared global
-    // state (unlike `localtime`), and it only writes into `tm`, never reads
-    // it, so `tm`'s zeroed starting state is irrelevant to correctness.
     unsafe {
         libc::localtime_r(&t, &mut tm);
     }
@@ -222,8 +206,6 @@ mod tests {
 
     #[test]
     fn format_time_epoch_zero_is_valid_hhmmss() {
-        // We don't assert an exact value (depends on local TZ), just that
-        // the format shape holds and fields are in-range.
         let s = format_time(0);
         assert_eq!(s.len(), 8);
         assert_eq!(s.as_bytes()[2], b':');
@@ -232,13 +214,11 @@ mod tests {
 
     #[test]
     fn now_epoch_is_positive_and_recent() {
-        // Sanity check: should be a plausible post-2020 Unix timestamp.
         assert!(now_epoch() > 1_600_000_000);
     }
 
     #[test]
     fn read_uptime_secs_returns_some_on_linux() {
-        // /proc/uptime always exists on a Linux test runner.
         assert!(read_uptime_secs().is_some());
     }
 
