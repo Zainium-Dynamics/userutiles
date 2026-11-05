@@ -1,5 +1,4 @@
-//! user nologin — displayed as the login shell for accounts that must
-//! not be able to log in interactively; always refuses and exits 1.
+//! user nologin: displayed as the login shell for accounts that must
 use std::fs;
 
 const DEFAULT_MESSAGE: &str = "This account is currently not available.";
@@ -37,11 +36,9 @@ pub fn run() -> i32 {
                 println!("nologin (user_utils) 0.1.0");
                 return 0;
             }
-            // Options that take a value but are otherwise ignored.
             "-c" | "--command" | "--init-file" | "--rcfile" => {
                 i += 1;
             }
-            // Boolean compatibility flags: silently accepted.
             "-i" | "--interactive" | "-l" | "--login" | "--noprofile" | "--norc" | "--posix"
             | "-r" | "--restricted" => {}
             _ => {}

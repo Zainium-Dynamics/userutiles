@@ -1,5 +1,3 @@
-// lib.rs — Re-export modules; multicall entry is `run() -> i32`.
-
 pub mod cli;
 pub mod error;
 pub mod metadata;

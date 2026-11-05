@@ -1,4 +1,4 @@
-//! user more — page through text one screenful at a time.
+//! user more: page through text one screenful at a time.
 use std::fs::File;
 use std::io::{self, BufRead, IsTerminal, Read, Write};
 use std::os::fd::AsRawFd;
@@ -68,12 +68,6 @@ pub fn run() -> i32 {
 /// `$LINES`, then 24.
 fn term_rows() -> usize {
     // SAFETY: `libc::winsize` consists solely of four `u16` fields with no invalid
-    // bit patterns, so the all-zero value from `mem::zeroed` is a valid `winsize`.
-    // `libc::ioctl` is called on `STDOUT_FILENO` with the `TIOCGWINSZ` request,
-    // which expects a `*mut winsize`; `&mut ws` is a valid pointer to that local,
-    // live `winsize` for the duration of the call. If stdout is closed/not a tty
-    // the call simply fails (returns -1 / sets errno) rather than causing UB, and
-    // we only read `ws.ws_row` after checking the return value is 0.
     unsafe {
         let mut ws: libc::winsize = std::mem::zeroed();
         if libc::ioctl(libc::STDOUT_FILENO, libc::TIOCGWINSZ, &mut ws) == 0 && ws.ws_row > 0 {
@@ -137,16 +131,8 @@ fn read_cmd() -> io::Result<Cmd> {
         Err(_) => (None, libc::STDIN_FILENO),
     };
     // SAFETY: `libc::termios` is a plain-old-data struct of integer fields and a
-    // fixed-size `c_cc` array, all of which admit an all-zero bit pattern, so
-    // `mem::zeroed` produces a valid (if not yet meaningful) `termios`. This value
-    // is only used as scratch space to be filled by `tcgetattr` below; if that call
-    // fails, `raw_ok` is false and `old` is never read again.
     let mut old: libc::termios = unsafe { std::mem::zeroed() };
     // SAFETY: `fd` is either the raw fd of the `/dev/tty` `File` held live in
-    // `file` for the remainder of this function, or `STDIN_FILENO`, both of which
-    // are valid open file descriptors for `tcgetattr` to operate on. `&mut old` is
-    // a valid pointer to the live local `termios` above for `tcgetattr` to fill
-    // in; the return value is checked before `old` is trusted.
     let raw_ok = unsafe { libc::tcgetattr(fd, &mut old) == 0 };
     if raw_ok {
         let mut raw = old;
@@ -154,10 +140,6 @@ fn read_cmd() -> io::Result<Cmd> {
         raw.c_cc[libc::VMIN] = 1;
         raw.c_cc[libc::VTIME] = 0;
         // SAFETY: this block only runs when `raw_ok` is true, i.e. `tcgetattr`
-        // already succeeded on `fd` above, so `fd` is confirmed valid for terminal
-        // ioctls. `raw` is a fully-initialized `termios` (copied from `old`, which
-        // `tcgetattr` populated) with only flag/`c_cc` fields modified, and `&raw`
-        // is a valid pointer to it for the duration of the call.
         unsafe {
             libc::tcsetattr(fd, libc::TCSANOW, &raw);
         }
@@ -170,9 +152,6 @@ fn read_cmd() -> io::Result<Cmd> {
     };
     if raw_ok {
         // SAFETY: guarded by `raw_ok`, so `fd` was already validated as a working
-        // terminal fd by the earlier successful `tcgetattr` call. `old` holds the
-        // original attributes `tcgetattr` populated before we mutated `raw`, and
-        // `&old` is a valid pointer to it for the duration of this restore call.
         unsafe {
             libc::tcsetattr(fd, libc::TCSANOW, &old);
         }
@@ -209,9 +188,6 @@ mod tests {
 
     #[test]
     fn page_non_interactive_ignores_row_limit() {
-        // With interactive=false, more than `rows` lines must still all be
-        // written without pausing for a --More-- prompt (which would block
-        // on stdin in a test).
         let input = b"1\n2\n3\n4\n5\n".as_slice();
         let mut out = Vec::new();
         page(Box::new(input), 2, false, &mut out).unwrap();
@@ -220,8 +196,6 @@ mod tests {
 
     #[test]
     fn term_rows_has_sane_fallback() {
-        // We can't control the test harness's tty, but the result must
-        // always be a usable positive row count.
         assert!(term_rows() > 0);
     }
 }

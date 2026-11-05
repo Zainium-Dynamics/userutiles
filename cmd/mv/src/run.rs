@@ -1,12 +1,3 @@
-// run.rs — xmv CLI entry for the unified `zutils` binary.
-//
-// Decision tree mirrors the former binary `main.rs`:
-//
-// --undo → journal.undo_last()
-// --exchange A B → ops::atomic::atomic_exchange()
-// --no-replace src dest → ops::atomic::atomic_no_replace()
-// same device, standard → ops::rename::rename_*()
-// cross-device → ops::crossdev::move_cross_device()
 use std::path::Path;
 use usercore::protect;
 
@@ -22,11 +13,9 @@ use crate::{
 };
 
 pub fn run(args: Vec<String>) {
-    // ── Platform guard ────────────────────────────────────────────────────────
     #[cfg(not(any(target_os = "linux", target_os = "redox")))]
     ui::fatal("mv only supports Linux and Redox OS.");
 
-    // ── Ctrl-C handler ────────────────────────────────────────────────────────
     ctrlc::set_handler(|| {
  eprintln!();
  ui::warn("Operation interrupted. The journal records any partial state — run mv --undo to reverse.");
@@ -36,7 +25,6 @@ pub fn run(args: Vec<String>) {
 
     let opts = Opts::parse_from(args);
 
-    // ── Open / resolve journal ────────────────────────────────────────────────
     let journal_path = opts
         .journal
         .as_deref()
@@ -47,7 +35,6 @@ pub fn run(args: Vec<String>) {
         ui::fatal(&format!("Cannot open journal: {e}"));
     });
 
-    // ── --undo: reverse last committed operation ──────────────────────────────
     if opts.undo {
         ui::heading("mv — Undo");
         ui::kv("Journal", &journal_path.display().to_string());
@@ -59,7 +46,6 @@ pub fn run(args: Vec<String>) {
         return;
     }
 
-    // ── Validate argument count ───────────────────────────────────────────────
     let (sources, dest_s) = opts.sources_and_dest();
     if sources.is_empty() {
         ui::fatal("At least one source path is required.");
@@ -69,7 +55,6 @@ pub fn run(args: Vec<String>) {
     }
     let dest = Path::new(&dest_s);
 
-    // ── --exchange: atomic swap of two paths ──────────────────────────────────
     if opts.exchange {
         if sources.len() != 1 {
             ui::fatal("--exchange requires exactly two arguments: mv --exchange pathA pathB");
@@ -96,7 +81,6 @@ pub fn run(args: Vec<String>) {
         return;
     }
 
-    // ── Multi-source moves: all sources must go into a dest directory ─────────
     if opts.no_target_directory && sources.len() > 1 {
         ui::fatal(&format!("extra operand '{}'", sources[1]));
     }
@@ -106,8 +90,6 @@ pub fn run(args: Vec<String>) {
     let backup = opts.backup.clone().or(opts.backup_short.then(|| "existing".to_string()));
     let suffix = opts.suffix.clone().or_else(|| std::env::var("SIMPLE_BACKUP_SUFFIX").ok()).unwrap_or_else(|| "~".into());
 
-    // ── Process each source ───────────────────────────────────────────────────
-    // silent unless asked: scripts and Makefiles call mv as POSIX mv
     for source_str in sources.iter() {
         let src = Path::new(source_str);
 
@@ -115,7 +97,6 @@ pub fn run(args: Vec<String>) {
             ui::fatal(&format!("cannot stat '{}': No such file or directory", src.display()));
         }
 
-        // Determine effective destination path.
         let effective_dest: std::path::PathBuf = if dest.is_dir() && !opts.no_target_directory {
             dest.join(src.file_name().expect("source has no filename"))
         } else {
@@ -152,7 +133,6 @@ pub fn run(args: Vec<String>) {
             }
         }
 
-        // ── --trash-safe: send existing dest to Trash before overwriting ──────
         if opts.trash_safe && effective_dest.exists() {
             match trash::move_to_trash(&effective_dest) {
                 Ok(trash_path) => {
@@ -172,8 +152,6 @@ pub fn run(args: Vec<String>) {
             continue;
         }
 
-        // ── Route: same-device or cross-device ───────────────────────────────
-        // `mv a b` in the current directory: b's parent is "", which is "."
         let dest_parent = effective_dest
             .parent()
             .filter(|p| !p.as_os_str().is_empty())
@@ -257,7 +235,6 @@ fn move_cross_device(src: &Path, dest: &Path, opts: &Opts, journal: &mut Journal
 
     let (tx, rx) = unbounded();
 
-    // a progress bar only on a terminal; scripts get POSIX mv's silence
     let show = opts.progress && std::io::IsTerminal::is_terminal(&std::io::stderr());
     let progress_handle = std::thread::spawn(move || {
         if show {

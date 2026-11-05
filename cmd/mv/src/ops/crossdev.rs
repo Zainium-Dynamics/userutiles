@@ -1,19 +1,3 @@
-// ops/crossdev.rs — Cross-device move implementation.
-//
-// When source and destination are on different filesystems, rename(2) fails
-// with EXDEV. The correct strategy is:
-//
-// 1. Copy every file from src to dest (parallel, via copy_file_range)
-// 2. Verify every file with XXH3-128 (optional but default-on)
-// 3. Delete the source (only after successful verify)
-//
-// This is the only operation in xmv that moves data — all other operations
-// are metadata-only rename() calls. Progress bars are shown here because
-// moves can take seconds-to-minutes for large directories.
-//
-// The copy engine is intentionally re-implemented (not imported from xcp)
-// so that xmv has no binary dependency on xcp. The logic is identical.
-
 use std::{
     fs::{self, File, OpenOptions},
     io::{Read, Write},
@@ -32,8 +16,6 @@ use crate::{
     verify,
 };
 
-// ─── Public entry point ───────────────────────────────────────────────────────
-
 /// Move `src` to `dest` across filesystem boundaries.
 ///
 /// Steps:
@@ -50,17 +32,14 @@ pub fn move_cross_device(
     preserve_meta: bool,
     tx: Sender<ProgressEvent>,
 ) -> Result<()> {
-    // ── Step 1: discover ──────────────────────────────────────────────────────
     let tasks = discover(src, dest)?;
 
     if tasks.is_empty() {
-        // src is an empty directory — just recreate it at dest.
         fs::create_dir_all(dest).map_err(|e| io_err(dest, e))?;
         fs::remove_dir(src).map_err(|e| io_err(src, e))?;
         return Ok(());
     }
 
-    // ── Step 2: parallel copy ─────────────────────────────────────────────────
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(jobs)
         .build()
@@ -75,18 +54,14 @@ pub fn move_cross_device(
             .try_for_each(|(src_file, dest_file)| copy_one(src_file, dest_file, tx_ref, meta_ref))
     })?;
 
-    // Drop the sender so the progress thread can finish.
     drop(tx);
 
-    // ── Step 3: verify ────────────────────────────────────────────────────────
     if do_verify {
         for (src_file, dest_file) in &tasks {
             verify::verify(src_file, dest_file)?;
         }
     }
 
-    // ── Step 4: delete source ─────────────────────────────────────────────────
-    // Remove files first, then prune now-empty directories bottom-up.
     for (src_file, _) in &tasks {
         fs::remove_file(src_file).map_err(|e| io_err(src_file, e))?;
     }
@@ -94,8 +69,6 @@ pub fn move_cross_device(
 
     Ok(())
 }
-
-// ─── File discovery ───────────────────────────────────────────────────────────
 
 fn discover(src: &Path, dest: &Path) -> Result<Vec<(PathBuf, PathBuf)>> {
     if src.is_file() {
@@ -140,8 +113,6 @@ fn discover(src: &Path, dest: &Path) -> Result<Vec<(PathBuf, PathBuf)>> {
     pairs
 }
 
-// ─── Per-file copy ────────────────────────────────────────────────────────────
-
 fn copy_one(
     src: &Path,
     dest: &Path,
@@ -173,8 +144,6 @@ fn copy_one(
     Ok(())
 }
 
-// ─── copy_file_range loop (same as xcp — kernel zero-copy) ───────────────────
-
 fn copy_file_range_or_fallback(src: &Path, dest: &Path, tx: &Sender<ProgressEvent>) -> Result<()> {
     let src_file = File::open(src).map_err(|e| io_err(src, e))?;
     let dest_file = OpenOptions::new()
@@ -197,14 +166,6 @@ fn copy_file_range_or_fallback(src: &Path, dest: &Path, tx: &Sender<ProgressEven
         let chunk = remaining.min(128 * 1024 * 1024);
 
         // SAFETY: `src_file`/`dest_file` are open for the duration of this call and
-        // their raw fds are valid; `&mut src_off`/`&mut dest_off` are valid pointers
-        // to live, properly-aligned `i64` locals matching the syscall's `loff_t*`
-        // ABI, which the kernel reads and updates in place. `chunk` is a `usize`
-        // bounded above by `remaining` (itself bounded by `src_size`), so it cannot
-        // overflow to something absurd, and `flags` is `0`. The return value is a
-        // plain `i64` (bytes copied or a negative errno), checked below before use;
-        // a negative/zero result (e.g. `ENOSYS` on old kernels) falls back to
-        // `buffered_copy` rather than being trusted.
         #[cfg(target_os = "linux")]
         let n = unsafe {
             libc::syscall(
@@ -265,15 +226,12 @@ fn buffered_copy(src: &Path, dest: &Path, tx: &Sender<ProgressEvent>) -> Result<
     Ok(())
 }
 
-// ─── Source cleanup ───────────────────────────────────────────────────────────
-
 /// Remove directories under `root` bottom-up after all files have been deleted.
 fn remove_empty_dirs(root: &Path) -> Result<()> {
     if root.is_file() {
         return Ok(());
     }
 
-    // Collect all directories, deepest first.
     let mut dirs: Vec<PathBuf> = WalkDir::new(root)
         .contents_first(true)
         .into_iter()
@@ -287,13 +245,9 @@ fn remove_empty_dirs(root: &Path) -> Result<()> {
         })
         .collect();
 
-    // The root itself last.
     dirs.push(root.to_owned());
 
     for dir in dirs {
-        // remove_dir only succeeds if the directory is empty.
-        // Silently ignore errors (e.g. dir already removed, or not empty due
-        // to files we didn't create — leave them untouched).
         let _ = fs::remove_dir(&dir);
     }
 

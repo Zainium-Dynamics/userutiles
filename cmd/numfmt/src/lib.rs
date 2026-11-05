@@ -1,4 +1,4 @@
-//! user numfmt — reformat numbers.
+//! user numfmt: reformat numbers.
 use usercore::Ui;
 
 /// Entry point for the `numfmt` utility. Parses `std::env::args()` as
@@ -111,9 +111,6 @@ fn parse_human(s: &str) -> Result<u64, String> {
         _ => return Err(format!("invalid suffix in '{s}'")),
     };
     let scaled = base * mult;
-    // `u64::MAX as f64` rounds up past the true max representable u64, so
-    // compare against it directly rather than casting first: an `as u64`
-    // cast on an out-of-range float silently saturates instead of erroring.
     if !scaled.is_finite() || scaled > u64::MAX as f64 {
         return Err(format!("number too large: '{s}'"));
     }
@@ -184,8 +181,6 @@ mod tests {
 
     #[test]
     fn parse_human_rejects_overflow_instead_of_saturating() {
-        // u64::MAX bytes worth of terabytes overflows u64 when scaled; this
-        // must be a hard error, not a silently saturated/wrapped value.
         let huge = format!("{}T", u64::MAX);
         assert!(parse_human(&huge).is_err());
     }
@@ -209,7 +204,6 @@ mod tests {
 
     #[test]
     fn to_iec_u64_max_does_not_panic() {
-        // Must not panic/overflow while scaling down a near-maximal value.
         let s = to_iec(u64::MAX);
         assert!(s.ends_with('P'));
     }

@@ -1,4 +1,4 @@
-//! user mktemp — create a temporary file or directory securely.
+//! user mktemp: create a temporary file or directory securely.
 use std::env;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -9,7 +9,7 @@ use usercore::Ui;
 
 /// Entry point for the `mktemp` utility. Parses `std::env::args()` as
 /// `[OPTION]... [TEMPLATE]`, atomically creates a uniquely-named temporary
-/// file or directory (never via a check-then-create race — creation always
+/// file or directory (never via a check-then-create race: creation always
 /// uses `O_CREAT|O_EXCL` semantics, retrying on collision), and prints its
 /// path.
 ///
@@ -22,7 +22,6 @@ pub fn run() -> i32 {
     let mut tmpl: Option<String> = None;
     let mut suffix = String::new();
     let mut tmpdir: Option<PathBuf> = None;
-    // -t: TEMPLATE goes in $TMPDIR (or -p DIR) even when given
     let mut in_tmpdir = false;
 
     let args: Vec<String> = env::args().skip(1).collect();
@@ -89,8 +88,6 @@ pub fn run() -> i32 {
         i += 1;
     }
 
-    // a TEMPLATE alone is relative to the current directory, as in GNU mktemp; without
-    // one, or with -p/-t, it goes in the temporary directory
     let base = match tmpdir {
         Some(d) => d,
         None if tmpl.is_none() || in_tmpdir => default_tmpdir(),
@@ -171,7 +168,6 @@ fn create_unique(full_tmpl: &str, directory: bool, dry_run: bool) -> Result<Stri
 /// current time and mixed further with `salt` so repeated calls (retries
 /// after a collision) produce different candidates.
 fn randomize_template(tmpl: &str, salt: u32) -> String {
-    // replace last run of X's
     let bytes = tmpl.as_bytes();
     let mut end = bytes.len();
     let mut start = end;
@@ -179,7 +175,6 @@ fn randomize_template(tmpl: &str, salt: u32) -> String {
         start -= 1;
     }
     if end - start < 3 {
-        // find any XXX
         if let Some(pos) = tmpl.rfind("XXX") {
             start = pos;
             end = pos;
@@ -191,13 +186,10 @@ fn randomize_template(tmpl: &str, salt: u32) -> String {
     let mut out = tmpl.to_string().into_bytes();
     let alphabet = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     // SAFETY: `libc::rand` takes no arguments and only mutates C's internal RNG
-    // state; it cannot fail or cause UB regardless of process state.
     let mut seed = unsafe { libc::rand() as u32 }
         ^ salt
         ^ (std::process::id())
         // SAFETY: `libc::time` is called with a NULL `time_t*`, which per POSIX is
-        // explicitly valid and simply means the current time is not also stored
-        // through the (absent) output pointer; the return value alone is used.
         ^ (unsafe { libc::time(std::ptr::null_mut()) } as u32);
     for byte in out.iter_mut().take(end).skip(start) {
         seed = seed.wrapping_mul(1103515245).wrapping_add(12345);
@@ -275,8 +267,6 @@ mod tests {
 
     #[test]
     fn default_tmpdir_falls_back_to_tmp_when_tmpdir_unset_or_bad() {
-        // Just check it returns *some* directory path; exact value depends
-        // on environment/CI.
         let d = default_tmpdir();
         assert!(!d.as_os_str().is_empty());
     }

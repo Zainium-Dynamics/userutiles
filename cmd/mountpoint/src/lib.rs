@@ -1,7 +1,4 @@
-//! user mountpoint — check whether a directory is a mountpoint, using the
-//! standard st_dev/st_ino heuristic: a directory is a mountpoint if it
-//! sits on a different device than its parent, or (for the root of a
-//! bind mount / filesystem root) shares its parent's inode number.
+//! user mountpoint: check whether a directory is a mountpoint, using the
 use std::ffi::CString;
 use std::io;
 use std::path::Path;
@@ -122,8 +119,6 @@ pub fn run() -> i32 {
 fn stat_path(path: &str, follow: bool) -> io::Result<libc::stat> {
     let c_path = CString::new(path).map_err(|_| io::Error::from(io::ErrorKind::InvalidInput))?;
     // SAFETY: `st` is fully populated by a successful `stat`/`lstat` call
-    // before use; `c_path` is a valid NUL-terminated string for the
-    // duration of the call.
     unsafe {
         let mut st: libc::stat = std::mem::zeroed();
         let rc = if follow {
@@ -163,14 +158,12 @@ mod tests {
 
     #[test]
     fn split_devno_recovers_common_encoding() {
-        // /dev/sda1 is typically major 8, minor 1 -> dev_t 0x0801.
         let (maj, min) = split_devno(0x0801);
         assert_eq!((maj, min), (8, 1));
     }
 
     #[test]
     fn split_devno_handles_high_minor() {
-        // major 259 (nvme), minor 300 encoded per glibc layout.
         let dev: u64 = ((259u64 & 0xfff) << 8) | (300u64 & 0xff) | ((300u64 & !0xffu64) << 12);
         let (maj, min) = split_devno(dev);
         assert_eq!((maj, min), (259, 300));

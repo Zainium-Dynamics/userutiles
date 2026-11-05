@@ -1,4 +1,4 @@
-//! user nl — number lines of files.
+//! user nl: number lines of files.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 
@@ -27,7 +27,7 @@ pub fn run() -> i32 {
                 println!("nl (user_utils) 0.1.0");
                 return 0;
             }
-            "-ba" => body_num = true, // all — handled simply as number all nonempty + empty with a
+            "-ba" => body_num = true,
             "-bt" => body_num = true,
             s if s.starts_with("-w") => match s[2..].parse::<usize>() {
                 Ok(n) if n > 0 => width = n,

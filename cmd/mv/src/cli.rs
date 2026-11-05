@@ -1,8 +1,6 @@
-// cli.rs — Command-line interface for mv (formerly xmv).
-
 use clap::Parser;
 
-/// mv — Next-generation move: atomic swaps, undo journal, trash-safe
+/// mv: Next-generation move: atomic swaps, undo journal, trash-safe
 #[derive(Parser, Debug, Clone)]
 #[command(
  name = "mv",
@@ -38,7 +36,7 @@ pub struct Opts {
     pub exchange: bool,
 
     /// Make the rename non-destructive: fail if dest already exists
-    /// Uses renameat2(RENAME_NOREPLACE) — atomic, no TOCTOU race.
+    /// Uses renameat2(RENAME_NOREPLACE): atomic, no TOCTOU race.
     #[arg(long = "no-replace")]
     pub no_replace: bool,
 
@@ -47,7 +45,7 @@ pub struct Opts {
     pub verify: bool,
 
     /// Write a transaction journal to this path for --undo support.
-    /// Default: $XDG_STATE_HOME/mv/journal.toml (TOML only — never JSON)
+    /// Default: $XDG_STATE_HOME/mv/journal.toml (TOML only: never JSON)
     #[arg(long = "journal")]
     pub journal: Option<String>,
 
@@ -67,7 +65,7 @@ pub struct Opts {
     #[arg(long = "progress", default_value_t = true)]
     pub progress: bool,
 
-    /// Verbose output — print each operation as it happens
+    /// Verbose output: print each operation as it happens
     #[arg(short = 'v', long = "verbose")]
     pub verbose: bool,
 

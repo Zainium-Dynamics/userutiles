@@ -1,4 +1,4 @@
-//! user nproc — print number of processing units.
+//! user nproc: print number of processing units.
 use usercore::Ui;
 
 /// Entry point for the `nproc` utility. Parses `std::env::args()` as
@@ -53,15 +53,6 @@ fn available(total: usize, ignore: usize) -> usize {
 /// `std::thread::available_parallelism` if that call fails or reports zero.
 fn num_cpus() -> usize {
     // SAFETY: `libc::cpu_set_t` is a fixed-size bitmask backed by an array of
-    // unsigned integers with no invalid bit patterns, so the all-zero value from
-    // `mem::zeroed` is a valid (empty) `cpu_set_t`. `sched_getaffinity` is called
-    // with pid `0` (meaning the calling thread), a size matching
-    // `size_of::<cpu_set_t>()` exactly as required by the ABI, and `&mut set`, a
-    // valid pointer to that live local for the kernel to write into; the return
-    // value is checked (`== 0`) before `set` is read. `CPU_ISSET` is then called
-    // for each `i` in `0..CPU_SETSIZE`, which is exactly the bit range the
-    // `cpu_set_t` type is sized for, so no out-of-bounds bit access occurs, and
-    // `&set` is a valid pointer to the same live local.
     unsafe {
         let mut set: libc::cpu_set_t = std::mem::zeroed();
         if libc::sched_getaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &mut set) == 0 {

@@ -1,9 +1,4 @@
-//! user partx — tell the kernel about a device's partitions.
-//!
-//! Reads the partition table via `usercore::ptable` (same MBR/GPT reader
-//! `fdisk -l`/`sfdisk` use) and informs the running kernel about
-//! individual partitions through the `BLKPG` ioctl — the same mechanism
-//! real `partx`/`partprobe` use, not a re-scan-the-whole-disk shortcut.
+//! user partx: tell the kernel about a device's partitions.
 use std::io;
 use std::path::Path;
 
@@ -12,7 +7,7 @@ use usercore::ptable::{self, Partition};
 use usercore::Ui;
 
 /// Tell the kernel about one partition on `disk` (the whole-disk device
-/// node) — add it if `add`, else remove it.
+/// node): add it if `add`, else remove it.
 fn notify_kernel(disk: &Path, p: &Partition, add: bool) -> io::Result<()> {
     let op = if add {
         BLKPG_ADD_PARTITION
@@ -187,10 +182,6 @@ pub fn run() -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // The BLKPG struct-ABI and no-such-device failure cases are covered
-    // once, in usercore::blkpg's own tests, since notify_kernel here is
-    // a thin wrapper over it.
 
     #[test]
     fn print_show_on_a_file_with_no_table_errors() {

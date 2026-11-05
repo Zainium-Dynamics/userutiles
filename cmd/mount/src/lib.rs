@@ -1,4 +1,4 @@
-//! user mount — mount a filesystem.
+//! user mount: mount a filesystem.
 use std::ffi::CString;
 use std::fs;
 use std::io;
@@ -7,13 +7,13 @@ use std::path::Path;
 use usercore::Ui;
 
 /// Filesystem types tried in order when none was given and `/etc/fstab`
-/// doesn't say (or says `auto`) — a practical stand-in for the real
+/// doesn't say (or says `auto`): a practical stand-in for the real
 /// `mount`'s libblkid-based detection, which this workspace doesn't have.
 const AUTO_FSTYPES: &[&str] = &[
     "ext4", "ext3", "ext2", "xfs", "btrfs", "vfat", "exfat", "ntfs3", "iso9660", "f2fs",
 ];
 
-/// One `-o`-style comma option, mapped to a mount(2) flag bit — matches
+/// One `-o`-style comma option, mapped to a mount(2) flag bit: matches
 /// `mount(8)`'s well-known option names.
 const FLAG_OPTS: &[(&str, libc::c_ulong)] = &[
     ("ro", libc::MS_RDONLY),
@@ -36,7 +36,7 @@ const FLAG_OPTS: &[(&str, libc::c_ulong)] = &[
 ];
 
 /// Options that clear a bit rather than set one (the "un-" form of a
-/// [`FLAG_OPTS`] entry) — `rw` is the default, but explicit for clarity
+/// [`FLAG_OPTS`] entry): `rw` is the default, but explicit for clarity
 /// and to override an fstab default.
 const CLEAR_FLAG_OPTS: &[(&str, libc::c_ulong)] = &[
     ("rw", libc::MS_RDONLY),
@@ -50,7 +50,7 @@ const CLEAR_FLAG_OPTS: &[(&str, libc::c_ulong)] = &[
 
 /// Split a comma-separated `-o` option string into a mount(2) flags word
 /// and the leftover filesystem-specific tokens (passed through verbatim
-/// as the `data` argument, comma-joined — e.g. ext4's `data=ordered`).
+/// as the `data` argument, comma-joined: e.g. ext4's `data=ordered`).
 fn parse_opts(opts: &str) -> (libc::c_ulong, String) {
     let mut flags: libc::c_ulong = 0;
     let mut data: Vec<&str> = Vec::new();
@@ -88,9 +88,6 @@ fn mount_once(
         c_data.as_ptr() as *const libc::c_void
     };
     // SAFETY: all three C strings are valid and NUL-terminated and kept
-    // alive for the call; `data_ptr` is either NULL or points at a live,
-    // NUL-terminated buffer of the same lifetime. `mount(2)`'s contract is
-    // a plain syscall wrapper with no further pointer retention.
     let r = unsafe {
         libc::mount(
             c_source.as_ptr(),
@@ -229,7 +226,7 @@ pub fn run() -> i32 {
                 }
                 opts.push_str("rw");
             }
-            "-n" | "-v" => {} // no mtab to skip writing; verbose is a no-op here
+            "-n" | "-v" => {}
             "--bind" => opts_add(&mut opts, "bind"),
             "--rbind" => opts_add(&mut opts, "rbind"),
             "--move" => opts_add(&mut opts, "move"),
@@ -396,14 +393,10 @@ mod tests {
 
     #[test]
     fn do_mount_unprivileged_fails_cleanly() {
-        // Regression guard for the syscall plumbing itself: an
-        // unprivileged process must get a real OS error (EPERM), not a
-        // panic or a silently-wrong success.
         let dir = std::env::temp_dir().join(format!("user_mount_test_{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let result = do_mount("tmpfs", dir.to_str().unwrap(), Some("tmpfs"), "");
         // SAFETY: `libc::geteuid` takes no arguments and cannot fail or
-        // cause UB.
         if unsafe { libc::geteuid() } != 0 {
             assert!(result.is_err());
         }

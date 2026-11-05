@@ -1,6 +1,3 @@
-// error.rs — Unified XmvError type.
-// Every sub-module returns Result<T, XmvError>. No unwrap() anywhere.
-
 use std::path::PathBuf;
 use thiserror::Error;
 

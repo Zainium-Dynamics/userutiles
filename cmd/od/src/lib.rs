@@ -1,4 +1,4 @@
-//! user od — dump files in octal and other formats, with GNU od's options and layout.
+//! user od: dump files in octal and other formats, with GNU od's options and layout.
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom, Write};
 
@@ -177,7 +177,6 @@ pub fn run() -> i32 {
                 break;
             }
             if c == 'w' {
-                // the width is optional and only ever attached: -w, -w8
                 o.width = Some(if rest.is_empty() {
                     32
                 } else {
@@ -219,7 +218,6 @@ pub fn run() -> i32 {
         }
     }
 
-    // POSIX: `od [FILE] [+]OFFSET` when only traditional options were used
     if !modern || traditional {
         let n = files.len();
         let last_is_offset = n >= 1
@@ -465,7 +463,6 @@ impl Input {
     fn skip(&mut self, mut n: u64) -> bool {
         while n > 0 {
             if self.cur.is_none() {
-                // seek or skip whole regular files without reading them
                 while self.idx < self.files.len() && self.files[self.idx] != "-" {
                     let f = self.files[self.idx].clone();
                     let Ok(meta) = std::fs::metadata(&f) else { break };
@@ -747,7 +744,6 @@ fn dump_strings(input: &mut Input, o: &Opts, min: u64, out: &mut dyn Write) -> i
             break;
         }
         if input.fill(&mut byte) == 0 {
-            // at EOF an unterminated run is dropped, as GNU does
             return Ok(());
         }
         addr += 1;

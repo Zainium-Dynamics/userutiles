@@ -1,27 +1,3 @@
-// undo.rs — Transaction journal for mv --undo.
-//
-// Every operation that mutates the filesystem is recorded in a TOML journal
-// before the mutation occurs. If the operation succeeds, the entry is marked
-// committed. If the process dies between the two writes, the entry is treated
-// as uncommitted and skipped by --undo.
-//
-// Journal location (in priority order):
-// 1. --journal <path> (user-specified)
-// 2. $XDG_STATE_HOME/mv/journal.toml
-// 3. $HOME/.local/state/mv/journal.toml
-//
-// Journal format (TOML only — user_utils never uses JSON):
-// [[entries]]
-// op = "move"
-// src = "/a"
-// dest = "/b"
-// ts = 1700000000
-// committed = true
-//
-// --undo reverses the most recent committed entry:
-// move → rename dest back to src
-// exchange → rename_exchange again (its own inverse)
-
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -35,8 +11,6 @@ use crate::{
     ops::crossdev,
     progress::ProgressEvent,
 };
-
-// ─── Data model ───────────────────────────────────────────────────────────────
 
 /// A single reversible operation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,8 +34,6 @@ struct JournalFile {
     #[serde(default)]
     entries: Vec<Entry>,
 }
-
-// ─── Journal handle ───────────────────────────────────────────────────────────
 
 pub struct Journal {
     path: PathBuf,
@@ -146,8 +118,6 @@ impl Journal {
         self.write_all(&file)
     }
 
-    // ── Internal ──────────────────────────────────────────────────────────────
-
     fn read_all(&self) -> Result<JournalFile> {
         if !self.path.exists() {
             return Ok(JournalFile::default());
@@ -167,7 +137,7 @@ impl Journal {
 
 /// Reverse a recorded `Move { src, dest }` by moving `dest` back to `src`.
 ///
-/// Tries a plain `rename(2)` first — the common case for same-device moves.
+/// Tries a plain `rename(2)` first: the common case for same-device moves.
 /// If `dest` and `src` are on different filesystems (`EXDEV`, which is
 /// exactly what happens after undoing a *cross-device* move, since the
 /// original source is already gone and the two paths live on different

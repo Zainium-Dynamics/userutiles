@@ -1,14 +1,3 @@
-// ui.rs — Terminal output helpers, Zainuim cyber-tech aesthetic.
-//
-// Color mapping (contributing.md):
-// Headings → Bright Cyan
-// Labels → Soft Green
-// Values → Bright Magenta / Purple
-// Warning → Bright Yellow
-// Success (✓) → Bright Green
-// Error (✖) → Bright Red
-// Standard output → Default white
-
 use colored::Colorize;
 
 /// Print a top-level operation heading.

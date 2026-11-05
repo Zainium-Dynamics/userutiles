@@ -1,14 +1,3 @@
-// progress.rs — Progress rendering for cross-device moves.
-//
-// Receives ProgressEvents over a crossbeam channel and drives an indicatif
-// MultiProgress display following the Zainuim cyber-tech aesthetic:
-//
-// Bright Cyan — heading / tool name
-// Bright Magenta — values (filenames, sizes)
-// Yellow — throughput, ETA
-// Bright Green — success tick (✓)
-// Bright Red — error indicator (only in ui.rs)
-
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -29,12 +18,11 @@ pub enum ProgressEvent {
     FileDone { path: PathBuf, bytes: u64 },
 }
 
-/// Blocking render loop — intended to run on a dedicated thread.
+/// Blocking render loop: intended to run on a dedicated thread.
 /// Returns `(files_moved, total_bytes)` when the channel is closed.
 pub fn render_progress(rx: Receiver<ProgressEvent>) -> (u64, u64) {
     let mp = MultiProgress::new();
 
-    // ── Aggregate bar (bottom of the stack) ───────────────────────────────────
     let overall = mp.add(ProgressBar::new(0));
     overall.set_style(
         ProgressStyle::with_template(
@@ -78,7 +66,6 @@ pub fn render_progress(rx: Receiver<ProgressEvent>) -> (u64, u64) {
                         ByteSize(bytes)
                     ));
                 } else {
-                    // Skipped file (already complete) — keep overall bar in sync.
                     overall.inc_length(bytes);
                     overall.inc(bytes);
                 }

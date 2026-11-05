@@ -1,4 +1,4 @@
-//! user nice — run with modified niceness (or print current).
+//! user nice: run with modified niceness (or print current).
 use std::os::unix::process::CommandExt;
 use std::process::Command;
 
@@ -11,7 +11,7 @@ use usercore::Ui;
 /// `exec`s COMMAND in place.
 ///
 /// Returns 0 when just printing niceness; otherwise this only returns (with
-/// 126 or 127) if `exec` itself failed — on success the process image is
+/// 126 or 127) if `exec` itself failed: on success the process image is
 /// replaced and `run` never returns to its caller.
 pub fn run() -> i32 {
     let ui = Ui::new("nice");
@@ -59,8 +59,6 @@ pub fn run() -> i32 {
                     }
                 }
             }
-            // "-10" style: a leading-digit (or leading-sign-then-digit)
-            // argument is an inline adjustment, not the command to run.
             s if s.starts_with('-') && s.len() > 1 && looks_like_signed_number(s) => {
                 match parse_adjustment(s) {
                     Ok(n) => adjustment = Some(n),
@@ -82,9 +80,6 @@ pub fn run() -> i32 {
 
     if cmd.is_empty() {
         // SAFETY: `libc::getpriority` takes only plain integer arguments
-        // (`PRIO_PROCESS` and `0`, meaning "the calling process") and has no
-        // pointer arguments; it cannot cause UB regardless of process state or
-        // permissions — failure is only ever signalled via `errno`.
         let n = unsafe { libc::getpriority(libc::PRIO_PROCESS, 0) };
         println!("{n}");
         return 0;
@@ -92,16 +87,9 @@ pub fn run() -> i32 {
 
     let adj = adjustment.unwrap_or(10);
     // SAFETY: same as above — `getpriority(PRIO_PROCESS, 0)` takes only plain
-    // integers and cannot cause UB.
     let current = unsafe { libc::getpriority(libc::PRIO_PROCESS, 0) };
     let new_nice = clamp_niceness(current, adj);
     // SAFETY: `libc::setpriority` takes only plain integer arguments
-    // (`PRIO_PROCESS`, `0` for "the calling process", and `new_nice` which is
-    // clamped to the valid `[-20, 19]` range above); it has no pointer
-    // arguments and cannot cause UB. If the calling process lacks permission to
-    // lower its niceness the call simply fails and sets `errno`, which is not
-    // inspected here (matching standard `nice(1)` behaviour of proceeding to
-    // exec the command regardless).
     unsafe {
         libc::setpriority(libc::PRIO_PROCESS, 0, new_nice);
     }
@@ -173,7 +161,6 @@ mod tests {
 
     #[test]
     fn clamp_niceness_does_not_overflow_on_extreme_adjustment() {
-        // i32::MAX + i32::MAX would overflow a raw `+`; must saturate, not panic.
         assert_eq!(clamp_niceness(i32::MAX, i32::MAX), 19);
         assert_eq!(clamp_niceness(i32::MIN, i32::MIN), -20);
     }
