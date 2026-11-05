@@ -1,4 +1,4 @@
-//! user hostid — print the numeric identifier for the current host.
+//! user hostid: print the numeric identifier for the current host.
 
 use usercore::Ui;
 
@@ -51,9 +51,6 @@ pub fn run() -> i32 {
         }
         Action::PrintId => {
             // SAFETY: `gethostid` takes no arguments and simply reads a
-            // host-identifier value (from `/etc/hostid` or a
-            // kernel-provided fallback); it cannot fail or cause undefined
-            // behavior regardless of process state.
             let id = unsafe { libc::gethostid() } as u32;
             println!("{id:08x}");
             0

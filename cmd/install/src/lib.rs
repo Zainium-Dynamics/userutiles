@@ -1,5 +1,4 @@
-//! user install — copy files and set attributes (core subset).
-//! Default destination layout is Zainium overlayer-aware (no /usr hardcoding).
+//! user install: copy files and set attributes (core subset).
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
@@ -29,7 +28,6 @@ pub fn run() -> i32 {
     let mut target_dir: Option<PathBuf> = None;
     let mut paths: Vec<PathBuf> = Vec::new();
 
-    // bundled short options (-Dm644, -dm755, -vD) become separate ones
     let mut args: Vec<String> = Vec::new();
     let mut operands_only = false;
     for a in std::env::args().skip(1) {
@@ -183,13 +181,11 @@ pub fn run() -> i32 {
                 ui.err("missing destination file operand");
                 return 1;
             }
-            // `paths.len() >= 2` was just checked above, so `pop()` cannot be None.
             let dest = paths.pop().unwrap();
             let is_dir = !no_target && (dest.is_dir() || paths.len() > 1);
             (paths, dest, is_dir)
         }
     };
-    // -D: create DEST's missing parents (or the -t directory itself)
     if leading {
         let dir = if dest_is_dir { Some(dest.as_path()) } else { dest.parent() };
         if let Some(d) = dir.filter(|d| !d.as_os_str().is_empty()) {
@@ -298,12 +294,6 @@ fn apply_owner(path: &Path, uid: Option<u32>, gid: Option<u32>) {
         let u = uid.unwrap_or(u32::MAX);
         let g = gid.unwrap_or(u32::MAX);
         // SAFETY: `c` is a valid, NUL-terminated `CString` kept alive for
-        // the duration of this call, so `c.as_ptr()` is a sound
-        // `chown(2)` path argument. `u`/`g` are either real ids or the
-        // POSIX `(uid_t)-1`/`(gid_t)-1` sentinel (`u32::MAX`), which tells
-        // the kernel to leave that field unchanged; the (ignored) return
-        // value only reports an errno failure (e.g. missing privileges),
-        // causing no memory unsafety.
         unsafe {
             let _ = libc::chown(c.as_ptr(), u as libc::uid_t, g as libc::gid_t);
         }
@@ -351,13 +341,6 @@ fn copy_file(src: &Path, dst: &Path, mode: u32, preserve_ts: bool) -> io::Result
         use std::os::unix::ffi::OsStrExt;
         if let Ok(c) = std::ffi::CString::new(dst.as_os_str().as_bytes()) {
             // SAFETY: `c` is a valid, NUL-terminated `CString` kept alive
-            // for the duration of this call, so `c.as_ptr()` is a sound
-            // path argument. `times` is a local `[libc::timespec; 2]`
-            // array — the exact element count `utimensat(2)` requires for
-            // an explicit times argument — so `times.as_ptr()` points to
-            // enough initialized, correctly laid-out memory. `AT_FDCWD`
-            // needs no open fd, and the (ignored) return value only
-            // reports an errno failure, causing no memory unsafety.
             unsafe {
                 libc::utimensat(libc::AT_FDCWD, c.as_ptr(), times.as_ptr(), 0);
             }
@@ -389,7 +372,7 @@ mod tests {
     #[test]
     fn parse_mode_rejects_invalid_input() {
         assert_eq!(parse_mode("rwxr-xr-x"), None);
-        assert_eq!(parse_mode("899"), None); // 9 is not an octal digit
+        assert_eq!(parse_mode("899"), None);
         assert_eq!(parse_mode(""), None);
     }
 

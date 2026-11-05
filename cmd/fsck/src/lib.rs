@@ -1,20 +1,14 @@
-//! user fsck — filesystem check front-end.
-//!
-//! Detects each device's filesystem type (via `-t`, or else
-//! `usercore::blkprobe`) and dispatches to the matching `fsck.<type>`
-//! found on `PATH` — the same front-end/backend split real `fsck(8)`
-//! uses, just without vendoring any of the actual per-filesystem
-//! checkers (`e2fsck`, `xfs_repair`, `fsck.vfat`, …).
+//! user fsck: filesystem check front-end.
 use std::path::PathBuf;
 use std::process::Command;
 
 use usercore::Ui;
 
-/// Real `fsck(8)`'s documented exit-code bits — a caller can combine
+/// Real `fsck(8)`'s documented exit-code bits: a caller can combine
 /// several by bitwise OR, and this front-end does the same across
 /// multiple devices. `EX_UNCORRECTED` is never constructed here (a
 /// child `fsck.<type>` produces it on its own, and we just relay its
-/// exit code) — kept as documentation of the contract, exercised by the
+/// exit code): kept as documentation of the contract, exercised by the
 /// OR-combination test below.
 #[allow(dead_code)]
 const EX_UNCORRECTED: i32 = 4;

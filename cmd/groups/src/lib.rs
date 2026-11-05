@@ -1,4 +1,4 @@
-//! user groups — print group memberships.
+//! user groups: print group memberships.
 
 use std::ffi::CString;
 
@@ -48,9 +48,6 @@ pub fn run() -> i32 {
 /// effective GID, if not already among them), space-separated.
 fn print_current() {
     // SAFETY: passing a `gidsetsize` of 0 is the documented POSIX idiom
-    // for querying the number of supplementary group IDs without writing
-    // anything, so the kernel never dereferences the list pointer and a
-    // null pointer is a valid argument in this mode.
     let mut n = unsafe { libc::getgroups(0, std::ptr::null_mut()) };
     if n < 0 {
         n = 0;
@@ -58,18 +55,11 @@ fn print_current() {
     let mut buf = vec![0 as libc::gid_t; n as usize];
     if n > 0 {
         // SAFETY: `buf` is a `Vec<gid_t>` with exactly `n` elements
-        // (allocated above from the same `n`), and `n` is passed as the
-        // `gidsetsize` bound, so `getgroups` cannot write more than
-        // `buf.len()` entries into `buf.as_mut_ptr()`. If the process's
-        // group count grew since the sizing call above, `getgroups`
-        // fails with `EINVAL` instead of overflowing the buffer, so this
-        // is sound even under that race.
         unsafe {
             libc::getgroups(n, buf.as_mut_ptr());
         }
     }
     // SAFETY: `getegid` takes no arguments and always succeeds; it
-    // cannot cause undefined behavior regardless of process state.
     let egid = unsafe { libc::getegid() };
     if !buf.contains(&egid) {
         buf.insert(0, egid);
@@ -80,7 +70,7 @@ fn print_current() {
 
 /// Print `name : GROUP...` from Zainium's passwd/group files: the primary
 /// group plus every group listing `name` as a member. Returns `Err` (with
-/// a user-facing message, no `name:` prefix — the caller adds that via
+/// a user-facing message, no `name:` prefix: the caller adds that via
 /// [`Ui::err`]) if `name` contains a NUL byte or isn't a known user.
 fn print_user(name: &str) -> Result<(), String> {
     to_cstring(name)?;
@@ -120,9 +110,6 @@ mod tests {
 
     #[test]
     fn gid_name_falls_back_to_numeric_for_unknown_gid() {
-        // A gid this large is exceedingly unlikely to exist in any group
-        // database, so this exercises the "no such group" fallback path
-        // hermetically.
         let gid = u32::MAX - 1;
         assert_eq!(gid_name(gid), gid.to_string());
     }

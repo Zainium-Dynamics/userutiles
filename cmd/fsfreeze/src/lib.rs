@@ -1,12 +1,11 @@
-//! user fsfreeze — suspend or resume modifications to a mounted
-//! filesystem via the `FIFREEZE`/`FITHAW` ioctls.
+//! user fsfreeze: suspend or resume modifications to a mounted
 use std::fs::File;
 use std::io;
 use std::os::fd::AsRawFd;
 
 use usercore::Ui;
 
-/// `FIFREEZE`/`FITHAW` from `<linux/fs.h>` — verified against the system
+/// `FIFREEZE`/`FITHAW` from `<linux/fs.h>`: verified against the system
 /// header (see the `blockdev` port for the same verification method)
 /// rather than pulled in via `linux-raw-sys`.
 const FIFREEZE: libc::c_ulong = 0xc004_5877;
@@ -118,11 +117,6 @@ fn freeze_or_thaw(mountpoint: &str, freeze: bool) -> io::Result<()> {
 
     let code = if freeze { FIFREEZE } else { FITHAW };
     // SAFETY: `file` stays open (and thus `fd` valid) for the duration of
-    // the call; FIFREEZE/FITHAW ignore their third argument (the kernel
-    // does not dereference it), so passing the immediate `0` is correct
-    // for both, matching util-linux's own `fsfreeze` implementation.
-    // `as _` because `libc::ioctl`'s request type differs by target libc
-    // (c_ulong on glibc, c_int on musl).
     let ret = unsafe { libc::ioctl(file.as_raw_fd(), code as _, 0) };
     if ret < 0 {
         Err(io::Error::last_os_error())
@@ -198,8 +192,6 @@ mod tests {
 
     #[test]
     fn freeze_on_real_directory_without_privilege_fails_cleanly() {
-        // FIFREEZE requires CAP_SYS_ADMIN; as an unprivileged user this
-        // must surface a clean OS error rather than crash.
         let dir = std::env::temp_dir();
         let result = freeze_or_thaw(dir.to_str().unwrap(), true);
         assert!(result.is_err(), "expected freeze without privilege to fail");

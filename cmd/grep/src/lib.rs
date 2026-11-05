@@ -1,4 +1,4 @@
-//! user grep — print lines matching patterns (POSIX BRE by default, -E ERE, -F fixed).
+//! user grep: print lines matching patterns (POSIX BRE by default, -E ERE, -F fixed).
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::Path;
@@ -45,7 +45,6 @@ impl Opts {
 const HELP: &str = "Usage: grep [OPTION]... PATTERNS [FILE]...\n  -E, -F, -G, -P       extended / fixed-string / basic / Perl patterns (default -G)\n  -e PAT, -f FILE      use PAT / patterns from FILE (repeatable)\n  -i, -v, -w, -x       ignore case / invert / whole words / whole lines\n  -c, -l, -L, -q, -s   count / files with / files without / quiet / no file errors\n  -n, -b, -o           line numbers / byte offsets / only matching\n  -h, -H               no names / with names\n  -m NUM               stop after NUM matches\n  -A, -B, -C NUM       context after / before / around\n  -r, -R               recurse into directories (--include, --exclude, --exclude-dir)\n  -Z, --null           NUL after file names\n  -z, --null-data      lines end in NUL, not newline\n";
 
 pub fn run() -> i32 {
-    // a closed pipe (`| head`) ends the program quietly instead of panicking
     // SAFETY: restoring the default SIGPIPE action has no preconditions.
     unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
     let mut o = Opts::default();
@@ -172,7 +171,6 @@ pub fn run() -> i32 {
             continue;
         }
 
-        // short options, possibly combined (-inE, -A3, -e PAT, -ePAT)
         let chars: Vec<char> = a[1..].chars().collect();
         let mut k = 0;
         while k < chars.len() {
@@ -372,7 +370,6 @@ fn grep_one(path: &str, m: &Matcher, o: &Opts, show_name: bool, out: &mut dyn Wr
         }
         Ok(())
     };
-    // name, line number and byte offset; `sep` is ':' on selected lines, '-' on context lines
     let prefix = |out: &mut dyn Write, sep: char, lineno: usize, offset: usize| -> io::Result<()> {
         name(out, sep)?;
         if o.number {

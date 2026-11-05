@@ -1,4 +1,4 @@
-//! user fold — wrap lines.
+//! user fold: wrap lines.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 
@@ -151,8 +151,6 @@ mod tests {
 
     #[test]
     fn fold_line_spaces_breaks_at_whitespace() {
-        // "abc def" with width 5: without -s it'd cut mid-word ("abc d" /
-        // "ef"); with -s it should break after "abc ".
         assert_eq!(fold("abc def", 5, false, true), "abc \ndef\n");
     }
 

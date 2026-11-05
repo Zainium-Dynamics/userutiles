@@ -1,4 +1,4 @@
-//! user free — display free and used memory from /proc/meminfo.
+//! user free: display free and used memory from /proc/meminfo.
 use std::fs;
 use std::io::{self, Write};
 
@@ -50,7 +50,7 @@ pub fn run() -> i32 {
             return 1;
         }
     };
-    let unit = if bytes { 1u64 } else { 1024 }; // default KiB like free
+    let unit = if bytes { 1u64 } else { 1024 };
     let fmt = |n: u64| {
         let v = n / unit;
         if human {
@@ -139,7 +139,7 @@ fn parse_meminfo(s: &str) -> MemInfo {
     for line in s.lines() {
         let mut it = line.split_whitespace();
         let key = it.next().unwrap_or("");
-        let val: u64 = it.next().and_then(|v| v.parse().ok()).unwrap_or(0) * 1024; // kB -> bytes
+        let val: u64 = it.next().and_then(|v| v.parse().ok()).unwrap_or(0) * 1024;
         match key {
             "MemTotal:" => m.total = val,
             "MemFree:" => m.free = val,

@@ -1,9 +1,4 @@
-//! user hexdump — display file contents in hexadecimal, decimal, octal, or
-//! ASCII.
-//!
-//! Supports the fixed-format flags of util-linux's `hexdump`
-//! (`-b -X -c -C -d -o -x`, plus `-n`/`-s`/`-v`); it does not implement the
-//! `-e`/`-f` custom format-string mini-language.
+//! user hexdump: display file contents in hexadecimal, decimal, octal, or
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 
@@ -155,7 +150,6 @@ impl ChainedFileReader {
                     }
                 }
                 Err(_) => {
-                    // Not seekable (e.g. a pipe) — skip via dummy reads.
                     while remaining > 0 {
                         let mut dummy_buf = vec![0u8; remaining.min(65536) as usize];
                         match self.current_file().read(&mut dummy_buf) {
@@ -205,13 +199,13 @@ Display file contents in hexadecimal, decimal, octal, or ascii.\n\n\
 /// Parse a byte-count argument (`-n`/`-s`), matching the exact grammar
 /// `uucore::parser::parse_size::parse_size_u64` accepts with its default
 /// settings (no allow-list, no `b`-as-byte-count, `B` alone not treated as
-/// bytes) — verified field-by-field against `uucore` 0.2.2's source
+/// bytes): verified field-by-field against `uucore` 0.2.2's source
 /// (`Parser::parse`) after this crate's earlier port only supported
 /// `K`/`M`/`G` binary suffixes and rejected the full `T/P/E/Z/Y/R/Q` range,
 /// the `KB`/`MB`/... (decimal, 1000-based) family, the `b` (block, 512)
 /// suffix, and octal input. The one deliberately unimplemented case is the
 /// `%` suffix (a fraction of total physical memory, read from
-/// `/proc/meminfo`) — not meaningful for a hexdump length/skip argument,
+/// `/proc/meminfo`): not meaningful for a hexdump length/skip argument,
 /// and real-world use of `-n`/`-s` with a percentage is not something this
 /// tool's users would plausibly reach for.
 fn parse_size_u64(s: &str) -> Result<u64, String> {
@@ -265,7 +259,7 @@ fn parse_size_u64(s: &str) -> Result<u64, String> {
     } else if is_octal {
         u64::from_str_radix(numeric.trim_start_matches('0'), 8).map_err(|_| err())?
     } else if numeric.is_empty() {
-        1 // e.g. bare "K" means one of that unit, matching the reference.
+        1
     } else {
         numeric.parse().map_err(|_| err())?
     };
@@ -388,7 +382,6 @@ fn run_hexdump(options: &HexdumpOptions) -> i32 {
         }
         let line_data = &line_data[..bytes_read];
 
-        // Consolidate runs of identical 16-byte lines into a single '*'.
         if !options.no_squeezing && last_line == line_data {
             if !squeezing {
                 out.push_str("*\n");
@@ -407,8 +400,6 @@ fn run_hexdump(options: &HexdumpOptions) -> i32 {
     }
 
     if offset != 0 {
-        // The trailing offset line's formatting must match the last
-        // requested format.
         print_offset(offset, *options.formats.last().unwrap(), &mut out);
         out.push('\n');
     }
@@ -491,7 +482,6 @@ where
     for &byte in line_data {
         byte_printer(byte, out);
     }
-    // Pad every line to the same length, matching the original hexdump.
     out.push_str(&format!(
         "{:width$}\n",
         "",
@@ -529,9 +519,6 @@ where
         word_printer(*line_data.last().unwrap() as u16, out);
     }
 
-    // Pad every line to the same length, matching the original hexdump.
-    // (Manual ceil-div: `div_ceil` isn't available until Rust 1.73, but
-    // this crate targets rust-version 1.70.)
     let word_count = (line_data.len() + 1) / 2;
     out.push_str(&format!(
         "{:width$}\n",
@@ -545,9 +532,6 @@ mod tests {
     use super::*;
 
     fn dump(bytes: &[u8], options: &HexdumpOptions) -> String {
-        // Route through the same line-formatting path `run_hexdump` uses,
-        // but purely in-memory: capture into a String rather than
-        // touching stdin/files.
         let mut out = String::new();
         let mut offset: u64 = options.skip;
         let mut last_line: Vec<u8> = Vec::new();
@@ -587,7 +571,6 @@ mod tests {
 
     #[test]
     fn default_format_known_bytes() {
-        // 16 bytes 0x00..0x0f, default two-byte-hex-compact format.
         let bytes: Vec<u8> = (0u8..16).collect();
         let out = dump(&bytes, &default_options());
         assert_eq!(
@@ -598,7 +581,7 @@ mod tests {
 
     #[test]
     fn canonical_format_known_bytes() {
-        let bytes: Vec<u8> = b"Hello, World!!!!".to_vec(); // exactly 16 bytes
+        let bytes: Vec<u8> = b"Hello, World!!!!".to_vec();
         let mut options = default_options();
         options.formats = vec![DisplayFormat::Canonical];
         let out = dump(&bytes, &options);
@@ -640,12 +623,9 @@ mod tests {
 
     #[test]
     fn identical_lines_are_squeezed_by_default() {
-        // Three identical 16-byte lines followed by a different one.
         let mut bytes = vec![0xAAu8; 16 * 3];
         bytes.extend_from_slice(&[0xBBu8; 4]);
         let out = dump(&bytes, &default_options());
-        // Expect: line 1 in full, then '*' once (not three times), then
-        // the final differing partial line, then the trailing offset.
         assert_eq!(out.matches('*').count(), 1);
         let first_line_dump = {
             let mut o = String::new();
@@ -663,7 +643,6 @@ mod tests {
         options.no_squeezing = true;
         let out = dump(&bytes, &options);
         assert_eq!(out.matches('*').count(), 0);
-        // Each of the 3 identical lines should appear (offset differs).
         assert!(out.contains("0000000"));
         assert!(out.contains("0000010"));
         assert!(out.contains("0000020"));
@@ -676,7 +655,6 @@ mod tests {
         options.formats = vec![DisplayFormat::OneByteHex, DisplayFormat::Canonical];
         let out = dump(&bytes, &options);
         let lines: Vec<&str> = out.lines().collect();
-        // First line rendered twice (once per format) plus final offset line.
         assert_eq!(lines.len(), 3);
         assert!(lines[0].starts_with("0000000"));
         assert!(lines[1].starts_with("00000000"));
@@ -728,45 +706,34 @@ mod tests {
     /// binary (`KiB`) family, the decimal/SI (`KB`) family, the full
     /// `T/P/E/Z/Y/R/Q` range, the `b` (block=512) suffix, octal input, and
     /// the specific case-sensitivity rules (`"K"`/`"k"` both bind to 1024,
-    /// but only `"KB"`/`"kB"` — not `"Kb"`/`"kb"` — bind to 1000), all
+    /// but only `"KB"`/`"kB"`: not `"Kb"`/`"kb"` — bind to 1000), all
     /// checked directly against `uucore` 0.2.2's own test expectations.
     #[test]
     fn parse_size_u64_matches_uucore_default_parser_grammar() {
-        // Binary (KiB) family + bare unit means "1 of that unit".
         assert_eq!(parse_size_u64("K").unwrap(), 1024);
         assert_eq!(parse_size_u64("k").unwrap(), 1024);
         assert_eq!(parse_size_u64("2K").unwrap(), 2048);
         assert_eq!(parse_size_u64("2KiB").unwrap(), 2048);
         assert_eq!(parse_size_u64("2kiB").unwrap(), 2048);
 
-        // Decimal/SI (KB) family — was entirely unsupported before this fix.
         assert_eq!(parse_size_u64("9kB").unwrap(), 9000);
         assert_eq!(parse_size_u64("123KB").unwrap(), 123_000);
         assert_eq!(parse_size_u64("KB").unwrap(), 1000);
 
-        // Full unit range up to Q (was capped at G before this fix).
         assert_eq!(parse_size_u64("1T").unwrap(), 1_099_511_627_776);
         assert_eq!(parse_size_u64("1P").unwrap(), 1_125_899_906_842_624);
         assert_eq!(parse_size_u64("2TB").unwrap(), 2_000_000_000_000);
 
-        // Block suffix (was entirely unsupported before this fix).
         assert_eq!(parse_size_u64("3b").unwrap(), 3 * 512);
 
-        // Octal input (was entirely unsupported before this fix).
         assert_eq!(parse_size_u64("077").unwrap(), 63);
         assert_eq!(parse_size_u64("01234K").unwrap(), 668 * 1024);
 
-        // Case sensitivity: "Kb"/"kb" are not valid units (only a
-        // lowercase-only "b" suffix or an exact "KB"/"kB" pair are).
         assert!(parse_size_u64("5Kb").is_err());
         assert!(parse_size_u64("5kb").is_err());
 
-        // Bare "B" is not a valid suffix under the reference's default
-        // settings (hexdump doesn't opt into `capital_b_bytes`).
         assert!(parse_size_u64("5B").is_err());
 
-        // Overflow must error (not silently saturate, which the pre-fix
-        // implementation did via `saturating_mul`).
         assert!(parse_size_u64("100000P").is_err());
         assert!(parse_size_u64("1Y").is_err());
 

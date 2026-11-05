@@ -1,4 +1,4 @@
-//! user id — print user identity.
+//! user id: print user identity.
 use usercore::Ui;
 
 /// Entry point for the `id` utility. Parses `std::env::args()` and prints
@@ -70,9 +70,6 @@ pub fn run() -> i32 {
         }
     } else {
         // SAFETY: `getuid`/`geteuid`/`getgid`/`getegid` (below) take no
-        // arguments and simply read process credential state; none of
-        // them can fail or cause undefined behavior regardless of
-        // process state.
         let uid = if real {
             // SAFETY: see comment above.
             unsafe { libc::getuid() }
@@ -120,7 +117,6 @@ pub fn run() -> i32 {
         return 0;
     }
 
-    // default full format
     print!("uid={uid}({}) gid={gid}({})", uid_name(uid), gid_name(gid));
     if !groups.is_empty() {
         print!(" groups=");
@@ -152,16 +148,6 @@ fn lookup_user(name: &str) -> Result<(u32, u32, Vec<u32>), String> {
 /// `getgroups(2)`, falling back to `[getegid()]` if the query fails.
 fn get_groups() -> Vec<u32> {
     // SAFETY: `getgroups(0, null)` is the documented POSIX idiom for
-    // querying the supplementary group count without writing anything, so
-    // a null list pointer is valid in that mode. `getegid` takes no
-    // arguments and cannot fail. `buf` is then allocated with exactly `n`
-    // elements (from that same query), and `n` is passed again as the
-    // `gidsetsize` bound, so the second `getgroups` call cannot write
-    // past `buf`; if the group count grew in the meantime it fails with
-    // `EINVAL` (handled via the `n < 0` check) rather than overflowing
-    // the buffer. `buf.truncate(n as usize)` is bounded by `buf.len()` by
-    // construction (`n` can only shrink from the original count on
-    // success), so it cannot panic.
     unsafe {
         let mut n = libc::getgroups(0, std::ptr::null_mut());
         if n < 0 {
@@ -207,7 +193,6 @@ mod tests {
 
     #[test]
     fn lookup_user_root_resolves_to_uid_zero() {
-        // "root" (uid 0) exists on every Linux system this crate targets.
         let (uid, _gid, groups) = lookup_user("root").expect("root should resolve");
         assert_eq!(uid, 0);
         assert!(!groups.is_empty());
@@ -225,7 +210,6 @@ mod tests {
 
     #[test]
     fn uid_name_unknown_uid_falls_back_to_number() {
-        // A UID this unlikely to exist on any real system.
         assert_eq!(uid_name(u32::MAX - 1), (u32::MAX - 1).to_string());
     }
 

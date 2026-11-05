@@ -1,4 +1,4 @@
-//! user fmt — reformat paragraphs to a given width.
+//! user fmt: reformat paragraphs to a given width.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Write};
 
@@ -10,7 +10,7 @@ use usercore::Ui;
 /// columns.
 ///
 /// `-c`/`--crown-margin` and `-t`/`--tagged-paragraph` are accepted for
-/// CLI compatibility but not yet honored — indentation is not currently
+/// CLI compatibility but not yet honored: indentation is not currently
 /// preserved specially for the first line(s) of a paragraph.
 ///
 /// Returns 0 on success, 1 on a usage or I/O error.
@@ -61,7 +61,7 @@ pub fn run() -> i32 {
         }
         i += 1;
     }
-    let _ = (crown, tagged); // accepted but not yet honored, see doc comment
+    let _ = (crown, tagged);
     if files.is_empty() {
         files.push("-".into());
     }
@@ -209,7 +209,6 @@ mod tests {
     #[test]
     fn flush_para_split_only_preserves_short_lines_as_is() {
         let result = flush(&["a  b   c"], 75, true);
-        // split_only keeps the original line verbatim when it already fits.
         assert_eq!(result, "a  b   c\n");
     }
 

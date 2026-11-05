@@ -1,4 +1,4 @@
-//! user head — output the first part of files.
+//! user head: output the first part of files.
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
@@ -16,11 +16,9 @@ pub fn run() -> i32 {
     let mut bytes: Option<u64> = None;
     let mut quiet = false;
     let mut verbose = false;
-    // -n -NUM / -c -NUM: everything but the last NUM lines or bytes
     let mut all_but = false;
     let mut files: Vec<String> = Vec::new();
 
-    // --lines=NUM / --bytes=NUM as two arguments
     let args: Vec<String> = std::env::args()
         .skip(1)
         .flat_map(|a| match a.split_once('=') {
@@ -106,7 +104,6 @@ pub fn run() -> i32 {
                 }
             },
             s if s.starts_with('-') && s.len() > 1 && s.as_bytes()[1].is_ascii_digit() => {
-                // historic: -NUM
                 match parse_count(&s[1..]) {
                     Ok(n) => {
                         lines = Some(n);
@@ -185,7 +182,6 @@ fn head_all_but(path: &str, by_bytes: bool, n: u64, out: &mut impl Write) -> io:
     let end = if by_bytes {
         data.len().saturating_sub(n)
     } else {
-        // line ends, the last line counting even without a newline
         let mut ends: Vec<usize> = data
             .iter()
             .enumerate()

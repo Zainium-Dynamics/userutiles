@@ -1,4 +1,4 @@
-//! user hostname — show or set the system host name.
+//! user hostname: show or set the system host name.
 use std::ffi::CString;
 use std::io::{self, Write};
 
@@ -46,12 +46,6 @@ pub fn run() -> i32 {
             return 1;
         };
         // SAFETY: `c` is a valid, NUL-terminated `CString` kept alive for
-        // the duration of this call, so `c.as_ptr()` is a sound
-        // `sethostname(2)` argument. `name.len()` is the byte length of
-        // `name` *without* the NUL terminator, which is exactly what
-        // `sethostname` expects (and matches `c`'s content length, since
-        // `CString::new` succeeding above guarantees `name` has no
-        // interior NUL bytes).
         let rc = unsafe { libc::sethostname(c.as_ptr(), name.len()) };
         if rc != 0 {
             ui.err(&format!("{}", io::Error::last_os_error()));
@@ -61,12 +55,6 @@ pub fn run() -> i32 {
     }
     let mut buf = vec![0u8; 256];
     // SAFETY: `buf` is a heap-allocated `Vec<u8>` with exactly 256 bytes
-    // of storage, and `buf.len()` is passed as the size bound, so
-    // `gethostname` cannot write past the buffer. Per POSIX, if the
-    // hostname (plus NUL) doesn't fit, the result may be silently
-    // truncated without a trailing NUL; that's handled below by treating
-    // "no NUL found" as "use the whole buffer" (`unwrap_or(buf.len())`),
-    // which stays within `buf`'s bounds either way.
     let rc = unsafe { libc::gethostname(buf.as_mut_ptr() as *mut _, buf.len()) };
     if rc != 0 {
         ui.err(&format!("{}", io::Error::last_os_error()));
