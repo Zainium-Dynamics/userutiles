@@ -102,7 +102,7 @@ pub fn removal_denied_resolved(resolved: &Path) -> Option<ProtectReason> {
         }
     }
 
-    if is_named_root(resolved, "zaisys") {
+    if ZAISYS_ROOTS.iter().any(|r| resolved == Path::new(r)) {
         return Some(ProtectReason::ZaisysRoot);
     }
 
@@ -151,12 +151,16 @@ pub fn modification_denied_resolved(resolved: &Path) -> Option<ProtectReason> {
         }
     }
 
-    if is_named_root(resolved, "zaisys") {
+    if ZAISYS_ROOTS.iter().any(|r| resolved == Path::new(r)) {
         return Some(ProtectReason::ZaisysRoot);
     }
 
     None
 }
+
+/// The real zaisys: on the running system and as quantra-ramfs mounts it. A folder that
+/// is only named zaisys (a copy in a build tree, in the Trash) is an ordinary folder.
+const ZAISYS_ROOTS: [&str; 2] = ["/overlayer/zaisys", "/zaisys"];
 
 fn syshub_upgrade_denied(resolved: &Path) -> Option<ProtectReason> {
     SYSHUB_UPGRADE_PREFIXES
@@ -205,10 +209,19 @@ mod tests {
             "/overlayer/.syshub-pending/root/bin/zex",
             "/overlayer/.syshub-rollback/x/journal",
         ] {
-            assert_eq!(removal_denied_resolved(Path::new(p)), Some(ProtectReason::SyshubUpgrade));
-            assert_eq!(modification_denied_resolved(Path::new(p)), Some(ProtectReason::SyshubUpgrade));
+            assert_eq!(
+                removal_denied_resolved(Path::new(p)),
+                Some(ProtectReason::SyshubUpgrade)
+            );
+            assert_eq!(
+                modification_denied_resolved(Path::new(p)),
+                Some(ProtectReason::SyshubUpgrade)
+            );
         }
-        assert_eq!(removal_denied_resolved(Path::new("/overlayer/.syshub-pendingx")), None);
+        assert_eq!(
+            removal_denied_resolved(Path::new("/overlayer/.syshub-pendingx")),
+            None
+        );
     }
 
     #[test]
@@ -218,6 +231,13 @@ mod tests {
             removal_denied_resolved(Path::new("/overlayer/zexlib")),
             None
         );
+    }
+
+    #[test]
+    fn a_copy_named_zaisys_is_an_ordinary_folder() {
+        let copy = Path::new("/home/u/.local/share/Trash/files/eclipse-work/root/overlayer/zaisys");
+        assert_eq!(removal_denied_resolved(copy), None);
+        assert_eq!(modification_denied_resolved(copy), None);
     }
 
     #[test]
