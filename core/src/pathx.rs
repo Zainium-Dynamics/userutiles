@@ -51,7 +51,11 @@ pub enum Need {
 /// missing component is an error unless `need` allows it.
 pub fn canonicalize_mode(path: &Path, need: Need, follow: bool) -> std::io::Result<PathBuf> {
     use std::io::{Error, ErrorKind};
-    let mut result = if path.is_absolute() { PathBuf::from("/") } else { std::env::current_dir()? };
+    let mut result = if path.is_absolute() {
+        PathBuf::from("/")
+    } else {
+        std::env::current_dir()?
+    };
     let mut pending: Vec<std::ffi::OsString> = Vec::new();
     let push = |pending: &mut Vec<std::ffi::OsString>, p: &Path| {
         for c in p.components().rev() {
@@ -71,7 +75,10 @@ pub fn canonicalize_mode(path: &Path, need: Need, follow: bool) -> std::io::Resu
         }
         let next = result.join(&c);
         if !follow {
-            if need != Need::Nothing && (need == Need::All || !pending.is_empty()) && std::fs::symlink_metadata(&next).is_err() {
+            if need != Need::Nothing
+                && (need == Need::All || !pending.is_empty())
+                && std::fs::symlink_metadata(&next).is_err()
+            {
                 return Err(Error::from(ErrorKind::NotFound));
             }
             result = next;
@@ -108,14 +115,23 @@ pub fn canonicalize_mode(path: &Path, need: Need, follow: bool) -> std::io::Resu
 /// The backup name for `dest`: `dest~N~` (numbered), `dest` + SUFFIX (simple), or numbered
 /// when numbered backups already exist (existing).
 pub fn backup_name(dest: &Path, control: &str, suffix: &str) -> PathBuf {
-    let name = dest.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    let dir = dest.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let name = dest
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let dir = dest
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
     let highest = std::fs::read_dir(dir)
         .map(|rd| {
             rd.filter_map(|e| e.ok())
                 .filter_map(|e| {
                     let n = e.file_name().to_string_lossy().into_owned();
-                    n.strip_prefix(&format!("{name}.~"))?.strip_suffix('~')?.parse::<u64>().ok()
+                    n.strip_prefix(&format!("{name}.~"))?
+                        .strip_suffix('~')?
+                        .parse::<u64>()
+                        .ok()
                 })
                 .max()
                 .unwrap_or(0)

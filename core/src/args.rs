@@ -6,7 +6,11 @@
 /// of the cluster, or else the next argument (left in place). A cluster with
 /// a letter in neither set, long options, `-` and everything after `--` pass
 /// through untouched, so the utility still reports what it doesn't know.
-pub fn expand_short<I: IntoIterator<Item = String>>(args: I, flags: &str, with_value: &str) -> Vec<String> {
+pub fn expand_short<I: IntoIterator<Item = String>>(
+    args: I,
+    flags: &str,
+    with_value: &str,
+) -> Vec<String> {
     let mut out = Vec::new();
     let mut done = false;
     for a in args {

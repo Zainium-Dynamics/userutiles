@@ -364,6 +364,160 @@ pub fn read_table(path: &Path) -> io::Result<Option<PartitionTable>> {
     }))
 }
 
+/// The GUIDs of a GPT disk, for `sfdisk -d`: the disk GUID (label-id) and each partition's
+/// unique GUID by partition number. `Ok(None)` when the disk has no GPT.
+pub fn gpt_ids(path: &Path) -> io::Result<Option<(String, Vec<(u32, String)>)>> {
+    let mut f = File::open(path)?;
+    let header = read_at(&mut f, SECTOR_SIZE, 512)?;
+    if &header[0..8] != b"EFI PART" {
+        return Ok(None);
+    }
+    let disk: [u8; 16] = header[56..72].try_into().unwrap();
+    let entry_lba = u64::from_le_bytes(header[72..80].try_into().unwrap());
+    let count = u32::from_le_bytes(header[80..84].try_into().unwrap()) as u64;
+    let esize = u32::from_le_bytes(header[84..88].try_into().unwrap()) as u64;
+    let raw = read_at(&mut f, entry_lba * SECTOR_SIZE, (count * esize) as usize)?;
+    let mut ids = Vec::new();
+    for (i, e) in raw.chunks(esize as usize).enumerate() {
+        if e[0..16].iter().all(|&b| b == 0) {
+            continue;
+        }
+        let uuid: [u8; 16] = e[16..32].try_into().unwrap();
+        ids.push((i as u32 + 1, format_guid(&uuid)));
+    }
+    Ok(Some((format_guid(&disk), ids)))
+}
+
+/// Checks the partition table of `path` the way `sfdisk --verify` does and returns the
+/// problems found; an empty list means none. For GPT: both headers (signature, CRC, where
+/// they say they and each other are), both entry arrays (CRC, and that they match), every
+/// partition inside the usable area, and no two partitions overlapping. For MBR: every
+/// partition inside the disk, and no overlaps.
+pub fn verify(path: &Path) -> io::Result<Vec<String>> {
+    let mut f = File::open(path)?;
+    let total = device_size_sectors(&mut f)?;
+    let boot = read_at(&mut f, 0, 512)?;
+    let mut problems = Vec::new();
+    if boot[510] != 0x55 || boot[511] != 0xAA {
+        problems.push("no partition table found (no 55AA signature in the MBR)".into());
+        return Ok(problems);
+    }
+    let le32 = |b: &[u8], o: usize| u32::from_le_bytes(b[o..o + 4].try_into().unwrap());
+    let le64 = |b: &[u8], o: usize| u64::from_le_bytes(b[o..o + 8].try_into().unwrap());
+    let mut ranges: Vec<(u32, u64, u64)> = Vec::new();
+
+    if boot[446 + 4] == 0xEE {
+        let mut header_of =
+            |lba: u64, which: &str, problems: &mut Vec<String>| -> io::Result<Option<Vec<u8>>> {
+                let h = read_at(&mut f, lba * SECTOR_SIZE, SECTOR_SIZE as usize)?;
+                if &h[0..8] != b"EFI PART" {
+                    problems.push(format!("{which} GPT header at LBA {lba} is missing"));
+                    return Ok(None);
+                }
+                let size = le32(&h, 12) as usize;
+                if !(92..=SECTOR_SIZE as usize).contains(&size) {
+                    problems.push(format!("{which} GPT header has a bad size ({size})"));
+                    return Ok(None);
+                }
+                let mut copy = h[..size].to_vec();
+                copy[16..20].fill(0);
+                if crc32fast::hash(&copy) != le32(&h, 16) {
+                    problems.push(format!("{which} GPT header is corrupt (CRC mismatch)"));
+                }
+                if le64(&h, 24) != lba {
+                    problems.push(format!(
+                        "{which} GPT header says it is at LBA {}, not {lba}",
+                        le64(&h, 24)
+                    ));
+                }
+                Ok(Some(h))
+            };
+        let last = total.saturating_sub(1);
+        let primary = header_of(1, "primary", &mut problems)?;
+        let backup = header_of(last, "backup", &mut problems)?;
+        let mut arrays = Vec::new();
+        for (h, which) in [(&primary, "primary"), (&backup, "backup")] {
+            let Some(h) = h else { continue };
+            let count = le32(h, 80) as u64;
+            let esize = le32(h, 84) as u64;
+            if esize < 128 || count == 0 || count * esize > 1 << 20 {
+                problems.push(format!(
+                    "{which} GPT entry array has a bad shape ({count} x {esize})"
+                ));
+                continue;
+            }
+            let entries = read_at(&mut f, le64(h, 72) * SECTOR_SIZE, (count * esize) as usize)?;
+            if crc32fast::hash(&entries) != le32(h, 88) {
+                problems.push(format!("{which} GPT entry array is corrupt (CRC mismatch)"));
+            }
+            arrays.push((which, h.clone(), entries, esize));
+        }
+        if let (Some(p), Some(b)) = (&primary, &backup) {
+            if le64(p, 32) != last {
+                problems.push(format!(
+                    "primary GPT header says the backup is at LBA {}, not {last}",
+                    le64(p, 32)
+                ));
+            }
+            if le64(b, 32) != 1 {
+                problems.push(format!(
+                    "backup GPT header says the primary is at LBA {}, not 1",
+                    le64(b, 32)
+                ));
+            }
+        }
+        if arrays.len() == 2 && arrays[0].2 != arrays[1].2 {
+            problems.push("the primary and backup GPT entry arrays differ".into());
+        }
+        if let Some((_, h, entries, esize)) = arrays.first() {
+            let (first_usable, last_usable) = (le64(h, 40), le64(h, 48));
+            for (i, e) in entries.chunks(*esize as usize).enumerate() {
+                if e[0..16].iter().all(|&b| b == 0) {
+                    continue;
+                }
+                let (start, end) = (le64(e, 32), le64(e, 40));
+                let n = i as u32 + 1;
+                if end < start {
+                    problems.push(format!(
+                        "partition {n} ends (LBA {end}) before it starts (LBA {start})"
+                    ));
+                } else if start < first_usable || end > last_usable {
+                    problems.push(format!(
+                        "partition {n} (LBA {start}-{end}) is outside the usable area (LBA {first_usable}-{last_usable})"
+                    ));
+                }
+                ranges.push((n, start, end));
+            }
+        }
+    } else {
+        for slot in 0..4 {
+            let e = &boot[446 + slot * 16..446 + slot * 16 + 16];
+            if e[4] == 0 {
+                continue;
+            }
+            let (start, size) = (le32(e, 8) as u64, le32(e, 12) as u64);
+            let n = slot as u32 + 1;
+            if size == 0 {
+                problems.push(format!("partition {n} has no sectors"));
+                continue;
+            }
+            let end = start + size - 1;
+            if end >= total {
+                problems.push(format!("partition {n} (LBA {start}-{end}) goes past the end of the disk ({total} sectors)"));
+            }
+            ranges.push((n, start, end));
+        }
+    }
+
+    ranges.sort_by_key(|r| r.1);
+    for w in ranges.windows(2) {
+        if w[1].1 <= w[0].2 {
+            problems.push(format!("partitions {} and {} overlap", w[0].0, w[1].0));
+        }
+    }
+    Ok(problems)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -458,5 +612,52 @@ mod tests {
             resolve_gpt_type("S"),
             Some("0657FD6D-A4AB-43C4-84E5-0933C84B4F4F".to_string())
         );
+    }
+
+    #[test]
+    fn verify_accepts_a_written_gpt_and_catches_damage() {
+        let p = scratch_file("verify", 4096);
+        let parts = vec![Partition {
+            number: 1,
+            start_lba: 2048,
+            size_lba: 1024,
+            part_type: "0FC63DAF-8483-4772-8E79-3D69D8477DE4".into(),
+            bootable: false,
+            name: Some("root".into()),
+        }];
+        write_gpt(&p, &parts).unwrap();
+        assert!(verify(&p).unwrap().is_empty(), "{:?}", verify(&p).unwrap());
+        // flip a byte of the primary header
+        let mut data = std::fs::read(&p).unwrap();
+        data[512 + 40] ^= 0xff;
+        std::fs::write(&p, &data).unwrap();
+        let problems = verify(&p).unwrap();
+        assert!(
+            problems
+                .iter()
+                .any(|m| m.contains("primary GPT header is corrupt")),
+            "{problems:?}"
+        );
+        std::fs::remove_file(&p).ok();
+    }
+
+    #[test]
+    fn verify_reports_overlapping_mbr_partitions() {
+        let p = scratch_file("verify_mbr", 4096);
+        let part = |n, start| Partition {
+            number: n,
+            start_lba: start,
+            size_lba: 1000,
+            part_type: "83".into(),
+            bootable: false,
+            name: None,
+        };
+        write_mbr(&p, &[part(1, 2048), part(2, 2500)]).unwrap();
+        let problems = verify(&p).unwrap();
+        assert!(
+            problems.iter().any(|m| m.contains("overlap")),
+            "{problems:?}"
+        );
+        std::fs::remove_file(&p).ok();
     }
 }

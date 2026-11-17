@@ -96,10 +96,15 @@ fn dump_script(device: &Path, table: &PartitionTable) -> String {
         Label::Dos => "dos",
         Label::Gpt => "gpt",
     };
-    let mut out = format!(
-        "label: {label_str}\ndevice: {}\nunit: sectors\n\n",
-        device.display()
-    );
+    let ids = match table.label {
+        Label::Gpt => ptable::gpt_ids(device).ok().flatten(),
+        Label::Dos => None,
+    };
+    let mut out = format!("label: {label_str}\n");
+    if let Some((disk, _)) = &ids {
+        out.push_str(&format!("label-id: {disk}\n"));
+    }
+    out.push_str(&format!("device: {}\nunit: sectors\n\n", device.display()));
     for p in &table.partitions {
         out.push_str(&format!(
             "{}{} : start={:>12}, size={:>12}, type={}",
@@ -111,6 +116,12 @@ fn dump_script(device: &Path, table: &PartitionTable) -> String {
         ));
         if p.bootable {
             out.push_str(", bootable");
+        }
+        if let Some(uuid) = ids
+            .as_ref()
+            .and_then(|(_, list)| list.iter().find(|(n, _)| *n == p.number))
+        {
+            out.push_str(&format!(", uuid={}", uuid.1));
         }
         if let Some(name) = &p.name {
             out.push_str(&format!(", name=\"{name}\""));
@@ -128,6 +139,7 @@ fn print_help() {
  Write (from a script on stdin) or dump the partition table of DEVICE.\n\
  -d, --dump dump the current table as a script, to stdout\n\
  -l, --list list the current table, human-readable\n\
+ -V, --verify check the partition table for errors\n\
  --help display this help and exit\n\
  --version output version information and exit\n"
     );
@@ -145,6 +157,7 @@ pub fn run() -> i32 {
 
     let mut dump = false;
     let mut list = false;
+    let mut verify = false;
     let mut device: Option<String> = None;
     for arg in &args {
         match arg.as_str() {
@@ -158,6 +171,7 @@ pub fn run() -> i32 {
             }
             "-d" | "--dump" => dump = true,
             "-l" | "--list" => list = true,
+            "-V" | "--verify" => verify = true,
             s if s.starts_with('-') && s.len() > 1 => {
                 ui.err(&format!("unrecognized option '{s}'"));
                 return 1;
@@ -167,10 +181,29 @@ pub fn run() -> i32 {
     }
 
     let Some(device) = device else {
-        ui.err("usage: sfdisk [-d|-l] DEVICE");
+        ui.err("usage: sfdisk [-d|-l|-V] DEVICE");
         return 1;
     };
     let path = Path::new(&device);
+
+    if verify {
+        return match ptable::verify(path) {
+            Ok(problems) if problems.is_empty() => {
+                println!("{device}: No errors detected.");
+                0
+            }
+            Ok(problems) => {
+                for p in &problems {
+                    println!("{device}: {p}");
+                }
+                1
+            }
+            Err(e) => {
+                ui.err(&format!("{device}: {e}"));
+                1
+            }
+        };
+    }
 
     if dump || list {
         return match ptable::read_table(path) {
