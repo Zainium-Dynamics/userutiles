@@ -106,7 +106,10 @@ pub fn main(name: &str, algo: Algo) -> i32 {
 
 /// The checksum tool over `args`; `tag_default` is cksum's tagged output (`--untagged` undoes it).
 pub fn run_args(name: &str, algo: Algo, args: Vec<String>, tag_default: bool) -> i32 {
-    let mut o = Opts { tag: tag_default, ..Opts::default() };
+    let mut o = Opts {
+        tag: tag_default,
+        ..Opts::default()
+    };
     let mut files: Vec<String> = Vec::new();
     let mut i = 0;
     let mut opts_done = false;
@@ -238,11 +241,20 @@ fn parse_bits(v: &str) -> Option<usize> {
 }
 
 /// One output line; names with `\`, newline or CR are escaped and the line starts with `\`.
-fn write_line(out: &mut dyn Write, o: &Opts, algo: Algo, bits: usize, hash: &str, file: &str) -> io::Result<()> {
+fn write_line(
+    out: &mut dyn Write,
+    o: &Opts,
+    algo: Algo,
+    bits: usize,
+    hash: &str,
+    file: &str,
+) -> io::Result<()> {
     let eol = if o.zero { '\0' } else { '\n' };
     let escape = !o.zero && file.contains(['\\', '\n', '\r']);
     let name = if escape {
-        file.replace('\\', "\\\\").replace('\n', "\\n").replace('\r', "\\r")
+        file.replace('\\', "\\\\")
+            .replace('\n', "\\n")
+            .replace('\r', "\\r")
     } else {
         file.to_string()
     };
@@ -250,7 +262,11 @@ fn write_line(out: &mut dyn Write, o: &Opts, algo: Algo, bits: usize, hash: &str
     if o.tag {
         write!(out, "{lead}{} ({name}) = {hash}{eol}", algo.tag(bits))
     } else {
-        write!(out, "{lead}{hash} {}{name}{eol}", if o.binary { '*' } else { ' ' })
+        write!(
+            out,
+            "{lead}{hash} {}{name}{eol}",
+            if o.binary { '*' } else { ' ' }
+        )
     }
 }
 
@@ -276,7 +292,11 @@ fn parse_line(line: &str, algo: Algo) -> Option<(String, String, usize)> {
         None => {
             let (hash, rest) = line.split_once(' ')?;
             let file = rest.strip_prefix(['*', ' ']).unwrap_or(rest);
-            let bits = if algo == Algo::Blake2b { hash.len() * 4 } else { algo.bits() };
+            let bits = if algo == Algo::Blake2b {
+                hash.len() * 4
+            } else {
+                algo.bits()
+            };
             (hash.to_string(), file.to_string(), bits)
         }
     };
@@ -325,7 +345,8 @@ fn check(name: &str, algo: Algo, o: &Opts, lists: &[String]) -> i32 {
                 }
             }
         };
-        let (mut bad_lines, mut failed, mut unreadable, mut verified, mut formatted) = (0, 0, 0, 0, 0);
+        let (mut bad_lines, mut failed, mut unreadable, mut verified, mut formatted) =
+            (0, 0, 0, 0, 0);
         for (n, raw) in reader.split(b'\n').enumerate() {
             let raw = match raw {
                 Ok(r) => r,
@@ -343,7 +364,11 @@ fn check(name: &str, algo: Algo, o: &Opts, lists: &[String]) -> i32 {
             let Some((hash, file, bits)) = parse_line(line, algo) else {
                 bad_lines += 1;
                 if o.warn {
-                    eprintln!("{name}: {list}: {}: improperly formatted {} checksum line", n + 1, algo.tag(algo.bits()));
+                    eprintln!(
+                        "{name}: {list}: {}: improperly formatted {} checksum line",
+                        n + 1,
+                        algo.tag(algo.bits())
+                    );
                 }
                 continue;
             };
@@ -378,13 +403,34 @@ fn check(name: &str, algo: Algo, o: &Opts, lists: &[String]) -> i32 {
         }
         if !o.status {
             if bad_lines > 0 {
-                eprintln!("{name}: WARNING: {}", plural(bad_lines, "line is improperly formatted", "lines are improperly formatted"));
+                eprintln!(
+                    "{name}: WARNING: {}",
+                    plural(
+                        bad_lines,
+                        "line is improperly formatted",
+                        "lines are improperly formatted"
+                    )
+                );
             }
             if unreadable > 0 {
-                eprintln!("{name}: WARNING: {}", plural(unreadable, "listed file could not be read", "listed files could not be read"));
+                eprintln!(
+                    "{name}: WARNING: {}",
+                    plural(
+                        unreadable,
+                        "listed file could not be read",
+                        "listed files could not be read"
+                    )
+                );
             }
             if failed > 0 {
-                eprintln!("{name}: WARNING: {}", plural(failed, "computed checksum did NOT match", "computed checksums did NOT match"));
+                eprintln!(
+                    "{name}: WARNING: {}",
+                    plural(
+                        failed,
+                        "computed checksum did NOT match",
+                        "computed checksums did NOT match"
+                    )
+                );
             }
         }
         if o.ignore_missing && verified + failed + unreadable == 0 {
@@ -407,16 +453,38 @@ mod tests {
     #[test]
     fn line_formats() {
         let h = "d41d8cd98f00b204e9800998ecf8427e";
-        assert_eq!(parse_line(&format!("{h}  a b"), Algo::Md5).unwrap().1, "a b");
-        assert_eq!(parse_line(&format!("{h} *bin"), Algo::Md5).unwrap().1, "bin");
+        assert_eq!(
+            parse_line(&format!("{h}  a b"), Algo::Md5).unwrap().1,
+            "a b"
+        );
+        assert_eq!(
+            parse_line(&format!("{h} *bin"), Algo::Md5).unwrap().1,
+            "bin"
+        );
         assert_eq!(parse_line(&format!("{h} one"), Algo::Md5).unwrap().1, "one");
-        assert_eq!(parse_line(&format!("MD5 (x (1).txt) = {h}"), Algo::Md5).unwrap().1, "x (1).txt");
-        assert_eq!(parse_line(&format!("\\{h}  a\\nb"), Algo::Md5).unwrap().1, "a\nb");
+        assert_eq!(
+            parse_line(&format!("MD5 (x (1).txt) = {h}"), Algo::Md5)
+                .unwrap()
+                .1,
+            "x (1).txt"
+        );
+        assert_eq!(
+            parse_line(&format!("\\{h}  a\\nb"), Algo::Md5).unwrap().1,
+            "a\nb"
+        );
         assert!(parse_line(&format!("SHA1 (x) = {h}"), Algo::Md5).is_none());
         assert!(parse_line("abc  x", Algo::Md5).is_none());
         let b = "0".repeat(32);
-        assert_eq!(parse_line(&format!("BLAKE2b-128 (f) = {b}"), Algo::Blake2b).unwrap().2, 128);
-        assert_eq!(parse_line(&format!("{b}  f"), Algo::Blake2b).unwrap().2, 128);
+        assert_eq!(
+            parse_line(&format!("BLAKE2b-128 (f) = {b}"), Algo::Blake2b)
+                .unwrap()
+                .2,
+            128
+        );
+        assert_eq!(
+            parse_line(&format!("{b}  f"), Algo::Blake2b).unwrap().2,
+            128
+        );
     }
 
     #[test]
@@ -428,6 +496,9 @@ mod tests {
         write_line(&mut v, &o, Algo::Md5, 128, "ab", "a\\b").unwrap();
         o.tag = true;
         write_line(&mut v, &o, Algo::Blake2b, 256, "ab", "f").unwrap();
-        assert_eq!(String::from_utf8(v).unwrap(), "ab  f\n\\ab *a\\\\b\nBLAKE2b-256 (f) = ab\n");
+        assert_eq!(
+            String::from_utf8(v).unwrap(),
+            "ab  f\n\\ab *a\\\\b\nBLAKE2b-256 (f) = ab\n"
+        );
     }
 }

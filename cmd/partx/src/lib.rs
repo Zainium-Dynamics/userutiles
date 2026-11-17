@@ -135,6 +135,7 @@ pub fn run() -> i32 {
             part_type: String::new(),
             bootable: false,
             name: None,
+            uuid: None,
         };
         return match notify_kernel(path, &partition, false) {
             Ok(()) => 0,

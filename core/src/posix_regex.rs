@@ -30,7 +30,10 @@ impl Regex {
     /// Match positions (byte offsets) for the whole match and groups 1..9, starting at `from`.
     pub fn find(&self, s: &str, from: usize) -> Option<[Option<(usize, usize)>; 10]> {
         let c = CString::new(&s.as_bytes()[from..]).ok()?;
-        let mut m = [libc::regmatch_t { rm_so: -1, rm_eo: -1 }; 10];
+        let mut m = [libc::regmatch_t {
+            rm_so: -1,
+            rm_eo: -1,
+        }; 10];
         let eflags = if from > 0 { libc::REG_NOTBOL } else { 0 };
         // SAFETY: the pattern is compiled, the subject is NUL-terminated and m has room for 10 groups.
         let rc = unsafe { libc::regexec(&*self.re, c.as_ptr(), 10, m.as_mut_ptr(), eflags) };

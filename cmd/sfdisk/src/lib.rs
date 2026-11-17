@@ -45,6 +45,7 @@ fn parse_script(text: &str) -> (Label, Vec<Partition>) {
         let mut part_type = String::new();
         let mut bootable = false;
         let mut name: Option<String> = None;
+        let mut uuid: Option<String> = None;
 
         for field in fields_str.split(',') {
             let field = field.trim();
@@ -66,6 +67,7 @@ fn parse_script(text: &str) -> (Label, Vec<Partition>) {
                     }
                 }
                 "name" => name = Some(value.to_string()),
+                "uuid" => uuid = Some(value.to_string()),
                 _ => {}
             }
         }
@@ -84,6 +86,7 @@ fn parse_script(text: &str) -> (Label, Vec<Partition>) {
             part_type,
             bootable,
             name,
+            uuid,
         });
         number += 1;
     }
@@ -91,15 +94,28 @@ fn parse_script(text: &str) -> (Label, Vec<Partition>) {
     (label, partitions)
 }
 
+/// The disk GUID a dumped GPT script names on its `label-id:` line.
+fn script_label_id(text: &str) -> Option<String> {
+    text.lines()
+        .find_map(|l| l.trim().strip_prefix("label-id:"))
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
 fn dump_script(device: &Path, table: &PartitionTable) -> String {
     let label_str = match table.label {
         Label::Dos => "dos",
         Label::Gpt => "gpt",
     };
-    let mut out = format!(
-        "label: {label_str}\ndevice: {}\nunit: sectors\n\n",
-        device.display()
-    );
+    let ids = match table.label {
+        Label::Gpt => ptable::gpt_ids(device).ok().flatten(),
+        Label::Dos => None,
+    };
+    let mut out = format!("label: {label_str}\n");
+    if let Some((disk, _)) = &ids {
+        out.push_str(&format!("label-id: {disk}\n"));
+    }
+    out.push_str(&format!("device: {}\nunit: sectors\n\n", device.display()));
     for p in &table.partitions {
         out.push_str(&format!(
             "{}{} : start={:>12}, size={:>12}, type={}",
@@ -111,6 +127,12 @@ fn dump_script(device: &Path, table: &PartitionTable) -> String {
         ));
         if p.bootable {
             out.push_str(", bootable");
+        }
+        if let Some(uuid) = ids
+            .as_ref()
+            .and_then(|(_, list)| list.iter().find(|(n, _)| *n == p.number))
+        {
+            out.push_str(&format!(", uuid={}", uuid.1));
         }
         if let Some(name) = &p.name {
             out.push_str(&format!(", name=\"{name}\""));
@@ -128,6 +150,7 @@ fn print_help() {
  Write (from a script on stdin) or dump the partition table of DEVICE.\n\
  -d, --dump dump the current table as a script, to stdout\n\
  -l, --list list the current table, human-readable\n\
+ -V, --verify check the partition table for errors\n\
  --help display this help and exit\n\
  --version output version information and exit\n"
     );
@@ -145,6 +168,7 @@ pub fn run() -> i32 {
 
     let mut dump = false;
     let mut list = false;
+    let mut verify = false;
     let mut device: Option<String> = None;
     for arg in &args {
         match arg.as_str() {
@@ -158,6 +182,7 @@ pub fn run() -> i32 {
             }
             "-d" | "--dump" => dump = true,
             "-l" | "--list" => list = true,
+            "-V" | "--verify" => verify = true,
             s if s.starts_with('-') && s.len() > 1 => {
                 ui.err(&format!("unrecognized option '{s}'"));
                 return 1;
@@ -167,10 +192,29 @@ pub fn run() -> i32 {
     }
 
     let Some(device) = device else {
-        ui.err("usage: sfdisk [-d|-l] DEVICE");
+        ui.err("usage: sfdisk [-d|-l|-V] DEVICE");
         return 1;
     };
     let path = Path::new(&device);
+
+    if verify {
+        return match ptable::verify(path) {
+            Ok(problems) if problems.is_empty() => {
+                println!("{device}: No errors detected.");
+                0
+            }
+            Ok(problems) => {
+                for p in &problems {
+                    println!("{device}: {p}");
+                }
+                1
+            }
+            Err(e) => {
+                ui.err(&format!("{device}: {e}"));
+                1
+            }
+        };
+    }
 
     if dump || list {
         return match ptable::read_table(path) {
@@ -215,7 +259,9 @@ pub fn run() -> i32 {
 
     let result = match label {
         Label::Dos => ptable::write_mbr(path, &partitions),
-        Label::Gpt => ptable::write_gpt(path, &partitions),
+        Label::Gpt => {
+            ptable::write_gpt_with_id(path, &partitions, script_label_id(&script).as_deref())
+        }
     };
     match result {
         Ok(()) => {
@@ -290,6 +336,7 @@ label: gpt
                 part_type: "83".to_string(),
                 bootable: true,
                 name: None,
+                uuid: None,
             }],
         };
         let dumped = dump_script(Path::new("/dev/sda"), &table);
@@ -316,5 +363,20 @@ sector-size: 512
 ";
         let (_, partitions) = parse_script(script);
         assert_eq!(partitions.len(), 1);
+    }
+
+    #[test]
+    fn parse_script_keeps_uuid_and_label_id() {
+        let script = "label: gpt\nlabel-id: 79EAF301-C0ED-45DD-BB88-1255A5C2BD65\n\n\
+            /dev/x1 : start=2048, size=1000, type=L, uuid=244533BF-6484-4854-BEF8-0FAF596B418B\n";
+        let (_, partitions) = parse_script(script);
+        assert_eq!(
+            partitions[0].uuid.as_deref(),
+            Some("244533BF-6484-4854-BEF8-0FAF596B418B")
+        );
+        assert_eq!(
+            script_label_id(script).as_deref(),
+            Some("79EAF301-C0ED-45DD-BB88-1255A5C2BD65")
+        );
     }
 }
