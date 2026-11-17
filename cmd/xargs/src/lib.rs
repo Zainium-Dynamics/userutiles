@@ -27,6 +27,7 @@ pub fn run() -> i32 {
  -I, --replace[=R] replace R (default {{}}) in INITIAL-ARGS\n\
  -d, --delimiter=DELIM input items are terminated by DELIM\n\
  -t, --verbose print commands before executing\n\
+ -x, --exit accepted; command lines are never split\n\
  --help display this help\n\
  --version output version\n"
                 );
@@ -64,6 +65,11 @@ pub fn run() -> i32 {
             s if s.starts_with("-L") && s.len() > 2 => max_lines = s[2..].parse().ok(),
             s if s.starts_with("--max-lines=") => max_lines = s["--max-lines=".len()..].parse().ok(),
             s if s.starts_with("--max-args=") => max_args = s["--max-args=".len()..].parse().ok(),
+            // -x: stop when a command line would be too long. Lines are never split here, so
+            // there is nothing to check; accepted for scripts such as xdg-open.
+            "-x" | "--exit" => {}
+            "-s" | "--max-chars" => i += 1,
+            s if s.starts_with("--max-chars=") || (s.starts_with("-s") && s.len() > 2) => {}
             "-P" | "--max-procs" => i += 1,
             s if s.starts_with("-P") || s.starts_with("--max-procs=") => {}
             "--" => {

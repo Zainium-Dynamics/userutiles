@@ -13,8 +13,15 @@ pub fn run() -> i32 {
     let ui = Ui::new("printenv");
     let mut zero = false;
     let mut names: Vec<String> = Vec::new();
+    let mut operands = false;
     for arg in env::args().skip(1) {
+        if operands {
+            names.push(arg);
+            continue;
+        }
         match arg.as_str() {
+            // POSIX: "--" ends the options (xdg-open runs `printenv -- NAME`)
+            "--" => operands = true,
             "-h" | "--help" => {
                 print!("Usage: printenv [OPTION]... [VARIABLE]...\n -0, --null end each output line with NUL\n");
                 return 0;
