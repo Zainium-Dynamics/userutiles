@@ -30,6 +30,8 @@ pub struct Partition {
     pub bootable: bool,
     /// GPT only: the UTF-16 partition name; always `None` for MBR.
     pub name: Option<String>,
+    /// GPT only: the partition's unique GUID; `None` when writing makes a new random one.
+    pub uuid: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +78,7 @@ fn parse_mbr(boot: &[u8]) -> Vec<Partition> {
             part_type: format!("{part_type:02x}"),
             bootable: entry[0] == 0x80,
             name: None,
+            uuid: None,
         });
     }
     out
@@ -198,6 +201,7 @@ fn parse_gpt_entries(raw: &[u8]) -> Vec<Partition> {
             part_type: format_guid(&type_guid),
             bootable: false,
             name: if name.is_empty() { None } else { Some(name) },
+            uuid: Some(format_guid(chunk[16..32].try_into().unwrap())),
         });
     }
     out
@@ -254,10 +258,15 @@ fn build_entry_array(partitions: &[Partition]) -> io::Result<Vec<u8>> {
         let type_guid = parse_guid(&p.part_type)
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "bad GPT type GUID"))?;
         arr[off..off + 16].copy_from_slice(&type_guid);
-        let mut unique = [0u8; 16];
-        if let Ok(mut urandom) = File::open("/dev/urandom") {
-            let _ = urandom.read_exact(&mut unique);
-        }
+        let unique = match &p.uuid {
+            Some(u) => parse_guid(u).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("bad partition GUID {u}"),
+                )
+            })?,
+            None => random_guid(),
+        };
         arr[off + 16..off + 32].copy_from_slice(&unique);
         arr[off + 32..off + 40].copy_from_slice(&p.start_lba.to_le_bytes());
         let end_lba = p.start_lba + p.size_lba.saturating_sub(1);
@@ -275,6 +284,26 @@ fn build_entry_array(partitions: &[Partition]) -> io::Result<Vec<u8>> {
 /// Write a fresh GPT table (protective MBR + primary header/entries +
 /// backup header/entries) to `path`.
 pub fn write_gpt(path: &Path, partitions: &[Partition]) -> io::Result<()> {
+    write_gpt_with_id(path, partitions, None)
+}
+
+/// A random version 4 GUID, in GPT's byte order.
+fn random_guid() -> [u8; 16] {
+    let mut g = [0u8; 16];
+    if let Ok(mut urandom) = File::open("/dev/urandom") {
+        let _ = urandom.read_exact(&mut g);
+    }
+    g[7] = (g[7] & 0x0f) | 0x40;
+    g[8] = (g[8] & 0x3f) | 0x80;
+    g
+}
+
+/// `write_gpt` with the disk GUID given (`sfdisk`'s `label-id:`), or a random one for `None`.
+pub fn write_gpt_with_id(
+    path: &Path,
+    partitions: &[Partition],
+    disk_id: Option<&str>,
+) -> io::Result<()> {
     let mut f = OpenOptions::new().read(true).write(true).open(path)?;
     let total_sectors = device_size_sectors(&mut f)?;
     if total_sectors < 2 + GPT_ENTRY_ARRAY_SECTORS * 2 + 2 {
@@ -299,10 +328,12 @@ pub fn write_gpt(path: &Path, partitions: &[Partition]) -> io::Result<()> {
     let first_usable = 2 + GPT_ENTRY_ARRAY_SECTORS;
     let backup_lba = total_sectors - 1;
     let last_usable = backup_lba - GPT_ENTRY_ARRAY_SECTORS - 1;
-    let mut disk_guid = [0u8; 16];
-    if let Ok(mut urandom) = File::open("/dev/urandom") {
-        let _ = urandom.read_exact(&mut disk_guid);
-    }
+    let disk_guid = match disk_id {
+        Some(id) => parse_guid(id).ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidInput, format!("bad disk GUID {id}"))
+        })?,
+        None => random_guid(),
+    };
 
     let mut primary_header = gpt_header_bytes(
         1,
@@ -546,6 +577,7 @@ mod tests {
                 part_type: "83".to_string(),
                 bootable: true,
                 name: None,
+                uuid: None,
             },
             Partition {
                 number: 2,
@@ -554,6 +586,7 @@ mod tests {
                 part_type: "82".to_string(),
                 bootable: false,
                 name: None,
+                uuid: None,
             },
         ];
         write_mbr(&path, &partitions).unwrap();
@@ -580,6 +613,7 @@ mod tests {
             part_type: resolve_gpt_type("L").unwrap(),
             bootable: false,
             name: Some("root".to_string()),
+            uuid: None,
         }];
         write_gpt(&path, &partitions).unwrap();
 
@@ -624,6 +658,7 @@ mod tests {
             part_type: "0FC63DAF-8483-4772-8E79-3D69D8477DE4".into(),
             bootable: false,
             name: Some("root".into()),
+            uuid: None,
         }];
         write_gpt(&p, &parts).unwrap();
         assert!(verify(&p).unwrap().is_empty(), "{:?}", verify(&p).unwrap());
@@ -651,6 +686,7 @@ mod tests {
             part_type: "83".into(),
             bootable: false,
             name: None,
+            uuid: None,
         };
         write_mbr(&p, &[part(1, 2048), part(2, 2500)]).unwrap();
         let problems = verify(&p).unwrap();

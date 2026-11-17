@@ -45,6 +45,7 @@ fn parse_script(text: &str) -> (Label, Vec<Partition>) {
         let mut part_type = String::new();
         let mut bootable = false;
         let mut name: Option<String> = None;
+        let mut uuid: Option<String> = None;
 
         for field in fields_str.split(',') {
             let field = field.trim();
@@ -66,6 +67,7 @@ fn parse_script(text: &str) -> (Label, Vec<Partition>) {
                     }
                 }
                 "name" => name = Some(value.to_string()),
+                "uuid" => uuid = Some(value.to_string()),
                 _ => {}
             }
         }
@@ -84,11 +86,20 @@ fn parse_script(text: &str) -> (Label, Vec<Partition>) {
             part_type,
             bootable,
             name,
+            uuid,
         });
         number += 1;
     }
 
     (label, partitions)
+}
+
+/// The disk GUID a dumped GPT script names on its `label-id:` line.
+fn script_label_id(text: &str) -> Option<String> {
+    text.lines()
+        .find_map(|l| l.trim().strip_prefix("label-id:"))
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
 }
 
 fn dump_script(device: &Path, table: &PartitionTable) -> String {
@@ -248,7 +259,9 @@ pub fn run() -> i32 {
 
     let result = match label {
         Label::Dos => ptable::write_mbr(path, &partitions),
-        Label::Gpt => ptable::write_gpt(path, &partitions),
+        Label::Gpt => {
+            ptable::write_gpt_with_id(path, &partitions, script_label_id(&script).as_deref())
+        }
     };
     match result {
         Ok(()) => {
@@ -323,6 +336,7 @@ label: gpt
                 part_type: "83".to_string(),
                 bootable: true,
                 name: None,
+                uuid: None,
             }],
         };
         let dumped = dump_script(Path::new("/dev/sda"), &table);
@@ -349,5 +363,20 @@ sector-size: 512
 ";
         let (_, partitions) = parse_script(script);
         assert_eq!(partitions.len(), 1);
+    }
+
+    #[test]
+    fn parse_script_keeps_uuid_and_label_id() {
+        let script = "label: gpt\nlabel-id: 79EAF301-C0ED-45DD-BB88-1255A5C2BD65\n\n\
+            /dev/x1 : start=2048, size=1000, type=L, uuid=244533BF-6484-4854-BEF8-0FAF596B418B\n";
+        let (_, partitions) = parse_script(script);
+        assert_eq!(
+            partitions[0].uuid.as_deref(),
+            Some("244533BF-6484-4854-BEF8-0FAF596B418B")
+        );
+        assert_eq!(
+            script_label_id(script).as_deref(),
+            Some("79EAF301-C0ED-45DD-BB88-1255A5C2BD65")
+        );
     }
 }
