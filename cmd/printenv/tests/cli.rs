@@ -52,3 +52,10 @@ fn invalid_option_errors() {
     assert_eq!(code, 1);
     assert!(stderr.contains("invalid option"));
 }
+
+#[test]
+fn double_dash_ends_options() {
+    let (stdout, _, code) = run(&["--", "FOO"], &[("FOO", "bar")]);
+    assert_eq!(code, 0);
+    assert_eq!(stdout, "bar\n");
+}
